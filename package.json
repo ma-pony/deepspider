@@ -1,0 +1,38 @@
+{
+  "name": "jsforge",
+  "version": "0.1.0",
+  "description": "JS Reverse Engineering Subagent - 专业的JavaScript逆向分析引擎",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "jsforge": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "cli": "node bin/cli.js",
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "javascript",
+    "reverse-engineering",
+    "sandbox",
+    "deobfuscation",
+    "encryption-analysis",
+    "browser-environment",
+    "subagent"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "isolated-vm": "^6.0.2",
+    "acorn": "^8.11.3",
+    "acorn-walk": "^8.3.2",
+    "escodegen": "^2.1.0",
+    "estraverse": "^5.3.0"
+  },
+  "devDependencies": {}
+}
