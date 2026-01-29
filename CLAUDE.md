@@ -1,150 +1,220 @@
-# CLAUDE.md - JSForge 项目指南
+# JSForge - JavaScript 逆向分析引擎
 
-> JSForge 是一个专业的 JavaScript 逆向分析引擎，设计为 Claude Code 的 Subagent。
+> 基于 DeepAgents + Patchright 的 JS 逆向分析 Agent
 
-## 项目定位
+## 功能
 
-**核心能力**：
-- 浏览器环境补全（沙箱执行 + 缺失检测 + 自动补丁）
-- 混淆代码分析（AST 解析、控制流分析、字符串解密）
-- 加密逻辑逆向（算法识别、参数追踪、实现还原）
-- 请求调用链分析（入口定位、依赖图谱、参数生成逻辑）
+- 真实浏览器动态分析 (Patchright + CDP)
+- Webpack/Browserify 解包 (webcrack)
+- 混淆代码分析与反混淆
+- 加密算法识别 (CryptoJS/RSA Hook)
+- 请求参数追踪
+- 浏览器环境补全
 
-**目标用户**：专业逆向工程师，处理复杂混淆的 JS 代码（上万行级别）
-
-## 技术栈
-
-- **运行时**: Node.js >= 18
-- **沙箱**: isolated-vm 6.x（V8 隔离环境）
-- **AST**: acorn + acorn-walk + escodegen
-- **包管理**: pnpm
-
-## 目录结构
+## 项目结构
 
 ```
-src/
-├── core/           # 核心引擎
-│   ├── Sandbox.js      # isolated-vm 沙箱封装
-│   ├── Engine.js       # 迭代执行引擎
-│   └── PatchGenerator.js # 补丁生成器
-├── analyzer/       # 代码分析器
-│   ├── ASTAnalyzer.js      # AST 解析
-│   ├── EncryptionAnalyzer.js # 加密识别
-│   └── Deobfuscator.js     # 反混淆
-├── tools/          # Subagent 工具
-│   ├── definitions.js  # 工具定义（JSON Schema）
-│   └── handlers.js     # 工具实现
-└── library/        # 知识库
-    └── Library.js      # 持久化管理
-
-library/            # 运行时生成的知识库（gitignore）
-├── env-module/         # 环境模块
-├── crypto-pattern/     # 加密模式
-└── obfuscation/        # 混淆特征
+jsforge/
+├── src/
+│   ├── agent/               # DeepAgent 系统
+│   │   ├── index.js         # 主入口
+│   │   ├── run.js           # Agent 运行入口
+│   │   ├── tools/           # 工具集（90+）
+│   │   ├── subagents/       # 子代理
+│   │   └── prompts/         # 系统提示
+│   ├── browser/             # 浏览器运行时
+│   │   ├── client.js        # Patchright 客户端
+│   │   ├── cdp.js           # CDP 会话管理
+│   │   ├── defaultHooks.js  # 默认注入的 Hook
+│   │   ├── interceptors/    # CDP 拦截器
+│   │   │   ├── NetworkInterceptor.js
+│   │   │   └── ScriptInterceptor.js
+│   │   ├── ui/              # 浏览器内 UI
+│   │   │   └── analysisPanel.js
+│   │   └── hooks/           # Hook 脚本
+│   ├── store/               # 数据存储
+│   │   └── DataStore.js     # 文件系统存储
+│   ├── analyzer/            # 静态分析器
+│   ├── core/                # 核心模块
+│   ├── env/                 # 环境补丁模块
+│   └── mcp/                 # MCP 服务
+├── bin/cli.js               # CLI 入口
+└── test/                    # 测试
 ```
 
-## 常用命令
+## 依赖版本
 
-```bash
-pnpm install        # 安装依赖
-pnpm test           # 运行测试
-pnpm run cli        # CLI 模式
-node bin/cli.js run <file.js>      # 沙箱执行
-node bin/cli.js analyze <file.js>  # AST 分析
-```
-
-## 核心模块说明
-
-### Sandbox (src/core/Sandbox.js)
-基于 isolated-vm 的安全执行环境：
-- `init()` - 初始化隔离环境，注入基础 API（console/atob/btoa）
-- `execute(code)` - 执行代码，返回结果和 `missingEnv` 列表
-- `inject(code)` - 注入补丁代码
-- `reset()` - 重置沙箱状态
-
-### Engine (src/core/Engine.js)
-迭代执行引擎，自动循环补环境：
-```
-执行 → 检测缺失 → 生成补丁 → 注入 → 重复（最多10次）
-```
-
-### PatchGenerator (src/core/PatchGenerator.js)
-补丁生成策略（优先级从高到低）：
-1. **库匹配** - 从 library/ 查找已有实现
-2. **模式匹配** - 常见属性的预设模板
-3. **模板生成** - 返回骨架代码，标记 `needsLLM: true`
-
-## Subagent 工具集
-
-工具定义在 `src/tools/definitions.js`，实现在 `src/tools/handlers.js`。
-
-| 工具 | 用途 |
-|------|------|
-| `sandbox_execute` | 沙箱执行代码 |
-| `sandbox_inject` | 注入补丁 |
-| `sandbox_reset` | 重置沙箱 |
-| `analyze_ast` | AST 分析 |
-| `analyze_encryption` | 加密识别 |
-| `deobfuscate` | 反混淆 |
-| `generate_patch` | 生成补丁 |
-| `match_module` | 库匹配 |
-| `save_to_library` | 保存到库 |
-| `query_library` | 查询库 |
-
-## 开发规范
-
-### 代码风格
-- ES Module（`import/export`）
-- 异步优先（`async/await`）
-- 类封装核心模块
-
-### 补丁代码规范
-生成的环境补丁应遵循：
-```javascript
-// @env-property {type} property.path
-// @description 简要说明
-(function() {
-  // 实现代码
-})();
-```
-
-### 知识库条目格式
 ```json
 {
-  "name": "navigator.userAgent",
-  "code": "...",
-  "metadata": { "source": "pattern|llm|manual" },
-  "createdAt": "ISO8601"
+  "@babel/parser": "^7.26.0",
+  "@babel/traverse": "^7.26.0",
+  "@babel/generator": "^7.26.0",
+  "deepagents": "^1.6.0",
+  "@langchain/core": "^1.1.17",
+  "@langchain/anthropic": "^1.3.12",
+  "patchright": "^1.51.1",
+  "webcrack": "^2.15.1",
+  "isolated-vm": "^6.0.2",
+  "zod": "^4.3.6"
 }
 ```
 
-## 典型工作流
+## 架构
 
-### 补环境任务
+### 三层子代理
+
+| 子代理 | 职责 | 工具 |
+|--------|------|------|
+| static-agent | 静态分析：预处理、解包、反混淆、加密定位 | preprocess, webcrack, deobfuscate, analyze |
+| dynamic-agent | 动态分析：浏览器控制、断点、Hook、数据采集 | browser, debug, capture, trigger |
+| sandbox-agent | 沙箱执行：环境补全、代码执行、补丁生成 | sandbox, env, patch, profile |
+
+### 交互流程
+
 ```
-1. sandbox_execute(目标代码)
-2. 检查 missingEnv 列表
-3. 对每个缺失项:
-   - match_module 查库
-   - 无匹配则 generate_patch
-   - sandbox_inject 注入
-4. 重复直到成功或达到上限
-5. 成功后 save_to_library 保存新模块
+pnpm run agent https://example.com
+         ↓
+┌─────────────────────────────────────┐
+│  浏览器启动，自动注入 Hook          │
+│  CDP 拦截器记录请求/脚本            │
+│  数据存储到 .jsforge-data/          │
+│  （不调用大模型）                   │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│  用户在网站操作（登录、翻页等）     │
+│  系统持续记录数据                   │
+│  （不调用大模型）                   │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│  用户点击面板选择按钮(⦿)           │
+│  进入选择模式，高亮元素             │
+│  点击选中 → 确认弹窗                │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│  点击"发送分析"                    │
+│  → 调用大模型                       │
+│  → 搜索响应定位来源                 │
+│  → 分析加密逻辑                     │
+│  → 结果显示在面板                   │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│  用户在面板/CLI 继续对话            │
+│  Agent 回复，结果同步到面板         │
+└─────────────────────────────────────┘
 ```
 
-### 加密分析任务
-```
-1. analyze_ast 提取函数结构
-2. analyze_encryption 识别加密模式
-3. 定位目标函数，提取依赖
-4. sandbox_execute 验证独立执行
-5. 输出可复用的加密实现
+## 代码规范
+
+### Babel AST 遍历
+
+使用 `@babel/traverse` 而非 acorn-walk：
+
+```javascript
+import { parse } from '@babel/parser';
+import traverse from '@babel/traverse';
+
+// 解析代码
+const ast = parse(code, {
+  sourceType: 'unambiguous',
+  plugins: ['jsx', 'typescript', 'decorators-legacy'],
+  errorRecovery: true,
+});
+
+// 遍历 AST
+traverse.default(ast, {
+  FunctionDeclaration(path) {
+    const node = path.node;
+    // 处理函数声明
+  },
+  CallExpression(path) {
+    const node = path.node;
+    // 处理调用表达式
+  }
+});
+
+// 遍历子节点（在 visitor 内部）
+path.traverse({
+  Identifier(innerPath) {
+    // 处理内部标识符
+  }
+});
 ```
 
-## 注意事项
+### LangChain 工具定义
 
-1. **沙箱限制**: isolated-vm 无法访问 Node.js API 和网络
-2. **内存限制**: 默认 128MB，处理大文件时注意
-3. **超时控制**: 默认 5s，复杂代码可能需要调整
-4. **知识库进化**: 验证通过的补丁应保存到 library/
-5. **最小补丁原则**: 只补必要的环境，避免过度实现
+使用 `@langchain/core/tools`：
+
+```javascript
+import { z } from 'zod';
+import { tool } from '@langchain/core/tools';
+
+const myTool = tool(
+  async ({ param1, param2 }) => {
+    // 工具逻辑
+    return result;
+  },
+  {
+    name: 'tool_name',
+    description: '工具描述',
+    schema: z.object({
+      param1: z.string().describe('参数1描述'),
+      param2: z.number().optional().default(100),
+    }),
+  }
+);
+```
+
+### DeepAgent 创建
+
+```javascript
+import { ChatAnthropic } from '@langchain/anthropic';
+import { createDeepAgent } from 'deepagents';
+
+export const agent = createDeepAgent({
+  model: new ChatAnthropic({
+    model: 'claude-sonnet-4-20250514',
+    temperature: 0,
+  }),
+  tools: [tool1, tool2],
+  systemPrompt: '系统提示',
+});
+```
+
+## 运行
+
+```bash
+# 安装依赖
+pnpm install
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入:
+#   LLM_API_KEY=your-api-key
+#   LLM_BASE_URL=https://api.openai.com/v1  # 可选，兼容 OpenAI 格式的任意供应商
+#   LLM_MODEL=gpt-4o                        # 可选，默认 gpt-4o
+
+# Agent 模式（推荐）- 指定目标网站
+pnpm run agent https://example.com
+
+# Agent 模式 - 纯交互（不启动浏览器）
+pnpm run agent
+
+# MCP 服务（供 Claude Code 等调用）
+pnpm run mcp
+
+# 测试
+pnpm test
+```
+
+### Agent 使用流程
+
+1. **启动**: `pnpm run agent https://target-site.com`
+2. **等待**: 浏览器打开，系统自动记录数据（不消耗 API）
+3. **操作**: 在网站上登录、翻页、触发目标请求
+4. **选择**: 点击面板的选择按钮(⦿)，进入选择模式
+5. **分析**: 点击目标数据，确认后发送给 Agent
+6. **对话**: 在面板或 CLI 继续提问，深入分析

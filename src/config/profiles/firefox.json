@@ -1,0 +1,44 @@
+{
+  "name": "Firefox 121 Windows",
+  "browser": "firefox",
+  "version": "121.0",
+  "platform": "Win32",
+
+  "navigator": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "appVersion": "5.0 (Windows)",
+    "platform": "Win32",
+    "language": "zh-CN",
+    "languages": ["zh-CN", "zh", "en-US", "en"],
+    "cookieEnabled": true,
+    "doNotTrack": "unspecified",
+    "maxTouchPoints": 0,
+    "hardwareConcurrency": 8,
+    "webdriver": false,
+    "vendor": "",
+    "vendorSub": "",
+    "productSub": "20100101"
+  },
+
+  "screen": {
+    "width": 1920,
+    "height": 1080,
+    "availWidth": 1920,
+    "availHeight": 1040,
+    "colorDepth": 24,
+    "pixelDepth": 24
+  },
+
+  "window": {
+    "innerWidth": 1903,
+    "innerHeight": 937,
+    "outerWidth": 1920,
+    "outerHeight": 1040,
+    "devicePixelRatio": 1
+  },
+
+  "webgl": {
+    "vendor": "Mozilla",
+    "renderer": "NVIDIA GeForce GTX 1060/PCIe/SSE2"
+  }
+}

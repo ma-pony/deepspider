@@ -1,40 +1,44 @@
 # JSForge
 
-> JS Reverse Engineering Subagent - 专业的 JavaScript 逆向分析引擎
+> JavaScript 逆向分析引擎 - 基于 DeepAgents + Patchright
 
-## 功能特性
+## 特性
 
-- **环境补全**: 自动检测并补全浏览器环境依赖
-- **混淆分析**: AST 解析、控制流分析、字符串解密
-- **加密逆向**: 识别加密函数、追踪参数流向、还原算法
-- **请求分析**: 调用栈追踪、请求参数生成逻辑分析
-- **知识积累**: 自动保存验证通过的实现到知识库
+- 真实浏览器动态分析 (反检测)
+- Webpack/Browserify 自动解包
+- 混淆代码智能反混淆
+- 加密算法 Hook 捕获
+- 39 个 MCP 工具
 
-## 快速开始
+## 文档
+
+- [开发使用指南](docs/GUIDE.md)
+- [调试指南](docs/DEBUG.md)
+
+## 安装
 
 ```bash
-# 安装依赖
-npm install
-
-# CLI 模式
-npm run cli
-
-# 作为 Subagent 运行
-npm start
+pnpm install
+cp .env.example .env  # 配置 ANTHROPIC_API_KEY
 ```
 
-## 项目结构
+## 使用
+
+```bash
+pnpm run agent       # Agent 交互模式
+pnpm run mcp         # MCP 服务
+pnpm test            # 运行测试
+```
+
+## 架构
 
 ```
-JSForge/
-├── src/
-│   ├── core/           # 核心引擎
-│   ├── analyzer/       # 代码分析器
-│   ├── tools/          # Subagent 工具集
-│   └── library/        # 知识库管理
-├── bin/                # CLI 入口
-├── test/               # 测试用例
-└── docs/               # 文档
+静态分析 (static-agent)
+    ↓ 预处理/解包/反混淆
+动态分析 (dynamic-agent)
+    ↓ 浏览器调试/Hook捕获
+沙箱执行 (sandbox-agent)
+    ↓ 环境补全/代码验证
 ```
 
 ## License

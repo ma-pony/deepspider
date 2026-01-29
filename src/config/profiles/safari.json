@@ -1,0 +1,38 @@
+{
+  "name": "Safari 17 macOS",
+  "browser": "safari",
+  "version": "17.0",
+  "platform": "MacIntel",
+
+  "navigator": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "appVersion": "5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "platform": "MacIntel",
+    "language": "zh-CN",
+    "languages": ["zh-CN", "zh"],
+    "cookieEnabled": true,
+    "maxTouchPoints": 0,
+    "hardwareConcurrency": 8,
+    "webdriver": false,
+    "vendor": "Apple Computer, Inc.",
+    "vendorSub": "",
+    "productSub": "20030107"
+  },
+
+  "screen": {
+    "width": 1440,
+    "height": 900,
+    "availWidth": 1440,
+    "availHeight": 875,
+    "colorDepth": 30,
+    "pixelDepth": 30
+  },
+
+  "window": {
+    "innerWidth": 1440,
+    "innerHeight": 789,
+    "outerWidth": 1440,
+    "outerHeight": 875,
+    "devicePixelRatio": 2
+  }
+}

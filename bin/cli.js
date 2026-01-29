@@ -3,15 +3,15 @@
  * JSForge CLI
  */
 
-import { Engine } from '../src/core/Engine.js';
+import { JSForge } from '../src/JSForge.js';
 import fs from 'fs';
 
 const args = process.argv.slice(2);
 const command = args[0];
 
 async function main() {
-  const engine = new Engine();
-  await engine.init();
+  const forge = new JSForge();
+  await forge.init();
 
   switch (command) {
     case 'run':
@@ -21,7 +21,7 @@ async function main() {
         process.exit(1);
       }
       const code = fs.readFileSync(file, 'utf-8');
-      const result = await engine.run(code);
+      const result = await forge.run(code);
       console.log(JSON.stringify(result, null, 2));
       break;
 
@@ -50,7 +50,7 @@ Commands:
       `);
   }
 
-  await engine.dispose();
+  await forge.dispose();
 }
 
 main().catch(console.error);

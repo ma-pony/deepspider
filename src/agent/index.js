@@ -1,0 +1,82 @@
+/**
+ * JSForge - DeepAgent 主入口
+ * 基于 DeepAgents 最佳实践重构
+ */
+
+import 'dotenv/config';
+import { createDeepAgent, StateBackend, FilesystemBackend } from 'deepagents';
+import { ChatOpenAI } from '@langchain/openai';
+
+import { coreTools } from './tools/index.js';
+import { allSubagents } from './subagents/index.js';
+import { systemPrompt } from './prompts/system.js';
+
+// 从环境变量读取配置
+const config = {
+  apiKey: process.env.LLM_API_KEY,
+  baseUrl: process.env.LLM_BASE_URL,
+  model: process.env.LLM_MODEL || 'gpt-4o',
+};
+
+/**
+ * 创建 LLM 模型实例
+ * 使用 ChatOpenAI 兼容 OpenAI 格式的任意供应商
+ */
+function createModel(options = {}) {
+  const {
+    model = config.model,
+    apiKey = config.apiKey,
+    baseUrl = config.baseUrl,
+  } = options;
+
+  return new ChatOpenAI({
+    model,
+    apiKey,
+    configuration: baseUrl ? { baseURL: baseUrl } : undefined,
+    temperature: 0,
+  });
+}
+
+/**
+ * 创建 JSForge Agent
+ */
+export function createJSForgeAgent(options = {}) {
+  const {
+    model = config.model,
+    apiKey = config.apiKey,
+    baseUrl = config.baseUrl,
+    enableMemory = true,
+    enableInterrupt = false,
+  } = options;
+
+  // 创建 LLM 模型实例
+  const llm = createModel({ model, apiKey, baseUrl });
+
+  // 后端配置：使用文件系统持久化
+  const backend = enableMemory
+    ? new FilesystemBackend({ rootDir: './.jsforge-agent' })
+    : new StateBackend();
+
+  // 人机交互配置（暂时禁用，需要 checkpointer）
+  const interruptOn = enableInterrupt
+    ? {
+        sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
+        sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
+      }
+    : undefined;
+
+  return createDeepAgent({
+    name: 'jsforge',
+    model: llm,
+    tools: coreTools,
+    subagents: allSubagents,
+    systemPrompt,
+    backend,
+    interruptOn,
+  });
+}
+
+// 默认导出
+export const agent = createJSForgeAgent();
+
+export default agent;

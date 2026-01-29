@@ -4,12 +4,15 @@
  */
 
 import ivm from 'isolated-vm';
+import { EnvMonitor } from './EnvMonitor.js';
 
 export class Sandbox {
   constructor() {
     this.isolate = null;
     this.context = null;
     this.missingEnv = [];
+    this.monitor = new EnvMonitor();
+    this.envLoaded = false;
   }
 
   async init(options = {}) {
@@ -27,12 +30,19 @@ export class Sandbox {
     return this;
   }
 
+  // 加载环境代码
+  async loadEnv(envCode) {
+    if (!envCode) return;
+    await this.context.eval(envCode);
+    this.envLoaded = true;
+  }
+
   async _injectBase(jail) {
     // console
     await jail.set('console', {
-      log: new ivm.Callback((...args) => console.log('[Sandbox]', ...args)),
-      error: new ivm.Callback((...args) => console.error('[Sandbox]', ...args)),
-      warn: new ivm.Callback((...args) => console.warn('[Sandbox]', ...args))
+      log: new ivm.Callback((...args) => console.log('[JSForge:sandbox]', ...args)),
+      error: new ivm.Callback((...args) => console.error('[JSForge:sandbox]', ...args)),
+      warn: new ivm.Callback((...args) => console.warn('[JSForge:sandbox]', ...args))
     }, { copy: true });
 
     // Base64
@@ -84,9 +94,19 @@ export class Sandbox {
   async inject(code) {
     try {
       await this.context.eval(code);
-      return { success: true };
+      // 返回更多信息帮助 Agent 判断下一步
+      return {
+        success: true,
+        message: '代码已注入沙箱，请使用 sandbox_execute 验证执行',
+        codeLength: code.length,
+        hint: '建议调用 sandbox_execute 测试注入的函数是否可用'
+      };
     } catch (e) {
-      return { success: false, error: e.message };
+      return {
+        success: false,
+        error: e.message,
+        hint: '注入失败，请检查代码语法'
+      };
     }
   }
 
@@ -98,18 +118,34 @@ export class Sandbox {
       const script = await this.isolate.compileScript(code);
       const result = await script.run(this.context, { timeout });
 
+      // 记录到监控系统
+      this.missingEnv.forEach(p => this.monitor.logMissing(p));
+
       return {
         success: true,
         result: this._serialize(result),
-        missingEnv: [...this.missingEnv]
+        missingEnv: [...this.missingEnv],
+        stats: this.monitor.getStats()
       };
     } catch (e) {
       return {
         success: false,
         error: e.message,
-        missingEnv: [...this.missingEnv]
+        errorType: this._classifyError(e),
+        missingEnv: [...this.missingEnv],
+        stats: this.monitor.getStats()
       };
     }
+  }
+
+  // 错误分类（帮助判断是环境缺失还是代码错误）
+  _classifyError(e) {
+    const msg = e.message || '';
+    if (/is not defined/.test(msg)) return 'undefined-reference';
+    if (/is not a function/.test(msg)) return 'not-a-function';
+    if (/Cannot read propert/.test(msg)) return 'null-access';
+    if (/timeout/.test(msg)) return 'timeout';
+    return 'runtime-error';
   }
 
   _serialize(val) {
@@ -125,6 +161,8 @@ export class Sandbox {
 
   async reset() {
     await this.dispose();
+    this.monitor.clearLogs();
+    this.envLoaded = false;
     await this.init();
   }
 

@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --test:*)",
+      "Bash(node:*)",
+      "WebSearch",
+      "Bash(npm view @anthropic-ai/claude-code version)",
+      "Bash(find:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(chmod:*)",
+      "mcp__jsforge__analyze_encryption",
+      "WebFetch(domain:docs.langchain.com)",
+      "Bash(python3:*)",
+      "mcp__zread__search_doc",
+      "mcp__zread__get_repo_structure",
+      "mcp__fetch__fetch",
+      "mcp__zread__read_file",
+      "Bash(pnpm install)",
+      "Bash(ls:*)",
+      "WebFetch(domain:reference.langchain.com)",
+      "Bash(pnpm list:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(npx patchright install chromium)",
+      "Bash(npx patchright install:*)",
+      "Bash(npm info:*)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm run agent)",
+      "Bash(pnpm why:*)",
+      "Bash(npx madge:*)",
+      "Bash(source .env)",
+      "Bash(git checkout:*)",
+      "mcp__memory__search_nodes"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "shadcn",
+    "jsforge"
+  ]
+}

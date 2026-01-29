@@ -1,0 +1,12 @@
+{
+  "name": "jsforge",
+  "version": "1.0.0",
+  "description": "JavaScript 逆向分析引擎 - 环境补全、混淆分析、加密逆向",
+  "author": {
+    "name": "JSForge"
+  },
+  "keywords": ["javascript", "reverse-engineering", "deobfuscation"],
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "skills": "./skills"
+}
