@@ -7,9 +7,12 @@
 
 import 'dotenv/config';
 import readline from 'readline';
+import { readFileSync } from 'fs';
+import { marked } from 'marked';
 import { createJSForgeAgent } from './index.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
+import { createLogger } from './logger.js';
 
 const args = process.argv.slice(2);
 const targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
@@ -19,24 +22,38 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const agent = createJSForgeAgent();
 let browser = null;
 let currentPage = null;
 
 console.log('=== JSForge Agent ===');
 console.log('JS 逆向分析助手，输入 exit 退出\n');
 
+// 调试模式
+const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');
+
+// 创建日志回调
+const logger = createLogger({ enabled: DEBUG, verbose: false });
+
+/**
+ * 报告就绪回调 - 由中间件在 afterAgent 时调用
+ */
+async function onReportReady(mdFilePath) {
+  console.log('[report] 中间件触发报告显示:', mdFilePath);
+  await showReportFromFile(mdFilePath);
+}
+
+// 创建 Agent，传入报告回调
+const agent = createJSForgeAgent({ onReportReady });
+
 const config = {
   configurable: { thread_id: `jsforge-${Date.now()}` },
-  recursionLimit: 100,
+  recursionLimit: 5000,
+  callbacks: logger ? [logger] : [],
 };
 
 // 文本累积缓冲区 - 用于累积 LLM 流式输出
 let panelTextBuffer = '';
 let hasStartedAssistantMsg = false;
-
-// 调试模式
-const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');
 
 function debug(...args) {
   if (DEBUG) {
@@ -51,20 +68,14 @@ async function sendToPanel(role, content) {
   if (!content?.trim()) return;
 
   const page = browser?.getPage?.();
-  if (!page) {
-    debug('sendToPanel: 无可用页面');
-    return;
-  }
-
-  debug(`sendToPanel: ${role} -> ${content.slice(0, 50)}...`);
+  if (!page) return;
 
   try {
     const escaped = JSON.stringify(content.trim());
     const code = `window.__jsforge__?.addMessage?.('${role}', ${escaped})`;
     await evaluateInPage(code);
-    debug('sendToPanel: 发送成功');
   } catch (e) {
-    debug('sendToPanel: 发送失败 -', e.message);
+    // ignore
   }
 }
 
@@ -74,30 +85,25 @@ async function sendToPanel(role, content) {
 async function appendToPanel(text) {
   if (!text) return;
   panelTextBuffer += text;
-  debug(`appendToPanel: 缓冲区长度=${panelTextBuffer.length}`);
 
   // 每累积一定量或遇到换行时刷新
   if (panelTextBuffer.length > 200 || text.includes('\n')) {
-    debug('appendToPanel: 触发刷新');
     await flushPanelText();
   }
 }
 
 /**
- * 通过 CDP 在页面主世界执行 JavaScript
+ * 通过 CDP 在页面主世界执行 JavaScript（复用 session）
  */
 async function evaluateInPage(code) {
-  const page = browser?.getPage?.();
-  if (!page) return null;
+  const cdp = await browser?.getCDPSession?.();
+  if (!cdp) return null;
 
   try {
-    // 获取 CDP 会话
-    const cdp = await page.context().newCDPSession(page);
     const result = await cdp.send('Runtime.evaluate', {
       expression: code,
       returnByValue: true,
     });
-    await cdp.detach();
     return result.result?.value;
   } catch (e) {
     debug('evaluateInPage 失败:', e.message);
@@ -109,53 +115,42 @@ async function evaluateInPage(code) {
  * 刷新累积的文本到面板
  */
 async function flushPanelText() {
-  if (!panelTextBuffer.trim()) {
-    debug('flushPanelText: 缓冲区为空，跳过');
-    return;
-  }
+  if (!panelTextBuffer.trim()) return;
 
   const page = browser?.getPage?.();
   if (!page) {
-    debug('flushPanelText: 无可用页面');
     panelTextBuffer = '';
     return;
   }
 
   try {
     const content = panelTextBuffer.trim();
-    debug(`flushPanelText: hasStarted=${hasStartedAssistantMsg}, 内容长度=${content.length}`);
-
-    // 转义内容中的特殊字符
     const escaped = JSON.stringify(content);
 
     if (!hasStartedAssistantMsg) {
-      debug('flushPanelText: 创建新消息');
       const code = `(function() {
         const fn = window.__jsforge__?.addMessage;
         if (typeof fn === 'function') {
           fn('assistant', ${escaped});
-          return { ok: true, msgCount: window.__jsforge__?.chatMessages?.length };
+          return { ok: true };
         }
-        return { ok: false, hasJsforge: !!window.__jsforge__, keys: Object.keys(window.__jsforge__ || {}) };
+        return { ok: false };
       })()`;
-      const result = await evaluateInPage(code);
-      debug('flushPanelText: 结果', JSON.stringify(result));
+      await evaluateInPage(code);
       hasStartedAssistantMsg = true;
     } else {
-      debug('flushPanelText: 追加到现有消息');
       const code = `(function() {
         const fn = window.__jsforge__?.appendToLastMessage;
         if (typeof fn === 'function') {
           fn('assistant', ${escaped});
           return { ok: true };
         }
-        return { ok: false, hasJsforge: !!window.__jsforge__, keys: Object.keys(window.__jsforge__ || {}) };
+        return { ok: false };
       })()`;
-      const result = await evaluateInPage(code);
-      debug('flushPanelText: 结果', JSON.stringify(result));
+      await evaluateInPage(code);
     }
   } catch (e) {
-    debug('flushPanelText: 发送失败 -', e.message);
+    // ignore
   }
 
   panelTextBuffer = '';
@@ -168,12 +163,26 @@ async function chatStream(input, page = null, retryCount = 0) {
   const MAX_RETRIES = 2;
   currentPage = page;
   let finalResponse = '';
+  let lastEventTime = Date.now();
+  let eventCount = 0;
+  let lastToolCall = null;
 
   // 重置面板状态
   panelTextBuffer = '';
   hasStartedAssistantMsg = false;
 
+  // 设置忙碌状态
+  await evaluateInPage('window.__jsforge__?.setBusy?.(true)');
+
   debug(`chatStream: 开始处理, 输入长度=${input.length}, page=${!!page}`);
+
+  // 心跳检测 - 每30秒输出状态
+  const heartbeat = setInterval(() => {
+    const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
+    if (elapsed > 30) {
+      console.log(`\n[心跳] 已等待 ${elapsed}s, 事件数=${eventCount}, 最后工具=${lastToolCall || '无'}`);
+    }
+  }, 30000);
 
   try {
     debug('chatStream: 创建事件流');
@@ -184,6 +193,14 @@ async function chatStream(input, page = null, retryCount = 0) {
 
     debug('chatStream: 开始遍历事件');
     for await (const event of eventStream) {
+      lastEventTime = Date.now();
+      eventCount++;
+
+      // 记录工具调用
+      if (event.event === 'on_tool_start') {
+        lastToolCall = event.name;
+      }
+
       await handleStreamEvent(event);
 
       // 收集最终响应
@@ -196,14 +213,27 @@ async function chatStream(input, page = null, retryCount = 0) {
       }
     }
 
+    // 流正常结束
+    clearInterval(heartbeat);
+    console.log(`\n[完成] 共处理 ${eventCount} 个事件`);
+
     // 刷新剩余的累积内容到面板
     debug('chatStream: 刷新剩余内容');
     await flushPanelText();
 
+    // 清除忙碌状态
+    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+
     debug(`chatStream: 完成, 响应长度=${finalResponse.length}`);
     return finalResponse || '[无响应]';
   } catch (error) {
+    clearInterval(heartbeat);
     const errMsg = error.message || String(error);
+
+    // 清除忙碌状态
+    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+
+    console.error(`\n[异常] 事件数=${eventCount}, 最后工具=${lastToolCall || '无'}, 错误: ${errMsg}`);
 
     // 工具调用参数错误，可以重试
     const isRetryable = errMsg.includes('did not match expected schema') ||
@@ -211,13 +241,80 @@ async function chatStream(input, page = null, retryCount = 0) {
                         errMsg.includes('tool input');
 
     if (isRetryable && retryCount < MAX_RETRIES) {
-      console.log(`\n[重试 ${retryCount + 1}/${MAX_RETRIES}] 工具调用失败，重试中...`);
-      await sendToPanel('system', `工具调用失败，重试中 (${retryCount + 1}/${MAX_RETRIES})`);
-      return chatStream(input, page, retryCount + 1);
+      console.log(`\n[重试 ${retryCount + 1}/${MAX_RETRIES}] 工具调用失败，从检查点恢复...`);
+      await sendToPanel('system', `工具调用失败，从检查点恢复 (${retryCount + 1}/${MAX_RETRIES})`);
+
+      // 使用 Command.resume 从检查点恢复，而不是重新开始
+      // 发送错误信息让 LLM 修正参数
+      const resumeInput = {
+        messages: [{
+          role: 'user',
+          content: `工具调用失败: ${errMsg}\n请检查参数并重试。`
+        }]
+      };
+      return chatStreamResume(resumeInput, page, retryCount + 1);
     }
 
-    console.error(`\n错误: ${errMsg}`);
     return `错误: ${errMsg}`;
+  }
+}
+
+/**
+ * 从检查点恢复流式对话
+ * 使用相同的 thread_id 继续对话，而不是从头开始
+ */
+async function chatStreamResume(input, page = null, retryCount = 0) {
+  currentPage = page;
+  let finalResponse = '';
+  let lastEventTime = Date.now();
+  let eventCount = 0;
+  let lastToolCall = null;
+
+  // 设置忙碌状态
+  await evaluateInPage('window.__jsforge__?.setBusy?.(true)');
+
+  debug(`chatStreamResume: 从检查点恢复, retryCount=${retryCount}`);
+
+  const heartbeat = setInterval(() => {
+    const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
+    if (elapsed > 30) {
+      console.log(`\n[心跳] 已等待 ${elapsed}s, 事件数=${eventCount}`);
+    }
+  }, 30000);
+
+  try {
+    // 使用相同的 config（包含相同的 thread_id）继续对话
+    const eventStream = await agent.streamEvents(input, { ...config, version: 'v2' });
+
+    for await (const event of eventStream) {
+      lastEventTime = Date.now();
+      eventCount++;
+
+      if (event.event === 'on_tool_start') {
+        lastToolCall = event.name;
+      }
+
+      await handleStreamEvent(event);
+
+      if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
+        const output = event.data?.output;
+        if (output?.content) {
+          finalResponse = output.content;
+        }
+      }
+    }
+
+    clearInterval(heartbeat);
+    await flushPanelText();
+    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+
+    return finalResponse || '[无响应]';
+  } catch (error) {
+    clearInterval(heartbeat);
+    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+    const errMsg = error.message || String(error);
+    console.error(`\n[恢复失败] ${errMsg}`);
+    return `恢复失败: ${errMsg}`;
   }
 }
 
@@ -253,6 +350,8 @@ async function handleStreamEvent(event) {
       // 工具调用开始
       debug('handleStreamEvent: 工具开始，先刷新缓冲区');
       await flushPanelText();
+      // 重置标志，让工具调用后的 AI 输出创建新消息
+      hasStartedAssistantMsg = false;
       const input = data?.input || {};
       const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
       const preview = inputStr.length > 100 ? inputStr.slice(0, 100) + '...' : inputStr;
@@ -264,6 +363,10 @@ async function handleStreamEvent(event) {
       // 工具调用结束
       const output = data?.output;
       let result = '';
+
+      // 调试：打印完整的事件结构
+      debug(`on_tool_end: name=${name}, output type=${typeof output}, keys=${output ? Object.keys(output) : 'null'}`);
+
       if (typeof output === 'string') {
         result = output.slice(0, 80);
       } else if (output?.content) {
@@ -271,9 +374,34 @@ async function handleStreamEvent(event) {
       }
       if (result) {
         console.log(`[结果] ${result}${result.length >= 80 ? '...' : ''}`);
-        await sendToPanel('system', `[结果] ${result}${result.length >= 80 ? '...' : ''}`);
+        await sendToPanel('system', `[结果] ${result.slice(0, 50)}${result.length > 50 ? '...' : ''}`);
       }
       break;
+  }
+}
+
+/**
+ * 从文件显示报告（由中间件回调触发）
+ */
+async function showReportFromFile(mdFilePath) {
+  const page = browser?.getPage?.();
+  if (!page) {
+    console.log('[report] 错误: 无法获取 page');
+    return;
+  }
+
+  try {
+    const content = readFileSync(mdFilePath, 'utf-8');
+    console.log('[report] 读取 MD 文件成功, 长度:', content.length);
+
+    // 使用 marked 转换为 HTML
+    const htmlContent = marked.parse(content);
+    const escaped = JSON.stringify(htmlContent);
+    const code = `window.__jsforge__?.showReport?.(${escaped}, true)`;
+    await evaluateInPage(code);
+    console.log('[report] 已显示分析报告');
+  } catch (e) {
+    console.log('[report] showReportFromFile 失败:', e.message);
   }
 }
 
@@ -283,12 +411,15 @@ async function handleStreamEvent(event) {
 async function handleBrowserMessage(data, page) {
   debug(`handleBrowserMessage: 收到消息, type=${data.type}, page=${!!page}`);
 
+  // 添加浏览器已就绪前缀，告诉 Agent 不需要再启动浏览器
+  const browserReadyPrefix = '[浏览器已就绪] ';
+
   let userPrompt;
   if (data.type === 'analysis') {
     const iframeInfo = data.iframeSrc ? `\niframe来源: ${data.iframeSrc}` : '';
-    userPrompt = `用户选中了以下数据要求分析来源：\n"${data.text}"\nXPath: ${data.xpath}${iframeInfo}\n\n请搜索响应数据定位来源，分析加密逻辑。`;
+    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求分析来源：\n"${data.text}"\nXPath: ${data.xpath}${iframeInfo}\n\n请直接使用 search_in_responses 搜索选中文本定位来源，分析加密逻辑。`;
   } else if (data.type === 'chat') {
-    userPrompt = data.text;
+    userPrompt = `${browserReadyPrefix}${data.text}`;
   } else {
     return;
   }

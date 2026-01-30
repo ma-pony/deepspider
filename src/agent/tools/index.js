@@ -14,7 +14,7 @@ export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, c
 export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
 export { triggerTools, clickElement, fillInput, waitForSelector } from './trigger.js';
-export { reportTools, generateReport } from './report.js';
+export { reportTools, saveAnalysisReport } from './report.js';
 export { webcrackTools, unpackBundle, analyzeBundle } from './webcrack.js';
 export { preprocessTools, preprocessCode } from './preprocess.js';
 export { envDumpTools, generateEnvDumpCode, generateBaseEnvCode, parseEnvLogs } from './envdump.js';
@@ -28,6 +28,8 @@ export { correlateTools, analyzeCorrelation, locateCryptoSource, analyzeHeaderEn
 export { extractorTools, listFunctions, getFunctionCode } from './extractor.js';
 export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequestList, getScriptList, getScriptSource, searchInScripts, clearSiteData, clearAllData } from './tracing.js';
 export { analysisTools, getPendingAnalysis, getPendingChat, sendPanelMessage, startSelector } from './analysis.js';
+export { fileTools, artifactSave, artifactLoad, artifactEdit, artifactGlob, artifactGrep } from './file.js';
+// pythonTools 只在 js2python 子代理中使用，不导出到主工具集
 
 // 所有工具
 import { sandboxTools } from './sandbox.js';
@@ -56,6 +58,7 @@ import { correlateTools } from './correlate.js';
 import { extractorTools } from './extractor.js';
 import { tracingTools } from './tracing.js';
 import { analysisTools } from './analysis.js';
+import { fileTools } from './file.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -84,11 +87,13 @@ export const allTools = [
   ...extractorTools,
   ...tracingTools,
   ...analysisTools,
+  ...fileTools,
 ];
 
 /**
  * 主 Agent 核心工具
  * 只包含必要的运行时、交互和数据查询工具
+ * pythonTools 只在 js2python 子代理中使用
  */
 export const coreTools = [
   // 浏览器运行时
@@ -103,4 +108,6 @@ export const coreTools = [
   ...sandboxTools,
   // Hook 日志
   ...captureTools,
+  // 文件操作
+  ...fileTools,
 ];

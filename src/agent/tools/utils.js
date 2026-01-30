@@ -1,32 +1,19 @@
 /**
  * JSForge - 工具函数
+ * 统一使用 ~/.jsforge/ 目录
  */
 
-import { mkdirSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
+import { join } from 'path';
+import { PATHS, ensureDir, generateFilename } from '../../config/paths.js';
 
-// 默认输出目录
-export const OUTPUT_DIR = './output';
-export const SCREENSHOTS_DIR = join(OUTPUT_DIR, 'screenshots');
-export const REPORTS_DIR = join(OUTPUT_DIR, 'reports');
-export const UNPACKED_DIR = join(OUTPUT_DIR, 'unpacked');
+// 导出路径常量（兼容旧代码）
+export const OUTPUT_DIR = PATHS.OUTPUT_DIR;
+export const SCREENSHOTS_DIR = PATHS.SCREENSHOTS_DIR;
+export const REPORTS_DIR = PATHS.REPORTS_DIR;
+export const UNPACKED_DIR = PATHS.UNPACKED_DIR;
 
-/**
- * 确保目录存在
- */
-export function ensureDir(dir) {
-  if (dir && !existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-}
-
-/**
- * 生成带时间戳的文件名
- */
-export function generateFilename(prefix, ext) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `${prefix}_${timestamp}.${ext}`;
-}
+// 重新导出工具函数
+export { ensureDir, generateFilename };
 
 /**
  * 获取截图保存路径

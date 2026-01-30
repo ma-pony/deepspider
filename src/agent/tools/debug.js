@@ -8,6 +8,8 @@ import { getBrowser } from '../../browser/index.js';
 import { CDPSession } from '../../browser/cdp.js';
 
 let cdpSession = null;
+let isPaused = false;
+let currentCallFrames = [];
 
 /**
  * 获取 CDP 会话
@@ -16,8 +18,32 @@ async function getSession() {
   if (!cdpSession) {
     const browser = await getBrowser();
     cdpSession = await CDPSession.fromBrowser(browser);
+
+    // 监听暂停事件
+    cdpSession.on('Debugger.paused', (params) => {
+      isPaused = true;
+      currentCallFrames = params.callFrames || [];
+      console.log('[debug] Debugger paused, callFrames:', currentCallFrames.length);
+    });
+
+    // 监听恢复事件
+    cdpSession.on('Debugger.resumed', () => {
+      isPaused = false;
+      currentCallFrames = [];
+      console.log('[debug] Debugger resumed');
+    });
   }
   return cdpSession;
+}
+
+/**
+ * 检查是否处于暂停状态
+ */
+function checkPaused() {
+  if (!isPaused || currentCallFrames.length === 0) {
+    return { success: false, error: '调试器未处于暂停状态，请先设置断点并触发断点' };
+  }
+  return null;
 }
 
 /**
@@ -63,12 +89,16 @@ export const setXHRBreakpoint = tool(
  */
 export const getCallStack = tool(
   async () => {
-    const session = await getSession();
-    const result = await session.send('Debugger.pause');
-    const { callFrames } = await session.send('Debugger.getStackTrace');
+    await getSession(); // 确保事件监听已注册
 
-    const stack = callFrames.map((frame, i) => ({
+    const pauseError = checkPaused();
+    if (pauseError) {
+      return JSON.stringify(pauseError);
+    }
+
+    const stack = currentCallFrames.map((frame, i) => ({
       index: i,
+      callFrameId: frame.callFrameId,
       functionName: frame.functionName || '(anonymous)',
       url: frame.url,
       line: frame.location.lineNumber,
@@ -79,7 +109,7 @@ export const getCallStack = tool(
   },
   {
     name: 'get_call_stack',
-    description: '获取当前断点处的调用栈',
+    description: '获取当前断点处的调用栈（需要先触发断点）',
     schema: z.object({}),
   }
 );
@@ -90,16 +120,33 @@ export const getCallStack = tool(
 export const getFrameVariables = tool(
   async ({ frameIndex }) => {
     const session = await getSession();
-    const { result } = await session.send('Debugger.evaluateOnCallFrame', {
-      callFrameId: String(frameIndex),
-      expression: 'JSON.stringify(Object.keys(this))',
-    });
 
-    return JSON.stringify({ success: true, variables: result }, null, 2);
+    const pauseError = checkPaused();
+    if (pauseError) {
+      return JSON.stringify(pauseError);
+    }
+
+    if (frameIndex >= currentCallFrames.length) {
+      return JSON.stringify({ success: false, error: `栈帧索引 ${frameIndex} 超出范围，当前共 ${currentCallFrames.length} 个栈帧` });
+    }
+
+    const callFrameId = currentCallFrames[frameIndex].callFrameId;
+
+    try {
+      const { result } = await session.send('Debugger.evaluateOnCallFrame', {
+        callFrameId,
+        expression: '(function() { var vars = {}; for (var k in this) vars[k] = typeof this[k]; return JSON.stringify(vars); })()',
+        returnByValue: true,
+      });
+
+      return JSON.stringify({ success: true, frameIndex, variables: JSON.parse(result.value || '{}') }, null, 2);
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message });
+    }
   },
   {
     name: 'get_frame_variables',
-    description: '获取指定栈帧的变量列表',
+    description: '获取指定栈帧的变量列表（需要先触发断点）',
     schema: z.object({
       frameIndex: z.number().default(0).describe('栈帧索引'),
     }),
@@ -112,17 +159,37 @@ export const getFrameVariables = tool(
 export const evaluateAtBreakpoint = tool(
   async ({ expression, frameIndex }) => {
     const session = await getSession();
-    const { result } = await session.send('Debugger.evaluateOnCallFrame', {
-      callFrameId: String(frameIndex),
-      expression,
-      returnByValue: true,
-    });
 
-    return JSON.stringify({ success: true, result: result.value }, null, 2);
+    const pauseError = checkPaused();
+    if (pauseError) {
+      return JSON.stringify(pauseError);
+    }
+
+    if (frameIndex >= currentCallFrames.length) {
+      return JSON.stringify({ success: false, error: `栈帧索引 ${frameIndex} 超出范围` });
+    }
+
+    const callFrameId = currentCallFrames[frameIndex].callFrameId;
+
+    try {
+      const { result, exceptionDetails } = await session.send('Debugger.evaluateOnCallFrame', {
+        callFrameId,
+        expression,
+        returnByValue: true,
+      });
+
+      if (exceptionDetails) {
+        return JSON.stringify({ success: false, error: exceptionDetails.text || '执行出错' });
+      }
+
+      return JSON.stringify({ success: true, result: result.value }, null, 2);
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message });
+    }
   },
   {
     name: 'evaluate_at_breakpoint',
-    description: '在断点处执行表达式，获取变量值',
+    description: '在断点处执行表达式，获取变量值（需要先触发断点）',
     schema: z.object({
       expression: z.string().describe('要执行的表达式'),
       frameIndex: z.number().default(0).describe('栈帧索引'),
@@ -136,8 +203,14 @@ export const evaluateAtBreakpoint = tool(
 export const resumeExecution = tool(
   async () => {
     const session = await getSession();
-    await session.send('Debugger.resume');
-    return JSON.stringify({ success: true });
+    try {
+      await session.send('Debugger.resume');
+      isPaused = false;
+      currentCallFrames = [];
+      return JSON.stringify({ success: true });
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message });
+    }
   },
   {
     name: 'resume_execution',

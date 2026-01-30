@@ -9,10 +9,13 @@ import { traceTools } from '../tools/trace.js';
 import { webcrackTools } from '../tools/webcrack.js';
 import { preprocessTools } from '../tools/preprocess.js';
 import { storeTools } from '../tools/store.js';
+import { verifyTools } from '../tools/verify.js';
+import { correlateTools } from '../tools/correlate.js';
+import { extractorTools } from '../tools/extractor.js';
 
 export const algoAgentSubagent = {
   name: 'algo-agent',
-  description: '纯算分析专家：解混淆、AST分析、调用链追踪、算法还原',
+  description: '纯算分析专家。当需要还原加密算法逻辑时使用，适用于：标准加密算法(AES/MD5/RSA)、需要理解算法细节、需要输出 Python 代码的场景。工具：解混淆、AST分析、调用链追踪、算法验证。',
   systemPrompt: `你是 JSForge 的纯算分析专家。
 
 ## 分析方向
@@ -47,6 +50,22 @@ export const algoAgentSubagent = {
 - trace_request_params: 请求参数追踪
 - find_call_pattern: 模式匹配查找
 
+### Phase 5: 算法验证
+- verify_md5: 验证 MD5 算法
+- verify_sha256: 验证 SHA256 算法
+- verify_hmac: 验证 HMAC 算法
+- verify_aes: 验证 AES 算法
+- identify_encryption: 识别加密特征
+
+### Phase 6: 关联分析
+- analyze_correlation: 请求-加密关联分析
+- locate_crypto_source: 定位加密源码
+- analyze_header_encryption: Header 加密分析
+
+### Phase 7: 函数提取
+- list_functions: 列出代码中的函数
+- get_function_code: 提取指定函数代码
+
 ## 判断标准
 适合纯算分析的场景：
 - 算法相对简单（MD5、AES等标准算法）
@@ -62,6 +81,9 @@ export const algoAgentSubagent = {
     ...analyzerTools,
     ...deobfuscatorTools,
     ...traceTools,
+    ...verifyTools,
+    ...correlateTools,
+    ...extractorTools,
     ...storeTools,
   ],
 };

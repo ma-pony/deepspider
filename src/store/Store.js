@@ -1,14 +1,16 @@
 /**
  * JSForge - 知识库存储
  * 文件系统持久化，支持分类索引
+ * 统一存储到 ~/.jsforge/store/
  */
 
 import fs from 'fs';
 import path from 'path';
+import { PATHS, ensureDir } from '../config/paths.js';
 
 export class Store {
   constructor(options = {}) {
-    this.baseDir = options.baseDir || path.join(process.cwd(), '.jsforge-store');
+    this.baseDir = options.baseDir || PATHS.STORE_DIR;
     this.cache = new Map();
     this.indexFile = path.join(this.baseDir, 'index.json');
     this.index = { types: {} };
@@ -17,9 +19,7 @@ export class Store {
   }
 
   _ensureDir() {
-    if (!fs.existsSync(this.baseDir)) {
-      fs.mkdirSync(this.baseDir, { recursive: true });
-    }
+    ensureDir(this.baseDir);
   }
 
   _loadIndex() {

@@ -13,7 +13,8 @@
     "cli": "node bin/cli.js",
     "mcp": "node src/mcp/server.js",
     "agent": "node src/agent/run.js",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt"
   },
   "keywords": [
     "javascript",
@@ -36,12 +37,14 @@
     "@babel/types": "^7.28.6",
     "@langchain/anthropic": "^1.3.12",
     "@langchain/core": "^1.1.17",
+    "@langchain/langgraph": "^1.1.2",
     "@langchain/openai": "^1.2.3",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "deepagents": "^1.6.0",
     "dotenv": "^17.2.3",
     "isolated-vm": "^6.0.2",
     "langchain": "^1.2.15",
+    "marked": "^17.0.1",
     "patchright": "^1.57.0",
     "webcrack": "^2.15.1",
     "zod": "^4.3.6"

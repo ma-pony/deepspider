@@ -7,6 +7,19 @@ import { tool } from '@langchain/core/tools';
 import { getBrowserClient } from '../../browser/index.js';
 
 /**
+ * 通过 CDP 执行 JS（复用 session）
+ */
+async function evaluateViaCDP(client, expression) {
+  const cdp = await client.getCDPSession();
+  if (!cdp) return null;
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+  });
+  return result.result?.value;
+}
+
+/**
  * 获取待分析数据
  */
 export const getPendingAnalysis = tool(
@@ -16,13 +29,15 @@ export const getPendingAnalysis = tool(
       return JSON.stringify({ error: '浏览器未启动' });
     }
 
-    const data = await client.page.evaluate(() => {
-      const jsforge = window.__jsforge__;
-      if (!jsforge?.pendingAnalysis) return null;
-      const result = jsforge.pendingAnalysis;
-      jsforge.pendingAnalysis = null;
-      return result;
-    });
+    const data = await evaluateViaCDP(client, `
+      (function() {
+        const jsforge = window.__jsforge__;
+        if (!jsforge?.pendingAnalysis) return null;
+        const result = jsforge.pendingAnalysis;
+        jsforge.pendingAnalysis = null;
+        return result;
+      })()
+    `);
 
     return JSON.stringify(data || { pending: false });
   },
@@ -43,13 +58,15 @@ export const getPendingChat = tool(
       return JSON.stringify({ error: '浏览器未启动' });
     }
 
-    const data = await client.page.evaluate(() => {
-      const jsforge = window.__jsforge__;
-      if (!jsforge?.pendingChat) return null;
-      const result = jsforge.pendingChat;
-      jsforge.pendingChat = null;
-      return result;
-    });
+    const data = await evaluateViaCDP(client, `
+      (function() {
+        const jsforge = window.__jsforge__;
+        if (!jsforge?.pendingChat) return null;
+        const result = jsforge.pendingChat;
+        jsforge.pendingChat = null;
+        return result;
+      })()
+    `);
 
     return JSON.stringify(data || { pending: false });
   },
@@ -70,12 +87,9 @@ export const sendPanelMessage = tool(
       return JSON.stringify({ error: '浏览器未启动' });
     }
 
-    await client.page.evaluate(({ msg, r }) => {
-      const jsforge = window.__jsforge__;
-      if (jsforge?.addMessage) {
-        jsforge.addMessage(r || 'assistant', msg);
-      }
-    }, { msg: message, r: role });
+    const escaped = JSON.stringify(message);
+    const r = role || 'assistant';
+    await evaluateViaCDP(client, `window.__jsforge__?.addMessage?.('${r}', ${escaped})`);
 
     return JSON.stringify({ success: true });
   },
@@ -99,10 +113,10 @@ export const startSelector = tool(
       return JSON.stringify({ error: '浏览器未启动' });
     }
 
-    await client.page.evaluate(() => {
+    await evaluateViaCDP(client, `
       window.__jsforge__?.startSelector?.();
       window.__jsforge__?.showPanel?.();
-    });
+    `);
 
     return JSON.stringify({ success: true, message: '选择器模式已开启' });
   },

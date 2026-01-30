@@ -7,6 +7,7 @@ import { chromium } from 'patchright';
 import { getDefaultHookScript } from './defaultHooks.js';
 import { NetworkInterceptor } from './interceptors/NetworkInterceptor.js';
 import { ScriptInterceptor } from './interceptors/ScriptInterceptor.js';
+import { getDataStore } from '../store/DataStore.js';
 
 export class BrowserClient {
   constructor() {
@@ -25,6 +26,10 @@ export class BrowserClient {
    * 启动浏览器
    */
   async launch(options = {}) {
+    // 启动新会话
+    const dataStore = getDataStore();
+    dataStore.startSession();
+
     const {
       headless = false,
       executablePath = null,
@@ -136,11 +141,17 @@ export class BrowserClient {
   }
 
   /**
-   * 获取 CDP 会话
+   * 获取 CDP 会话（始终使用当前页面的 session）
    */
   async getCDPSession() {
-    if (!this.cdpSession && this.page) {
-      this.cdpSession = await this.page.context().newCDPSession(this.page);
+    // 每次都为当前页面创建新的 CDP session，确保上下文正确
+    if (this.page) {
+      try {
+        this.cdpSession = await this.page.context().newCDPSession(this.page);
+      } catch (e) {
+        console.error('[BrowserClient] 创建 CDP session 失败:', e.message);
+        return null;
+      }
     }
     return this.cdpSession;
   }

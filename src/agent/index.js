@@ -6,10 +6,13 @@
 import 'dotenv/config';
 import { createDeepAgent, StateBackend, FilesystemBackend } from 'deepagents';
 import { ChatOpenAI } from '@langchain/openai';
+import { MemorySaver } from '@langchain/langgraph';
 
 import { coreTools } from './tools/index.js';
 import { allSubagents } from './subagents/index.js';
 import { systemPrompt } from './prompts/system.js';
+import { createReportMiddleware } from './middleware/report.js';
+import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 
 // 从环境变量读取配置
 const config = {
@@ -47,6 +50,7 @@ export function createJSForgeAgent(options = {}) {
     baseUrl = config.baseUrl,
     enableMemory = true,
     enableInterrupt = false,
+    onReportReady = null,  // 报告就绪回调
   } = options;
 
   // 创建 LLM 模型实例
@@ -57,13 +61,22 @@ export function createJSForgeAgent(options = {}) {
     ? new FilesystemBackend({ rootDir: './.jsforge-agent' })
     : new StateBackend();
 
-  // 人机交互配置（暂时禁用，需要 checkpointer）
+  // Checkpointer：保存对话状态，支持断点恢复
+  const checkpointer = new MemorySaver();
+
+  // 人机交互配置
   const interruptOn = enableInterrupt
     ? {
         sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
         sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
       }
     : undefined;
+
+  // 中间件配置
+  const middleware = [
+    createFilterToolsMiddleware(),  // 过滤内置的 write_file/read_file
+    createReportMiddleware({ onReportReady }),
+  ];
 
   return createDeepAgent({
     name: 'jsforge',
@@ -72,7 +85,9 @@ export function createJSForgeAgent(options = {}) {
     subagents: allSubagents,
     systemPrompt,
     backend,
+    checkpointer,
     interruptOn,
+    middleware,
   });
 }
 

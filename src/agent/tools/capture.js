@@ -65,17 +65,62 @@ export const autoFixEnv = tool(
 );
 
 /**
+ * 通过 CDP 在页面执行 JS（复用 session）
+ */
+async function evaluateViaCDP(browser, expression) {
+  const cdp = await browser.getCDPSession();
+  if (!cdp) return null;
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+  });
+  return result.result?.value;
+}
+
+/**
  * 获取 Hook 日志
  */
 export const getHookLogs = tool(
-  async () => {
-    // Hook 日志由 HookManager 管理，这里简化处理
-    return JSON.stringify({ logs: [] });
+  async ({ type, limit }) => {
+    try {
+      const browser = await getBrowser();
+      if (!browser.getPage()) {
+        return JSON.stringify({ success: false, error: '浏览器未就绪', logs: [] });
+      }
+
+      // 通过 CDP 从浏览器获取日志
+      const expression = type
+        ? `window.__jsforge__?.getLogs?.('${type}') || '[]'`
+        : `window.__jsforge__?.getAllLogs?.() || '[]'`;
+
+      const logsJson = await evaluateViaCDP(browser, expression);
+      if (!logsJson) {
+        return JSON.stringify({ success: false, error: 'Hook 未加载', logs: [] });
+      }
+
+      let logs = JSON.parse(logsJson);
+
+      // 限制返回数量
+      if (limit && Array.isArray(logs) && logs.length > limit) {
+        logs = logs.slice(-limit);
+      }
+
+      return JSON.stringify({
+        success: true,
+        count: Array.isArray(logs) ? logs.length : Object.keys(logs).length,
+        logs
+      });
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message, logs: [] });
+    }
   },
   {
     name: 'get_hook_logs',
-    description: '获取 Hook 捕获的加密调用日志',
-    schema: z.object({}),
+    description: '获取 Hook 捕获的日志（XHR、Fetch、Cookie、加密调用等）',
+    schema: z.object({
+      type: z.string().optional().describe('日志类型: xhr, fetch, cookie, crypto, env, debug, trace。不填则获取全部'),
+      limit: z.number().optional().default(50).describe('返回日志数量限制，默认50条'),
+    }),
   }
 );
 

@@ -26,6 +26,9 @@ importers:
       '@langchain/core':
         specifier: ^1.1.17
         version: 1.1.17(openai@6.17.0(zod@4.3.6))
+      '@langchain/langgraph':
+        specifier: ^1.1.2
+        version: 1.1.2(@langchain/core@1.1.17(openai@6.17.0(zod@4.3.6)))(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
       '@langchain/openai':
         specifier: ^1.2.3
         version: 1.2.3(@langchain/core@1.1.17(openai@6.17.0(zod@4.3.6)))
@@ -44,6 +47,9 @@ importers:
       langchain:
         specifier: ^1.2.15
         version: 1.2.15(@langchain/core@1.1.17(openai@6.17.0(zod@4.3.6)))(openai@6.17.0(zod@4.3.6))(zod-to-json-schema@3.25.1(zod@4.3.6))
+      marked:
+        specifier: ^17.0.1
+        version: 17.0.1
       patchright:
         specifier: ^1.57.0
         version: 1.57.0
@@ -51,7 +57,7 @@ importers:
         specifier: ^2.15.1
         version: 2.15.1
       zod:
-        specifier: '4'
+        specifier: ^4.3.6
         version: 4.3.6
 
 packages:
@@ -649,6 +655,11 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  marked@17.0.1:
+    resolution: {integrity: sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -1657,6 +1668,8 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  marked@17.0.1: {}
 
   math-intrinsics@1.1.0: {}
 

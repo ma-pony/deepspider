@@ -109,6 +109,28 @@ pnpm run agent https://example.com
 
 ## 代码规范
 
+### 浏览器交互
+
+与浏览器的交互优先使用 CDP（Chrome DevTools Protocol）方式，而非 `page.evaluate()`。
+
+CDP session 应复用，通过 `browser.getCDPSession()` 获取：
+
+```javascript
+// 复用 CDP session 执行 JS
+async function evaluateViaCDP(browser, expression) {
+  const cdp = await browser.getCDPSession();
+  if (!cdp) return null;
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+  });
+  return result.result?.value;
+}
+
+// 使用示例
+const logs = await evaluateViaCDP(browser, `window.__jsforge__?.getAllLogs?.()`);
+```
+
 ### Babel AST 遍历
 
 使用 `@babel/traverse` 而非 acorn-walk：
@@ -189,6 +211,9 @@ export const agent = createDeepAgent({
 ```bash
 # 安装依赖
 pnpm install
+
+# 安装 Python 加密库（用于运行生成的 Python 代码）
+pnpm run setup:crypto
 
 # 配置环境变量
 cp .env.example .env

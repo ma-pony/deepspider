@@ -1,15 +1,47 @@
 /**
  * JSForge - 数据存储管理
  * 按网站和页面层级存储采集数据
+ * 支持会话隔离、内容去重、自动清理
  */
 
-import { mkdirSync, existsSync, readFileSync } from 'fs';
-import { writeFile, readFile, readdir, rm } from 'fs/promises';
+import { mkdirSync, existsSync, readFileSync, statSync } from 'fs';
+import { writeFile, readFile, readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
+import { createHash } from 'crypto';
+import { PATHS, ensureDir } from '../config/paths.js';
 
-const DATA_DIR = './.jsforge-data';
-const SITES_DIR = join(DATA_DIR, 'sites');
+const DATA_DIR = PATHS.DATA_DIR;
+const SITES_DIR = PATHS.SITES_DIR;
 const GLOBAL_INDEX = join(DATA_DIR, 'index.json');
+
+// 存储配置
+const STORAGE_CONFIG = {
+  maxAge: 7 * 24 * 60 * 60 * 1000,    // 7天过期
+  maxSizePerSite: 100 * 1024 * 1024,  // 单站点100MB
+  maxTotalSize: 500 * 1024 * 1024,    // 总共500MB
+  cleanupInterval: 60 * 60 * 1000,    // 1小时检查一次
+};
+
+/**
+ * 生成内容 hash（用于去重）
+ */
+function contentHash(content) {
+  return createHash('md5').update(content || '').digest('hex').slice(0, 16);
+}
+
+/**
+ * 生成请求唯一标识
+ */
+function requestHash(url, method, body) {
+  return contentHash(`${url}|${method}|${body || ''}`);
+}
+
+/**
+ * 生成脚本唯一标识
+ */
+function scriptHash(url, source) {
+  return contentHash(`${url}|${source || ''}`);
+}
 
 /**
  * 从 URL 提取站点和路径
@@ -23,15 +55,6 @@ function parseUrl(url) {
     return { site, path };
   } catch {
     return { site: '_unknown', path: '_root' };
-  }
-}
-
-/**
- * 确保目录存在
- */
-function ensureDir(dir) {
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -101,10 +124,33 @@ export class DataStore {
     };
     // 站点索引缓存
     this.siteIndexCache = new Map();
+    // 当前会话 ID
+    this.sessionId = null;
+    // 上次清理时间
+    this.lastCleanup = 0;
 
     ensureDir(DATA_DIR);
     ensureDir(SITES_DIR);
     this.loadGlobalIndex();
+  }
+
+  /**
+   * 创建新会话
+   */
+  startSession() {
+    this.sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    console.log(`[DataStore] 新会话: ${this.sessionId}`);
+    return this.sessionId;
+  }
+
+  /**
+   * 获取当前会话 ID
+   */
+  getSessionId() {
+    if (!this.sessionId) {
+      this.startSession();
+    }
+    return this.sessionId;
   }
 
   loadGlobalIndex() {
@@ -199,18 +245,31 @@ export class DataStore {
   }
 
   /**
-   * 保存响应数据
+   * 保存响应数据（带去重）
    */
   async saveResponse(data) {
     const { url, method, status, requestHeaders, requestBody, responseBody, timestamp, pageUrl } = data;
     const { site, path } = parseUrl(pageUrl || url);
 
+    // 生成去重 hash
+    const hash = requestHash(url, method, requestBody);
+    const index = await this.getSiteIndex(site);
+
+    // 检查是否已存在相同内容
+    const existing = index.responses.find(r => r.hash === hash);
+    if (existing) {
+      // 更新时间戳和会话，不重复存储
+      existing.timestamp = timestamp || Date.now();
+      existing.sessionId = this.getSessionId();
+      await this.saveSiteIndex(site);
+      return { id: existing.id, site, path, deduplicated: true };
+    }
+
     const siteDir = this.getSiteDir(site);
     const responsesDir = join(siteDir, 'responses', path);
     ensureDir(responsesDir);
 
-    const index = await this.getSiteIndex(site);
-    // 生成可读文件名: GET_api_user_id=123_001.json
+    // 生成可读文件名
     const readableName = getReadableFilename(url, 'response', method);
     const seq = String(index.responses.length).padStart(3, '0');
     const id = `${readableName}_${seq}`;
@@ -225,29 +284,44 @@ export class DataStore {
     await writeFile(file, content);
 
     index.responses.push({
-      id, url, path, method, status, timestamp, file,
-      size: content.length
+      id, url, path, method, status,
+      timestamp: timestamp || Date.now(),
+      file, size: content.length,
+      hash,
+      sessionId: this.getSessionId()
     });
 
     await this.saveSiteIndex(site);
     await this.updateSiteStats(site);
+    this.maybeCleanup();
 
     return { id, site, path };
   }
 
   /**
-   * 保存脚本源码
+   * 保存脚本源码（带去重）
    */
   async saveScript(data) {
     const { url, type, source, timestamp, pageUrl } = data;
     const { site } = parseUrl(pageUrl || url);
 
+    // 生成去重 hash
+    const hash = scriptHash(url, source);
+    const index = await this.getSiteIndex(site);
+
+    // 检查是否已存在相同内容
+    const existing = index.scripts.find(s => s.hash === hash);
+    if (existing) {
+      existing.timestamp = timestamp || Date.now();
+      existing.sessionId = this.getSessionId();
+      await this.saveSiteIndex(site);
+      return { id: existing.id, site, deduplicated: true };
+    }
+
     const siteDir = this.getSiteDir(site);
     const scriptsDir = join(siteDir, 'scripts');
     ensureDir(scriptsDir);
 
-    const index = await this.getSiteIndex(site);
-    // 生成可读文件名: app.min_001.js 或 inline_001.js
     const readableName = getReadableFilename(url, 'script');
     const seq = String(index.scripts.length).padStart(3, '0');
     const id = `${readableName}_${seq}`;
@@ -256,12 +330,16 @@ export class DataStore {
     await writeFile(file, source || '');
 
     index.scripts.push({
-      id, url, type, timestamp, file,
-      size: source?.length || 0
+      id, url, type,
+      timestamp: timestamp || Date.now(),
+      file, size: source?.length || 0,
+      hash,
+      sessionId: this.getSessionId()
     });
 
     await this.saveSiteIndex(site);
     await this.updateSiteStats(site);
+    this.maybeCleanup();
 
     return { id, site };
   }
@@ -279,44 +357,68 @@ export class DataStore {
   }
 
   /**
-   * 获取站点的响应列表
+   * 获取站点的响应列表（支持会话过滤）
    */
-  async getResponseList(site) {
+  async getResponseList(site, sessionOnly = false) {
+    const currentSession = this.getSessionId();
+
     if (site) {
       const index = await this.getSiteIndex(site);
-      return index.responses.map(r => ({
+      let responses = index.responses;
+
+      if (sessionOnly) {
+        responses = responses.filter(r => r.sessionId === currentSession);
+      }
+
+      return responses.map(r => ({
         id: r.id, url: r.url, path: r.path,
         method: r.method, status: r.status,
-        timestamp: r.timestamp, size: r.size
+        timestamp: r.timestamp, size: r.size,
+        sessionId: r.sessionId
       }));
     }
+
     // 返回所有站点的响应
     const all = [];
     for (const s of this.globalIndex.sites) {
       const index = await this.getSiteIndex(s.hostname);
       for (const r of index.responses) {
-        all.push({ ...r, site: s.hostname });
+        if (!sessionOnly || r.sessionId === currentSession) {
+          all.push({ ...r, site: s.hostname });
+        }
       }
     }
     return all;
   }
 
   /**
-   * 获取站点的脚本列表
+   * 获取站点的脚本列表（支持会话过滤）
    */
-  async getScriptList(site) {
+  async getScriptList(site, sessionOnly = false) {
+    const currentSession = this.getSessionId();
+
     if (site) {
       const index = await this.getSiteIndex(site);
-      return index.scripts.map(s => ({
+      let scripts = index.scripts;
+
+      if (sessionOnly) {
+        scripts = scripts.filter(s => s.sessionId === currentSession);
+      }
+
+      return scripts.map(s => ({
         id: s.id, url: s.url, type: s.type,
-        timestamp: s.timestamp, size: s.size
+        timestamp: s.timestamp, size: s.size,
+        sessionId: s.sessionId
       }));
     }
+
     const all = [];
     for (const s of this.globalIndex.sites) {
       const index = await this.getSiteIndex(s.hostname);
       for (const sc of index.scripts) {
-        all.push({ ...sc, site: s.hostname });
+        if (!sessionOnly || sc.sessionId === currentSession) {
+          all.push({ ...sc, site: s.hostname });
+        }
       }
     }
     return all;
@@ -431,6 +533,165 @@ export class DataStore {
     this.siteIndexCache.clear();
     this.globalIndex = { sites: [] };
     await this.saveGlobalIndex();
+  }
+
+  /**
+   * 检查是否需要清理
+   */
+  maybeCleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanup < STORAGE_CONFIG.cleanupInterval) {
+      return;
+    }
+    this.lastCleanup = now;
+    this.cleanup().catch(e => {
+      console.error('[DataStore] 清理失败:', e.message);
+    });
+  }
+
+  /**
+   * 执行清理
+   */
+  async cleanup() {
+    console.log('[DataStore] 开始清理过期数据...');
+    const now = Date.now();
+    let totalCleaned = 0;
+
+    // 1. 清理过期数据
+    totalCleaned += await this.cleanupExpired(now);
+
+    // 2. 清理超大站点
+    totalCleaned += await this.cleanupOversizedSites();
+
+    // 3. 清理总大小超限
+    totalCleaned += await this.cleanupTotalSize();
+
+    if (totalCleaned > 0) {
+      console.log(`[DataStore] 清理完成，删除 ${totalCleaned} 条记录`);
+    }
+  }
+
+  /**
+   * 清理过期数据
+   */
+  async cleanupExpired(now) {
+    let cleaned = 0;
+    const maxAge = STORAGE_CONFIG.maxAge;
+
+    for (const s of this.globalIndex.sites) {
+      const index = await this.getSiteIndex(s.hostname);
+      const expiredResponses = [];
+      const expiredScripts = [];
+
+      // 找出过期的响应
+      for (const r of index.responses) {
+        if (now - r.timestamp > maxAge) {
+          expiredResponses.push(r);
+        }
+      }
+
+      // 找出过期的脚本
+      for (const sc of index.scripts) {
+        if (now - sc.timestamp > maxAge) {
+          expiredScripts.push(sc);
+        }
+      }
+
+      // 删除过期文件
+      for (const r of expiredResponses) {
+        await rm(r.file, { force: true }).catch(() => {});
+        cleaned++;
+      }
+      for (const sc of expiredScripts) {
+        await rm(sc.file, { force: true }).catch(() => {});
+        cleaned++;
+      }
+
+      // 更新索引
+      if (expiredResponses.length || expiredScripts.length) {
+        index.responses = index.responses.filter(r => now - r.timestamp <= maxAge);
+        index.scripts = index.scripts.filter(s => now - s.timestamp <= maxAge);
+        await this.saveSiteIndex(s.hostname);
+      }
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * 清理超大站点
+   */
+  async cleanupOversizedSites() {
+    let cleaned = 0;
+    const maxSize = STORAGE_CONFIG.maxSizePerSite;
+
+    for (const s of this.globalIndex.sites) {
+      const index = await this.getSiteIndex(s.hostname);
+      let totalSize = 0;
+
+      // 计算站点总大小
+      for (const r of index.responses) totalSize += r.size || 0;
+      for (const sc of index.scripts) totalSize += sc.size || 0;
+
+      if (totalSize <= maxSize) continue;
+
+      // 按时间排序，删除最旧的
+      const allItems = [
+        ...index.responses.map(r => ({ ...r, type: 'response' })),
+        ...index.scripts.map(s => ({ ...s, type: 'script' }))
+      ].sort((a, b) => a.timestamp - b.timestamp);
+
+      while (totalSize > maxSize && allItems.length > 0) {
+        const item = allItems.shift();
+        await rm(item.file, { force: true }).catch(() => {});
+        totalSize -= item.size || 0;
+        cleaned++;
+
+        if (item.type === 'response') {
+          index.responses = index.responses.filter(r => r.id !== item.id);
+        } else {
+          index.scripts = index.scripts.filter(s => s.id !== item.id);
+        }
+      }
+
+      await this.saveSiteIndex(s.hostname);
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * 清理总大小超限
+   */
+  async cleanupTotalSize() {
+    let cleaned = 0;
+    const maxTotal = STORAGE_CONFIG.maxTotalSize;
+
+    // 计算所有站点总大小
+    const siteStats = [];
+    for (const s of this.globalIndex.sites) {
+      const index = await this.getSiteIndex(s.hostname);
+      let size = 0;
+      for (const r of index.responses) size += r.size || 0;
+      for (const sc of index.scripts) size += sc.size || 0;
+      siteStats.push({ hostname: s.hostname, size, lastAccess: s.lastAccess });
+    }
+
+    let totalSize = siteStats.reduce((sum, s) => sum + s.size, 0);
+    if (totalSize <= maxTotal) return 0;
+
+    // 按最后访问时间排序，删除最旧的站点
+    siteStats.sort((a, b) => a.lastAccess - b.lastAccess);
+
+    while (totalSize > maxTotal && siteStats.length > 1) {
+      const oldest = siteStats.shift();
+      await this.clearSite(oldest.hostname);
+      totalSize -= oldest.size;
+      cleaned++;
+      console.log(`[DataStore] 清理站点: ${oldest.hostname}`);
+    }
+
+    return cleaned;
   }
 }
 
