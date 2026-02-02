@@ -31,6 +31,12 @@ console.log('JS 逆向分析助手，输入 exit 退出\n');
 // 调试模式
 const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');
 
+// DeepSeek 特殊标记清理
+const DSML_PATTERN = /｜DSML｜/g;
+function cleanDSML(text) {
+  return text ? text.replace(DSML_PATTERN, '') : text;
+}
+
 // 创建日志回调
 const logger = createLogger({ enabled: DEBUG, verbose: false });
 
@@ -338,9 +344,10 @@ async function handleStreamEvent(event) {
 
   switch (eventType) {
     case 'on_chat_model_stream':
-      // LLM 输出流
-      const chunk = data?.chunk?.content;
+      // LLM 输出流 - 清理 DeepSeek 特殊标记
+      let chunk = data?.chunk?.content;
       if (chunk && typeof chunk === 'string') {
+        chunk = cleanDSML(chunk);
         process.stdout.write(chunk);
         await appendToPanel(chunk);  // 累积发送到面板
       }
