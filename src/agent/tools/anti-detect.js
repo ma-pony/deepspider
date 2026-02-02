@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
-import { getBrowser } from '../../browser/client.js';
+import { getBrowser } from '../../browser/index.js';
 
 export const proxyTest = tool(
   async ({ proxy_url }) => {
