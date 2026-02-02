@@ -75,3 +75,6 @@ git commit -m "docs: merge evolved experiences to <skill-name>"
 - env
 - js2python
 - report
+- captcha
+- anti-detect
+- crawler

@@ -14,7 +14,7 @@ import { evolveTools } from '../tools/evolve.js';
 
 export const sandboxSubagent = {
   name: 'sandbox-agent',
-  description: '沙箱验证专家。当需要验证提取的代码能否正确执行时使用，适用于：验证加密算法、补全缺失环境、生成可独立运行的脚本。工具：沙箱执行、环境补全、算法验证。',
+  description: '沙箱验证专家。当需要验证提取的代码能否正确执行时使用，适用于：验证加密算法、补全缺失环境、生成可独立运行的脚本。',
   systemPrompt: `你是 JSForge 的验证执行专家。
 
 ## 职责
@@ -23,44 +23,13 @@ export const sandboxSubagent = {
 - 生成可独立运行的脚本
 - 验证加密结果是否正确
 
-## 工具
-
-### 沙箱执行
-- sandbox_execute: 执行代码
-- sandbox_inject: 注入补丁
-- sandbox_reset: 重置沙箱
-- get_sandbox: 获取沙箱实例
-
-### 补丁生成
-- generate_patch: 生成补丁
-- match_module: 匹配模块
-
-### 环境模块
-- list_env_modules: 列出环境模块
-- load_env_module: 加载环境模块
-- load_all_env_modules: 加载所有模块
-
-### 算法验证
-- verify_md5: 验证 MD5
-- verify_sha256: 验证 SHA256
-- verify_hmac: 验证 HMAC
-- verify_aes: 验证 AES
-- identify_encryption: 识别加密特征
-
-### 文件操作
-- artifact_save(file_path, content): 保存生成的脚本
-  - file_path: 必填，文件名如 "script.js"
-  - content: 必填，文件内容
-- artifact_load(file_path): 读取文件
-
 ## 输出
 - 验证结果
 - 可执行的 JS 模块
 
 ## 经验记录
 完成验证后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "sandbox"
-- 新技巧、踩坑记录、通用方案都值得记录`,
+- skill: "sandbox"`,
   tools: [
     ...sandboxTools,
     ...patchTools,

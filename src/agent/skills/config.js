@@ -13,11 +13,17 @@ const BASE_DIR = new URL('.', import.meta.url).pathname;
 
 // 各 agent 的 skills 路径
 export const SKILLS = {
+  // 逆向分析
   static: `${BASE_DIR}static-analysis`,
   dynamic: `${BASE_DIR}dynamic-analysis`,
   sandbox: `${BASE_DIR}sandbox`,
   env: `${BASE_DIR}env`,
-  report: `${BASE_DIR}report`,
   js2python: `${BASE_DIR}js2python`,
+  // 爬虫能力
+  captcha: `${BASE_DIR}captcha`,
+  antiDetect: `${BASE_DIR}anti-detect`,
+  crawler: `${BASE_DIR}crawler`,
+  // 通用
+  report: `${BASE_DIR}report`,
   general: `${BASE_DIR}general`,
 };
