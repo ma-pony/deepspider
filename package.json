@@ -1,7 +1,7 @@
 {
   "name": "jsforge",
   "version": "0.1.0",
-  "description": "JS Reverse Engineering Subagent - 专业的JavaScript逆向分析引擎",
+  "description": "智能爬虫工程平台 - 从JS逆向到完整爬虫脚本的一站式解决方案",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -17,13 +17,14 @@
     "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt"
   },
   "keywords": [
+    "crawler",
+    "web-scraping",
     "javascript",
     "reverse-engineering",
-    "sandbox",
     "deobfuscation",
-    "encryption-analysis",
-    "browser-environment",
-    "subagent"
+    "captcha",
+    "anti-detect",
+    "automation"
   ],
   "author": "",
   "license": "MIT",
