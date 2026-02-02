@@ -29,6 +29,23 @@ async function executePython(code, timeout = 10000) {
       stderr += data.toString();
     });
 
+    proc.on('close', (code) => {
+      resolve({
+        success: code === 0,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        exitCode: code,
+      });
+    });
+
+    proc.on('error', (err) => {
+      resolve({
+        success: false,
+        stdout: '',
+        stderr: err.message,
+        exitCode: -1,
+      });
+    });
   });
 }
 
