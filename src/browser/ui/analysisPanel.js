@@ -155,10 +155,25 @@ export function getAnalysisPanelScript() {
     return;
   }
 
-  // 状态
-  jsforge.chatMessages = [];
+  // 状态 - 从 sessionStorage 恢复消息
+  const STORAGE_KEY = 'jsforge_chat_messages';
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    jsforge.chatMessages = saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    jsforge.chatMessages = [];
+  }
   let isSelectMode = false;
   let currentElement = null;
+
+  // 保存消息到 sessionStorage
+  function saveMessages() {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(jsforge.chatMessages));
+    } catch (e) {
+      console.warn('[JSForge] 保存消息失败:', e);
+    }
+  }
 
   // 等待 DOM 加载完成后初始化 UI
   function initUI() {
@@ -806,6 +821,7 @@ export function getAnalysisPanelScript() {
     function addMessage(role, content) {
       console.log('[JSForge UI] addMessage:', role, content?.slice(0, 50));
       jsforge.chatMessages.push({ role, content, time: Date.now() });
+      saveMessages();
       renderMessages();
     }
 
@@ -896,6 +912,7 @@ export function getAnalysisPanelScript() {
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === role) {
           msgs[i].content += text;
+          saveMessages();
           renderMessages();
           return true;
         }
@@ -911,6 +928,7 @@ export function getAnalysisPanelScript() {
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === role) {
           msgs[i].content = content;
+          saveMessages();
           renderMessages();
           return true;
         }
@@ -1058,7 +1076,7 @@ export function getAnalysisPanelScript() {
     jsforge.addMessage = addMessage;
     jsforge.appendToLastMessage = appendToLastMessage;
     jsforge.updateLastMessage = updateLastMessage;
-    jsforge.clearMessages = () => { jsforge.chatMessages = []; renderMessages(); };
+    jsforge.clearMessages = () => { jsforge.chatMessages = []; saveMessages(); renderMessages(); };
     jsforge.startSelector = startSelectMode;
     jsforge.stopSelector = stopSelectMode;
     jsforge.showReport = showReport;
@@ -1068,6 +1086,8 @@ export function getAnalysisPanelScript() {
 
     // 自动显示面板
     panel.classList.add('visible');
+    // 渲染恢复的消息
+    renderMessages();
     console.log('[JSForge UI] 分析面板已加载');
   }
 
