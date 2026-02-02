@@ -290,3 +290,48 @@ tools: [...analyzerTools, ...browserTools, ...sandboxTools]
 **后果**: 污染 Agent 的领域知识库，与 JS 逆向分析无关。
 
 **正确做法**: Skills 只记录 Agent 执行任务时需要的领域知识（如加密算法差异）。
+
+### 错误 5: systemPrompt 中列出工具清单
+
+**问题**: 在 systemPrompt 中手动列出工具名称和用法说明。
+
+```javascript
+// ❌ 差
+systemPrompt: `你是分析专家。
+
+## 可用工具
+- analyze_ast: 分析 AST
+- deobfuscate: 反混淆代码
+...`
+```
+
+**后果**: LangChain 会自动注入工具信息，手动列出导致重复和不一致。
+
+**正确做法**: systemPrompt 只写职责和工作流程，工具信息由框架自动注入。
+
+### 错误 6: 子代理职责重叠
+
+**问题**: 创建多个子代理处理相似任务（如 static-agent 和 algo-agent 都做加密分析）。
+
+**后果**: 主 agent 难以选择正确的子代理，导致任务分发混乱。
+
+**正确做法**: 合并职责相近的子代理，确保每个子代理有明确独立的职责边界。
+
+### 错误 7: 引用不存在的工具模块
+
+**问题**: 在子代理中导入不存在的工具模块（如 `browserTools` 实际文件名是 `trigger.js`）。
+
+```javascript
+// ❌ 差：模块不存在
+import { browserTools } from '../tools/browser.js';
+
+// ✅ 好：确认模块存在后再导入
+import { browserTools } from '../tools/browser.js';  // 文件确实存在
+```
+
+**后果**: 运行时报错 `Cannot find module`。
+
+**正确做法**:
+1. 添加新子代理前，先确认所需工具模块存在
+2. 工具模块命名应语义化（如 `browser.js` 比 `trigger.js` 更清晰）
+3. 修改模块名时同步更新所有引用
