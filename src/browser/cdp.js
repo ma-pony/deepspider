@@ -151,4 +151,18 @@ export class CDPSession {
   send(method, params = {}) {
     return this.client.send(method, params);
   }
+
+  /**
+   * 监听 CDP 事件（代理到 client）
+   */
+  on(event, handler) {
+    return this.client.on(event, handler);
+  }
+
+  /**
+   * 移除 CDP 事件监听（代理到 client）
+   */
+  off(event, handler) {
+    return this.client.off(event, handler);
+  }
 }

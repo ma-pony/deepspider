@@ -107,7 +107,7 @@ export class ScriptCollector {
     const scripts = [];
 
     // 监听脚本解析事件
-    cdpSession.client.on('Debugger.scriptParsed', async (event) => {
+    cdpSession.on('Debugger.scriptParsed', async (event) => {
       if (event.url && !event.url.startsWith('chrome-extension://')) {
         this.scripts.set(event.scriptId, {
           url: event.url,
