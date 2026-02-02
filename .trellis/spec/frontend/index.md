@@ -1,12 +1,13 @@
-# Frontend Development Guidelines
+# JSForge Development Guidelines
 
-> Best practices for frontend development in this project.
+> JSForge 项目开发规范
 
 ---
 
 ## Overview
 
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+JSForge 是基于 DeepAgents + Patchright 的 JS 逆向分析引擎。
+本目录包含项目的开发规范和代码模式。
 
 ---
 
@@ -14,26 +15,22 @@ This directory contains guidelines for frontend development. Fill in each file w
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
+| [Directory Structure](./directory-structure.md) | 项目目录结构和模块组织 | Done |
+| [Tool Guidelines](./component-guidelines.md) | LangChain 工具定义规范 | Done |
+| [Hook Guidelines](./hook-guidelines.md) | 浏览器 Hook 注入规范 | Done |
+| [State Management](./state-management.md) | Agent 状态与数据存储 | Done |
+| [Quality Guidelines](./quality-guidelines.md) | 代码质量规范 | Done |
+| [Type Safety](./type-safety.md) | Zod 类型验证规范 | Done |
 
 ---
 
-## How to Fill These Guidelines
+## Quick Reference
 
-For each guideline file:
+核心规范要点：
 
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
+1. **工具定义**: 使用 `@langchain/core/tools` + Zod schema
+2. **浏览器交互**: 优先使用 CDP，避免 `page.evaluate()`
+3. **AST 遍历**: 使用 `@babel/traverse`
+4. **数据存储**: 使用 `getDataStore()` 单例
 
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+详见 `CLAUDE.md` 中的代码规范部分。

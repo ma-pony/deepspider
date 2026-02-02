@@ -1,51 +1,76 @@
 # State Management
 
-> How state is managed in this project.
+> Agent 状态与数据存储规范
 
 ---
 
 ## Overview
 
-<!--
-Document your project's state management conventions here.
-
-Questions to answer:
-- What state management solution do you use?
-- How is local vs global state decided?
-- How do you handle server state?
-- What are the patterns for derived state?
--->
-
-(To be filled by the team)
+JSForge 使用 DeepAgents 的状态后端和文件系统存储管理数据。
+Agent 状态通过 FilesystemBackend 持久化，采集数据通过 DataStore 存储。
 
 ---
 
 ## State Categories
 
-<!-- Local state, global state, server state, URL state -->
-
-(To be filled by the team)
-
----
-
-## When to Use Global State
-
-<!-- Criteria for promoting state to global -->
-
-(To be filled by the team)
+| 类型 | 存储方式 | 示例 |
+|------|----------|------|
+| Agent 状态 | FilesystemBackend | `.jsforge-agent/` |
+| 采集数据 | DataStore | `.jsforge-data/` |
+| 会话状态 | MemorySaver | 内存中 |
 
 ---
 
-## Server State
+## DataStore Pattern
 
-<!-- How server data is cached and synchronized -->
+数据存储使用单例模式：
 
-(To be filled by the team)
+```javascript
+import { getDataStore } from '../store/DataStore.js';
+
+const store = getDataStore();
+await store.saveResponse(data);
+```
+
+**示例**: `src/store/DataStore.js:699-706`
+
+---
+
+## Agent Backend
+
+Agent 状态后端配置：
+
+```javascript
+import { FilesystemBackend } from 'deepagents';
+
+const backend = new FilesystemBackend({
+  rootDir: './.jsforge-agent'
+});
+```
+
+**示例**: `src/agent/index.js:59-62`
 
 ---
 
 ## Common Mistakes
 
-<!-- State management mistakes your team has made -->
+### 1. 未使用单例
 
-(To be filled by the team)
+```javascript
+// ❌ 错误：每次创建新实例
+const store = new DataStore();
+
+// ✅ 正确：使用单例
+const store = getDataStore();
+```
+
+### 2. 忘记启动会话
+
+```javascript
+// ❌ 错误：直接保存
+await store.saveResponse(data);
+
+// ✅ 正确：先启动会话
+store.startSession();
+await store.saveResponse(data);
+```

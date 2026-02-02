@@ -1,51 +1,83 @@
 # Hook Guidelines
 
-> How hooks are used in this project.
+> 浏览器 Hook 注入规范
 
 ---
 
 ## Overview
 
-<!--
-Document your project's hook conventions here.
-
-Questions to answer:
-- What custom hooks do you have?
-- How do you handle data fetching?
-- What are the naming conventions?
-- How do you share stateful logic?
--->
-
-(To be filled by the team)
+JSForge 使用 Hook 拦截浏览器 API 来采集加密调用、网络请求等数据。
+Hook 脚本通过 CDP 注入到页面中执行。
 
 ---
 
-## Custom Hook Patterns
+## Hook Types
 
-<!-- How to create and structure custom hooks -->
-
-(To be filled by the team)
+| Hook 类型 | 位置 | 用途 |
+|-----------|------|------|
+| CryptoHook | `src/env/CryptoHook.js` | 拦截加密 API |
+| NetworkHook | `src/env/NetworkHook.js` | 拦截网络请求 |
+| Browser Hooks | `src/browser/hooks/` | 浏览器注入脚本 |
 
 ---
 
-## Data Fetching
+## Browser Hook Pattern
 
-<!-- How data fetching is handled (React Query, SWR, etc.) -->
+浏览器注入脚本结构：
 
-(To be filled by the team)
+```javascript
+// src/browser/hooks/crypto.js
+export function getCryptoHookScript() {
+  return `
+(function() {
+  const original = window.crypto.subtle.digest;
+  window.crypto.subtle.digest = async function(...args) {
+    console.log('[Hook] crypto.digest:', args);
+    return original.apply(this, args);
+  };
+})();
+`;
+}
+```
+
+**示例**: `src/browser/hooks/crypto.js`
 
 ---
 
 ## Naming Conventions
 
-<!-- Hook naming rules (use*, etc.) -->
-
-(To be filled by the team)
+| 类型 | 命名规则 | 示例 |
+|------|----------|------|
+| Hook 类 | *Hook | `CryptoHook`, `NetworkHook` |
+| 脚本函数 | get*Script | `getCryptoHookScript()` |
+| 全局对象 | __jsforge__* | `__jsforge__`, `__jsforge_send__` |
 
 ---
 
 ## Common Mistakes
 
-<!-- Hook-related mistakes your team has made -->
+### 1. 未保存原始函数
 
-(To be filled by the team)
+```javascript
+// ❌ 错误：直接覆盖
+window.fetch = function() { ... };
+
+// ✅ 正确：保存原始函数
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+  // 记录
+  return originalFetch.apply(this, args);
+};
+```
+
+### 2. Hook 脚本未使用 IIFE
+
+```javascript
+// ❌ 错误：污染全局
+const hook = ...;
+
+// ✅ 正确：使用 IIFE 隔离
+(function() {
+  const hook = ...;
+})();
+```

@@ -1,59 +1,144 @@
-# Component Guidelines
+# Tool Guidelines
 
-> How components are built in this project.
+> LangChain 工具定义规范
 
 ---
 
 ## Overview
 
-<!--
-Document your project's component conventions here.
-
-Questions to answer:
-- What component patterns do you use?
-- How are props defined?
-- How do you handle composition?
-- What accessibility standards apply?
--->
-
-(To be filled by the team)
+JSForge 使用 `@langchain/core/tools` 定义 Agent 工具。
+每个工具是一个独立的功能单元，通过 Zod schema 定义参数类型。
 
 ---
 
-## Component Structure
+## Tool Structure
 
-<!-- Standard structure of a component file -->
+标准工具定义结构：
 
-(To be filled by the team)
+```javascript
+import { z } from 'zod';
+import { tool } from '@langchain/core/tools';
+
+export const myTool = tool(
+  async ({ param1, param2 }) => {
+    // 工具逻辑
+    return JSON.stringify(result, null, 2);
+  },
+  {
+    name: 'tool_name',           // snake_case 命名
+    description: '工具描述',      // 简洁明确
+    schema: z.object({
+      param1: z.string().describe('参数描述'),
+      param2: z.number().optional().default(100),
+    }),
+  }
+);
+
+// 导出工具数组
+export const myTools = [myTool];
+```
+
+**示例**: `src/agent/tools/analyzer.js:14-38`
 
 ---
 
-## Props Conventions
+## Schema Conventions
 
-<!-- How props should be defined and typed -->
+使用 Zod 定义参数 schema：
 
-(To be filled by the team)
+```javascript
+schema: z.object({
+  // 必填参数
+  code: z.string().describe('JS代码'),
+
+  // 可选参数带默认值
+  extractFunctions: z.boolean().optional().default(true),
+
+  // 枚举类型
+  mode: z.enum(['fast', 'deep']).optional().default('fast'),
+
+  // 数组类型
+  patterns: z.array(z.string()).optional(),
+})
+```
+
+**示例**: `src/agent/tools/analyzer.js:32-36`
 
 ---
 
-## Styling Patterns
+## Return Value Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
+工具返回值规范：
 
-(To be filled by the team)
+```javascript
+// 返回 JSON 字符串（推荐）
+return JSON.stringify(result, null, 2);
+
+// 返回简单字符串
+return `分析完成: ${count} 个函数`;
+
+// 错误处理
+try {
+  // ...
+} catch (e) {
+  return JSON.stringify({ error: e.message });
+}
+```
 
 ---
 
-## Accessibility
+## Tool Organization
 
-<!-- A11y requirements and patterns -->
+工具文件组织：
 
-(To be filled by the team)
+```javascript
+// src/agent/tools/analyzer.js
+
+// 1. 导入依赖
+import { z } from 'zod';
+import { tool } from '@langchain/core/tools';
+import { ASTAnalyzer } from '../../analyzer/ASTAnalyzer.js';
+
+// 2. 定义各个工具
+export const analyzeAst = tool(...);
+export const analyzeCallstack = tool(...);
+
+// 3. 导出工具数组
+export const analyzerTools = [analyzeAst, analyzeCallstack];
+```
+
+**示例**: `src/agent/tools/analyzer.js`
 
 ---
 
 ## Common Mistakes
 
-<!-- Component-related mistakes your team has made -->
+### 1. 工具名称不规范
 
-(To be filled by the team)
+```javascript
+// ❌ 错误：使用 camelCase
+name: 'analyzeAst'
+
+// ✅ 正确：使用 snake_case
+name: 'analyze_ast'
+```
+
+### 2. 缺少参数描述
+
+```javascript
+// ❌ 错误：无描述
+param1: z.string()
+
+// ✅ 正确：有描述
+param1: z.string().describe('JS代码')
+```
+
+### 3. 返回非字符串
+
+```javascript
+// ❌ 错误：返回对象
+return result;
+
+// ✅ 正确：返回 JSON 字符串
+return JSON.stringify(result, null, 2);
+```

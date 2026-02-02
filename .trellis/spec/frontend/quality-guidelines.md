@@ -1,51 +1,68 @@
 # Quality Guidelines
 
-> Code quality standards for frontend development.
+> JSForge 代码质量规范
 
 ---
 
 ## Overview
 
-<!--
-Document your project's quality standards here.
-
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
-
-(To be filled by the team)
+JSForge 遵循 CLAUDE.md 中定义的代码规范，重点关注：
+- CDP 优先的浏览器交互
+- Babel AST 遍历模式
+- LangChain 工具定义规范
 
 ---
 
 ## Forbidden Patterns
 
-<!-- Patterns that should never be used and why -->
+### 1. 使用 page.evaluate 代替 CDP
 
-(To be filled by the team)
+```javascript
+// ❌ 禁止
+const result = await page.evaluate(() => { ... });
+
+// ✅ 使用 CDP
+const cdp = await browser.getCDPSession();
+const result = await cdp.send('Runtime.evaluate', { ... });
+```
 
 ---
 
 ## Required Patterns
 
-<!-- Patterns that must always be used -->
+### 1. Babel AST 遍历
 
-(To be filled by the team)
+```javascript
+import traverse from '@babel/traverse';
+
+traverse.default(ast, {
+  FunctionDeclaration(path) {
+    // 处理
+  }
+});
+```
+
+### 2. CDP Session 复用
+
+```javascript
+const cdp = await browser.getCDPSession();
+```
 
 ---
 
 ## Testing Requirements
 
-<!-- What level of testing is expected -->
+运行测试：
 
-(To be filled by the team)
+```bash
+pnpm test
+```
 
 ---
 
 ## Code Review Checklist
 
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+- [ ] 工具名称使用 snake_case
+- [ ] 参数有 describe 描述
+- [ ] 浏览器交互使用 CDP
+- [ ] AST 遍历使用 Babel
