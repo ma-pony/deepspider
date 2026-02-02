@@ -13,7 +13,7 @@ export { profileTools, listProfiles, loadProfile, generateProfileCode } from './
 export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, clearCookies } from './runtime.js';
 export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
-export { triggerTools, clickElement, fillInput, waitForSelector } from './trigger.js';
+export { browserTools, clickElement, fillInput, waitForSelector } from './browser.js';
 export { reportTools, saveAnalysisReport } from './report.js';
 export { webcrackTools, unpackBundle, analyzeBundle } from './webcrack.js';
 export { preprocessTools, preprocessCode } from './preprocess.js';
@@ -47,7 +47,7 @@ import { profileTools } from './profile.js';
 import { runtimeTools } from './runtime.js';
 import { debugTools } from './debug.js';
 import { captureTools } from './capture.js';
-import { triggerTools } from './trigger.js';
+import { browserTools } from './browser.js';
 import { reportTools } from './report.js';
 import { webcrackTools } from './webcrack.js';
 import { preprocessTools } from './preprocess.js';
@@ -80,7 +80,7 @@ export const allTools = [
   ...runtimeTools,
   ...debugTools,
   ...captureTools,
-  ...triggerTools,
+  ...browserTools,
   ...reportTools,
   ...webcrackTools,
   ...preprocessTools,
@@ -111,7 +111,7 @@ export const coreTools = [
   // 浏览器运行时
   ...runtimeTools,
   // 页面交互
-  ...triggerTools,
+  ...browserTools,
   // 浏览器分析交互
   ...analysisTools,
   // 数据溯源查询

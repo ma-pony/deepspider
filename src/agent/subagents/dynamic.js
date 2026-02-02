@@ -8,7 +8,7 @@ import { SKILLS, skillsBackend } from '../skills/config.js';
 import { runtimeTools } from '../tools/runtime.js';
 import { debugTools } from '../tools/debug.js';
 import { captureTools } from '../tools/capture.js';
-import { triggerTools } from '../tools/trigger.js';
+import { browserTools } from '../tools/browser.js';
 import { cryptoHookTools } from '../tools/cryptohook.js';
 import { correlateTools } from '../tools/correlate.js';
 import { tracingTools } from '../tools/tracing.js';
@@ -47,7 +47,7 @@ export const dynamicSubagent = {
     ...runtimeTools,
     ...debugTools,
     ...captureTools,
-    ...triggerTools,
+    ...browserTools,
     ...cryptoHookTools,
     ...correlateTools,
     ...tracingTools,

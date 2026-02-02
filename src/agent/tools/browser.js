@@ -1,5 +1,5 @@
 /**
- * JSForge - 页面交互工具
+ * JSForge - 浏览器交互工具
  * 混合实现：复杂交互用 Playwright，简单操作用 CDP
  */
 
@@ -247,7 +247,7 @@ export const getPageInfo = tool(
   }
 );
 
-export const triggerTools = [
+export const browserTools = [
   clickElement,
   fillInput,
   waitForSelector,
