@@ -23,6 +23,8 @@ description: |
 
 **填充方式：** 确认 PKCS7/PKCS5 是否一致。
 
+**CFB 模式 segment_size：** CryptoJS AES-CFB 默认 CFB128，PyCryptodome 默认 CFB8。必须指定 `segment_size=128`。
+
 ## 降级策略
 
 纯 Python 失败 3 次 → 改用 execjs 直接执行 JS。
