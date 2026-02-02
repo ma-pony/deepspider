@@ -47,3 +47,47 @@ description: |
 - 入口模块：找 `__webpack_require__.s` 或数组最后一个元素
 - 异步加载：搜索 `webpackJsonp` 或 `__webpack_require__.e`
 - 模块 ID：可能是数字或哈希字符串
+
+## 加密算法特征速查
+
+### 哈希算法
+
+| 算法 | 特征 | 输出长度 |
+|------|------|----------|
+| MD5 | `md5(`, `CryptoJS.MD5` | 32位hex |
+| SHA1 | `sha1`, `CryptoJS.SHA1` | 40位hex |
+| SHA256 | `sha256`, `CryptoJS.SHA256` | 64位hex |
+| SM3 | `sm3(`, `SM3` | 64位hex |
+
+### 对称加密
+
+| 算法 | 特征 | 模式 |
+|------|------|------|
+| AES | `AES.encrypt`, `CryptoJS.AES` | CBC/ECB/CTR/GCM |
+| DES | `DES.encrypt`, `CryptoJS.DES` | CBC/ECB |
+| SM4 | `sm4(`, `SM4.encrypt` | CBC/ECB |
+
+### 非对称加密
+
+| 算法 | 特征 | 用途 |
+|------|------|------|
+| RSA | `RSAKey`, `JSEncrypt`, `KEYUTIL` | 加密/签名 |
+| SM2 | `sm2(`, `SM2.encrypt`, `sm2.doEncrypt` | 加密/签名 |
+
+## 反混淆处理
+
+### 混淆类型识别
+
+| 类型 | 特征 |
+|------|------|
+| eval | `eval(` 包装 |
+| 字符串数组 | `_0x` 变量 |
+| 控制流 | switch-case 嵌套 |
+| Unicode | `\u0061` 编码 |
+
+### 处理步骤
+
+1. 识别混淆类型
+2. 解码字符串
+3. 简化控制流
+4. 重命名变量

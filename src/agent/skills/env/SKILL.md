@@ -31,3 +31,42 @@ description: |
 ## 环境自吐
 
 代码报错时，错误信息会暴露缺失的属性路径，按路径补全即可。
+
+## 常见错误与补丁
+
+| 错误 | 缺失环境 |
+|------|----------|
+| `window is not defined` | window |
+| `document is not defined` | document |
+| `navigator is not defined` | navigator |
+| `localStorage is not defined` | localStorage |
+
+## 补丁模板
+
+**window：**
+```javascript
+var window = global;
+window.location = {
+  href: 'https://example.com/',
+  hostname: 'example.com',
+  protocol: 'https:'
+};
+```
+
+**document：**
+```javascript
+var document = {
+  cookie: '',
+  createElement: (t) => ({tagName: t, style: {}}),
+  getElementById: () => null
+};
+```
+
+## 指纹检测绕过
+
+| 检测项 | 代码特征 |
+|--------|----------|
+| webdriver | `navigator.webdriver` |
+| headless | `navigator.plugins.length` |
+| canvas | `toDataURL()` |
+| WebGL | `getParameter()` |

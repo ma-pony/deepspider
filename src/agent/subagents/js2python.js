@@ -9,6 +9,7 @@ import { SKILLS, skillsBackend } from '../skills/config.js';
 import { pythonTools } from '../tools/python.js';
 import { analyzerTools } from '../tools/analyzer.js';
 import { fileTools } from '../tools/file.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const js2pythonSubagent = {
   name: 'js2python',
@@ -294,11 +295,17 @@ if __name__ == "__main__":
     print(encrypt("test"))
 \`\`\`
 
-**目标是保证最终输出可用的代码，而不是坚持纯 Python 方案。**`,
+**目标是保证最终输出可用的代码，而不是坚持纯 Python 方案。**
+
+## 经验记录
+完成转换后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "js2python"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...pythonTools,
     ...analyzerTools,
     ...fileTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({

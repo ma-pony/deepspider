@@ -32,3 +32,25 @@ description: |
 **时间检测：**
 - 原理：`Date.now()` 前后差值判断是否被调试
 - 绕过：Hook Date.now()，返回递增固定值
+
+## 调用追踪
+
+### 追踪方法
+
+1. 搜索目标参数名
+2. 定位赋值位置
+3. 向上追溯来源
+4. 找到生成函数
+
+### Hook 模板
+
+```javascript
+// 函数 Hook
+const _orig = obj.func;
+obj.func = function(...args) {
+  console.log('args:', args);
+  const r = _orig.apply(this, args);
+  console.log('return:', r);
+  return r;
+};
+```

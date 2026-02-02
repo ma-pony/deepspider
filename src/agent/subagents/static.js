@@ -12,6 +12,7 @@ import { webcrackTools } from '../tools/webcrack.js';
 import { preprocessTools } from '../tools/preprocess.js';
 import { extractorTools } from '../tools/extractor.js';
 import { storeTools } from '../tools/store.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const staticSubagent = {
   name: 'static-agent',
@@ -65,7 +66,12 @@ export const staticSubagent = {
 ## 输出
 - 加密函数位置（文件、行号）
 - 建议的断点列表
-- 代码结构摘要`,
+- 代码结构摘要
+
+## 经验记录
+完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "static-analysis"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...preprocessTools,
     ...webcrackTools,
@@ -74,6 +80,7 @@ export const staticSubagent = {
     ...traceTools,
     ...extractorTools,
     ...storeTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({

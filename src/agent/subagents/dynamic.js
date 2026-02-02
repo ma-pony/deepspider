@@ -12,6 +12,7 @@ import { triggerTools } from '../tools/trigger.js';
 import { cryptoHookTools } from '../tools/cryptohook.js';
 import { correlateTools } from '../tools/correlate.js';
 import { tracingTools } from '../tools/tracing.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const dynamicSubagent = {
   name: 'dynamic-agent',
@@ -88,7 +89,12 @@ export const dynamicSubagent = {
 3. 等待 Hook 捕获加密调用
 4. 分析请求与加密的关联
 5. 必要时设置断点深入分析
-6. 采集环境数据`,
+6. 采集环境数据
+
+## 经验记录
+完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "dynamic-analysis"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...runtimeTools,
     ...debugTools,
@@ -97,6 +103,7 @@ export const dynamicSubagent = {
     ...cryptoHookTools,
     ...correlateTools,
     ...tracingTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({

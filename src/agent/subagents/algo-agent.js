@@ -15,6 +15,7 @@ import { storeTools } from '../tools/store.js';
 import { verifyTools } from '../tools/verify.js';
 import { correlateTools } from '../tools/correlate.js';
 import { extractorTools } from '../tools/extractor.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const algoAgentSubagent = {
   name: 'algo-agent',
@@ -77,7 +78,12 @@ export const algoAgentSubagent = {
 - 环境检测少
 
 ## 失败处理
-如果算法过于复杂难以还原，建议切换到补环境方向。`,
+如果算法过于复杂难以还原，建议切换到补环境方向。
+
+## 经验记录
+完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "static-analysis"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...preprocessTools,
     ...webcrackTools,
@@ -88,6 +94,7 @@ export const algoAgentSubagent = {
     ...correlateTools,
     ...extractorTools,
     ...storeTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({

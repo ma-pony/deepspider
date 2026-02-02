@@ -16,6 +16,7 @@ import { storeTools } from '../tools/store.js';
 import { hookTools } from '../tools/hook.js';
 import { antiDebugTools } from '../tools/antidebug.js';
 import { asyncTools } from '../tools/async.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const envAgentSubagent = {
   name: 'env-agent',
@@ -81,7 +82,12 @@ export const envAgentSubagent = {
 跳过环境自吐和浏览器提取步骤。
 
 ## 失败处理
-如果补环境多次失败，建议切换到纯算分析方向。`,
+如果补环境多次失败，建议切换到纯算分析方向。
+
+## 经验记录
+完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "env"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...sandboxTools,
     ...envDumpTools,
@@ -93,6 +99,7 @@ export const envAgentSubagent = {
     ...antiDebugTools,
     ...asyncTools,
     ...storeTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({

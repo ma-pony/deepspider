@@ -10,6 +10,7 @@ import { patchTools } from '../tools/patch.js';
 import { envTools } from '../tools/env.js';
 import { verifyTools } from '../tools/verify.js';
 import { fileTools } from '../tools/file.js';
+import { evolveTools } from '../tools/evolve.js';
 
 export const sandboxSubagent = {
   name: 'sandbox-agent',
@@ -54,13 +55,19 @@ export const sandboxSubagent = {
 
 ## 输出
 - 验证结果
-- 可执行的 JS 模块`,
+- 可执行的 JS 模块
+
+## 经验记录
+完成验证后，如发现有价值的经验，使用 evolve_skill 记录：
+- skill: "sandbox"
+- 新技巧、踩坑记录、通用方案都值得记录`,
   tools: [
     ...sandboxTools,
     ...patchTools,
     ...envTools,
     ...verifyTools,
     ...fileTools,
+    ...evolveTools,
   ],
   middleware: [
     createSkillsMiddleware({
