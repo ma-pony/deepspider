@@ -8,13 +8,33 @@ import { getBrowser } from '../../browser/index.js';
 import { getScreenshotPath } from './utils.js';
 
 /**
+ * 临时隐藏 JSForge 面板，执行操作后恢复
+ */
+async function withPanelHidden(page, fn) {
+  // 隐藏面板
+  await page.evaluate(() => {
+    const panel = document.getElementById('jsforge-panel');
+    if (panel) panel.style.display = 'none';
+  });
+  try {
+    return await fn();
+  } finally {
+    // 恢复面板
+    await page.evaluate(() => {
+      const panel = document.getElementById('jsforge-panel');
+      if (panel) panel.style.display = '';
+    });
+  }
+}
+
+/**
  * 点击元素
  */
 export const clickElement = tool(
   async ({ selector }) => {
     const browser = await getBrowser();
     const page = browser.getPage();
-    await page.click(selector);
+    await withPanelHidden(page, () => page.click(selector));
     return JSON.stringify({ success: true, selector });
   },
   {
@@ -33,7 +53,7 @@ export const fillInput = tool(
   async ({ selector, value }) => {
     const browser = await getBrowser();
     const page = browser.getPage();
-    await page.fill(selector, value);
+    await withPanelHidden(page, () => page.fill(selector, value));
     return JSON.stringify({ success: true, selector, value });
   },
   {
