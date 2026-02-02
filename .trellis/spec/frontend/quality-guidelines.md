@@ -26,6 +26,18 @@ const cdp = await browser.getCDPSession();
 const result = await cdp.send('Runtime.evaluate', { ... });
 ```
 
+### 2. 直接访问封装类的内部属性
+
+```javascript
+// ❌ 禁止：暴露内部实现
+cdpSession.client.on('Debugger.paused', handler);
+
+// ✅ 使用封装类提供的方法
+cdpSession.on('Debugger.paused', handler);
+```
+
+**原因**: 直接访问 `.client` 会导致封装泄漏，当内部实现变化时调用方会报错。
+
 ---
 
 ## Required Patterns
