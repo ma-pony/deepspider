@@ -276,3 +276,11 @@ tools: [...analyzerTools, ...browserTools, ...sandboxTools]
 **后果**: 与 systemPrompt 重复，浪费 token。
 
 **正确做法**: Skills 只写领域经验、技巧、常见问题。
+
+### 错误 4: Skills 记录开发经验而非领域知识
+
+**问题**: 在 evolved.md 中记录项目开发经验（如 Playwright 用法）。
+
+**后果**: 污染 Agent 的领域知识库，与 JS 逆向分析无关。
+
+**正确做法**: Skills 只记录 Agent 执行任务时需要的领域知识（如加密算法差异）。
