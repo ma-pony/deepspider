@@ -85,10 +85,16 @@ export const staticSubagent = {
 ```javascript
 // src/agent/skills/config.js
 export const SKILLS = {
+  // 逆向分析
   static: `${BASE_DIR}static-analysis`,
   dynamic: `${BASE_DIR}dynamic-analysis`,
   sandbox: `${BASE_DIR}sandbox`,
   env: `${BASE_DIR}env`,
+  js2python: `${BASE_DIR}js2python`,
+  // 爬虫能力
+  captcha: `${BASE_DIR}captcha`,
+  antiDetect: `${BASE_DIR}anti-detect`,
+  crawler: `${BASE_DIR}crawler`,
 };
 ```
 

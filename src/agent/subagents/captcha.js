@@ -7,7 +7,7 @@ import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
 
 import { captchaTools } from '../tools/captcha.js';
-import { browserTools } from '../tools/browser.js';
+import { triggerTools } from '../tools/trigger.js';
 import { fileTools } from '../tools/file.js';
 import { evolveTools } from '../tools/evolve.js';
 
@@ -36,7 +36,7 @@ export const captchaSubagent = {
 - skill: "captcha"`,
   tools: [
     ...captchaTools,
-    ...browserTools,
+    ...triggerTools,
     ...fileTools,
     ...evolveTools,
   ],

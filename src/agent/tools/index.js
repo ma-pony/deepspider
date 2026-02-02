@@ -30,6 +30,9 @@ export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequ
 export { analysisTools, getPendingAnalysis, getPendingChat, sendPanelMessage, startSelector } from './analysis.js';
 export { fileTools, artifactSave, artifactLoad, artifactEdit, artifactGlob, artifactGrep } from './file.js';
 export { evolveTools, evolveSkill } from './evolve.js';
+export { captchaTools } from './captcha.js';
+export { antiDetectTools } from './anti-detect.js';
+export { crawlerTools } from './crawler.js';
 // pythonTools 只在 js2python 子代理中使用，不导出到主工具集
 
 // 所有工具
@@ -61,6 +64,9 @@ import { tracingTools } from './tracing.js';
 import { analysisTools } from './analysis.js';
 import { fileTools } from './file.js';
 import { evolveTools } from './evolve.js';
+import { captchaTools } from './captcha.js';
+import { antiDetectTools } from './anti-detect.js';
+import { crawlerTools } from './crawler.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -91,6 +97,9 @@ export const allTools = [
   ...analysisTools,
   ...fileTools,
   ...evolveTools,
+  ...captchaTools,
+  ...antiDetectTools,
+  ...crawlerTools,
 ];
 
 /**
