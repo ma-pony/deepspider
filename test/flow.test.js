@@ -6,6 +6,8 @@ import { ASTAnalyzer } from '../src/analyzer/ASTAnalyzer.js';
 import { CallStackAnalyzer } from '../src/analyzer/CallStackAnalyzer.js';
 import { EncryptionAnalyzer } from '../src/analyzer/EncryptionAnalyzer.js';
 import { Deobfuscator } from '../src/analyzer/Deobfuscator.js';
+import { Sandbox } from '../src/core/Sandbox.js';
+import { Store } from '../src/store/Store.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -69,9 +71,8 @@ console.log('  关键字符串:', keywords.map(s => `"${s.value}"`).join(', '));
 
 // Step 7: 沙箱执行
 console.log('\n【Step 7】沙箱执行');
-const forge = new JSForge({ logLevel: 'error' });
-await forge.init();
-const result = await forge.sandbox.execute(code, { timeout: 5000 });
+const sandbox = new Sandbox();
+const result = await sandbox.execute(code, { timeout: 5000 });
 console.log('  执行状态:', result.success ? '✅ 成功' : '❌ 失败');
 console.log('  结果:', result.result);
 
@@ -86,5 +87,4 @@ store.save('analysis', 'v2_ob_advanced', {
 });
 console.log('  已保存到 Store');
 
-await forge.dispose();
 console.log('\n=== 流程测试完成 ===');

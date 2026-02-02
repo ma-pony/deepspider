@@ -6,6 +6,7 @@ import { ASTAnalyzer } from '../src/analyzer/ASTAnalyzer.js';
 import { CallStackAnalyzer } from '../src/analyzer/CallStackAnalyzer.js';
 import { EncryptionAnalyzer } from '../src/analyzer/EncryptionAnalyzer.js';
 import { Deobfuscator } from '../src/analyzer/Deobfuscator.js';
+import { Sandbox } from '../src/core/Sandbox.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -74,10 +75,9 @@ console.log('');
 
 // 测试 7: 沙箱执行
 console.log('【测试7】沙箱执行');
-const forge = new JSForge();
-await forge.init();
+const sandbox = new Sandbox();
 
-const execResult = await forge.sandbox.execute(obfuscatedCode);
+const execResult = await sandbox.execute(obfuscatedCode);
 console.log('执行成功:', execResult.success);
 if (execResult.success) {
   console.log('执行结果:', execResult.result);
@@ -86,7 +86,5 @@ if (execResult.success) {
   console.log('错误类型:', execResult.errorType);
   console.log('缺失环境:', execResult.missingEnv);
 }
-
-await forge.dispose();
 
 console.log('\n=== 测试完成 ===');
