@@ -29,6 +29,7 @@ export { extractorTools, listFunctions, getFunctionCode } from './extractor.js';
 export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequestList, getScriptList, getScriptSource, searchInScripts, clearSiteData, clearAllData } from './tracing.js';
 export { analysisTools, getPendingAnalysis, getPendingChat, sendPanelMessage, startSelector } from './analysis.js';
 export { fileTools, artifactSave, artifactLoad, artifactEdit, artifactGlob, artifactGrep } from './file.js';
+export { evolveTools, evolveSkill } from './evolve.js';
 // pythonTools 只在 js2python 子代理中使用，不导出到主工具集
 
 // 所有工具
@@ -59,6 +60,7 @@ import { extractorTools } from './extractor.js';
 import { tracingTools } from './tracing.js';
 import { analysisTools } from './analysis.js';
 import { fileTools } from './file.js';
+import { evolveTools } from './evolve.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -88,6 +90,7 @@ export const allTools = [
   ...tracingTools,
   ...analysisTools,
   ...fileTools,
+  ...evolveTools,
 ];
 
 /**
@@ -110,4 +113,6 @@ export const coreTools = [
   ...captureTools,
   // 文件操作
   ...fileTools,
+  // 经验进化
+  ...evolveTools,
 ];

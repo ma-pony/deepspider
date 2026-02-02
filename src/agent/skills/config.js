@@ -19,4 +19,5 @@ export const SKILLS = {
   env: `${BASE_DIR}env`,
   report: `${BASE_DIR}report`,
   js2python: `${BASE_DIR}js2python`,
+  general: `${BASE_DIR}general`,
 };
