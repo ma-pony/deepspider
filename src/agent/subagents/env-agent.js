@@ -3,6 +3,9 @@
  * 方向：通过补全浏览器环境让代码直接运行
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { sandboxTools } from '../tools/sandbox.js';
 import { envDumpTools } from '../tools/envdump.js';
 import { extractTools } from '../tools/extract.js';
@@ -90,5 +93,11 @@ export const envAgentSubagent = {
     ...antiDebugTools,
     ...asyncTools,
     ...storeTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.env],
+    }),
   ],
 };

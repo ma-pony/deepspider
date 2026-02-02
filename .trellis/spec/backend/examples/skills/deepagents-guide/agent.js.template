@@ -1,0 +1,20 @@
+/**
+ * 主 Agent 创建示例
+ */
+import { createDeepAgent, FilesystemBackend } from 'deepagents';
+import { ChatOpenAI } from '@langchain/openai';
+import { MemorySaver } from '@langchain/langgraph';
+
+export function createAgent(options = {}) {
+  const { model, tools, subagents, systemPrompt } = options;
+
+  return createDeepAgent({
+    name: 'my-agent',
+    model: new ChatOpenAI({ model }),
+    tools,
+    subagents,
+    systemPrompt,
+    backend: new FilesystemBackend({ rootDir: './agent-data' }),
+    checkpointer: new MemorySaver(),
+  });
+}

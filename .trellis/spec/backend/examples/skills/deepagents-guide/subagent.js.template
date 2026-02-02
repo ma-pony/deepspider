@@ -1,0 +1,19 @@
+/**
+ * 子代理定义示例
+ */
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+import { myTools } from '../tools/my-tools.js';
+
+export const mySubagent = {
+  name: 'my-agent',
+  description: '专家描述。触发场景。',
+  systemPrompt: `你是专家...`,
+  tools: [...myTools],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.mySkill],
+    }),
+  ],
+};

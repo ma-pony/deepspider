@@ -3,6 +3,9 @@
  * 将 JS 加密逻辑转换为 Python 代码
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { pythonTools } from '../tools/python.js';
 import { analyzerTools } from '../tools/analyzer.js';
 import { fileTools } from '../tools/file.js';
@@ -296,5 +299,11 @@ if __name__ == "__main__":
     ...pythonTools,
     ...analyzerTools,
     ...fileTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.js2python],
+    }),
   ],
 };

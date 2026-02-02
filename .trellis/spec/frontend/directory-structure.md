@@ -28,6 +28,13 @@ src/
 │   │   ├── static.js      # 静态分析子代理
 │   │   ├── dynamic.js     # 动态分析子代理
 │   │   └── sandbox.js     # 沙箱执行子代理
+│   ├── skills/            # Agent Skills（领域知识）
+│   │   ├── config.js      # Skills 配置
+│   │   ├── static-analysis/  # 静态分析经验
+│   │   ├── dynamic-analysis/ # 动态分析经验
+│   │   ├── env/           # 补环境经验
+│   │   ├── sandbox/       # 沙箱执行经验
+│   │   └── js2python/     # JS转Python经验
 │   ├── middleware/        # Agent 中间件
 │   └── prompts/           # 系统提示词
 ├── browser/               # 浏览器运行时
@@ -70,14 +77,15 @@ src/
 
 1. **新增工具**: 在 `src/agent/tools/` 下创建文件，导出工具数组，在 `index.js` 中汇总
 2. **新增子代理**: 在 `src/agent/subagents/` 下创建文件，定义 subagent 对象
-3. **新增分析器**: 在 `src/analyzer/` 下创建类文件
-4. **新增 Hook**: 在 `src/browser/hooks/` 或 `src/env/` 下创建
-5. **新增环境模拟**: 在 `src/env/modules/` 对应子目录下创建
+3. **新增 Skill**: 在 `src/agent/skills/` 下创建目录，包含 `SKILL.md` 文件
+4. **新增分析器**: 在 `src/analyzer/` 下创建类文件
+5. **新增 Hook**: 在 `src/browser/hooks/` 或 `src/env/` 下创建
+6. **新增环境模拟**: 在 `src/env/modules/` 对应子目录下创建
 
 ### 模块依赖关系
 
 ```
-agent/ ──────> tools/, subagents/, prompts/
+agent/ ──────> tools/, subagents/, skills/, prompts/
    │
    └──────────> browser/, analyzer/, store/, core/
                    │

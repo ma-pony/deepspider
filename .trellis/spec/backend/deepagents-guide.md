@@ -1,0 +1,199 @@
+# DeepAgents 框架使用指南
+
+> JSForge 项目的 DeepAgents 框架规范
+
+---
+
+## Overview
+
+DeepAgents 是基于 LangGraph 的 Agent 框架，JSForge 使用它构建多代理系统。
+
+---
+
+## Agent 创建
+
+### 基础配置
+
+```javascript
+import { createDeepAgent, FilesystemBackend } from 'deepagents';
+import { ChatOpenAI } from '@langchain/openai';
+
+const agent = createDeepAgent({
+  name: 'jsforge',
+  model: new ChatOpenAI({ model: 'gpt-4o' }),
+  tools: coreTools,
+  subagents: allSubagents,
+  systemPrompt,
+  backend: new FilesystemBackend({ rootDir: './.jsforge-agent' }),
+});
+```
+
+### 必需参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `name` | string | Agent 名称 |
+| `model` | BaseChatModel | LLM 模型实例 |
+| `tools` | Tool[] | 工具数组 |
+| `systemPrompt` | string | 系统提示词 |
+
+---
+
+## 子代理定义
+
+### 字典式子代理
+
+```javascript
+export const staticSubagent = {
+  name: 'static-agent',
+  description: '静态代码分析专家。当需要分析混淆代码时使用。',
+  systemPrompt: `你是静态分析专家...`,
+  tools: [...analyzerTools, ...deobfuscatorTools],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.static],
+    }),
+  ],
+};
+```
+
+### 必需字段
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 子代理名称，用于调用 |
+| `description` | 描述何时使用该子代理 |
+| `systemPrompt` | 子代理的系统提示 |
+| `tools` | 子代理可用的工具 |
+
+### 可选字段
+
+| 字段 | 说明 |
+|------|------|
+| `model` | 覆盖默认模型 |
+| `middleware` | 子代理中间件（如 Skills） |
+
+---
+
+## Skills 系统
+
+### 配置独立 Skills
+
+每个子代理只加载属于自己的 skills：
+
+```javascript
+// src/agent/skills/config.js
+export const SKILLS = {
+  static: `${BASE_DIR}static-analysis`,
+  dynamic: `${BASE_DIR}dynamic-analysis`,
+  sandbox: `${BASE_DIR}sandbox`,
+  env: `${BASE_DIR}env`,
+};
+```
+
+### 子代理绑定 Skills
+
+```javascript
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
+export const staticSubagent = {
+  // ...其他配置
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.static],  // 只加载静态分析 skill
+    }),
+  ],
+};
+```
+
+### SKILL.md 格式
+
+```markdown
+---
+name: skill-name
+description: |
+  技能描述。触发场景。关键词。
+---
+
+# 技能内容
+
+只写领域知识和经验，不写工具调用。
+```
+
+---
+
+## 后端存储
+
+### FilesystemBackend（推荐）
+
+```javascript
+import { FilesystemBackend } from 'deepagents';
+
+const backend = new FilesystemBackend({
+  rootDir: './.jsforge-agent',
+});
+```
+
+### StateBackend（临时）
+
+```javascript
+import { StateBackend } from 'deepagents';
+
+const backend = new StateBackend();  // 数据不持久化
+```
+
+---
+
+## 人机交互
+
+### 配置敏感工具审批
+
+```javascript
+const agent = createDeepAgent({
+  interruptOn: {
+    sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
+    sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
+  },
+  checkpointer: new MemorySaver(),  // 必需
+});
+```
+
+---
+
+## 最佳实践
+
+### 子代理描述要具体
+
+```javascript
+// ✅ 好
+description: '静态代码分析专家。当需要分析混淆代码结构时使用，适用于：Webpack 解包、反混淆、定位加密函数。'
+
+// ❌ 差
+description: '分析代码'
+```
+
+### 工具集要专注
+
+```javascript
+// ✅ 好：静态分析子代理只有分析工具
+tools: [...analyzerTools, ...deobfuscatorTools, ...traceTools]
+
+// ❌ 差：混入不相关工具
+tools: [...analyzerTools, ...browserTools, ...sandboxTools]
+```
+
+### Skills 只写经验
+
+```markdown
+// ✅ 好：领域知识
+## 常见检测点
+- navigator.webdriver → undefined
+- window.chrome → 完整对象
+
+// ❌ 差：工具调用
+## 工具使用
+- sandbox_inject(code) - 注入代码
+```

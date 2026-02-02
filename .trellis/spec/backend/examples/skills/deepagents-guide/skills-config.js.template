@@ -1,0 +1,13 @@
+/**
+ * Skills 配置示例
+ */
+import { FilesystemBackend } from 'deepagents';
+
+export const skillsBackend = new FilesystemBackend({ rootDir: '/' });
+
+const BASE_DIR = new URL('.', import.meta.url).pathname;
+
+export const SKILLS = {
+  static: `${BASE_DIR}static-analysis`,
+  dynamic: `${BASE_DIR}dynamic-analysis`,
+};

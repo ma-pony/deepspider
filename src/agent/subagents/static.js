@@ -2,6 +2,9 @@
  * JSForge - 静态分析子代理
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { analyzerTools } from '../tools/analyzer.js';
 import { deobfuscatorTools } from '../tools/deobfuscator.js';
 import { traceTools } from '../tools/trace.js';
@@ -71,5 +74,11 @@ export const staticSubagent = {
     ...traceTools,
     ...extractorTools,
     ...storeTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.static],
+    }),
   ],
 };

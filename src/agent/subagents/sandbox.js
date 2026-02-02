@@ -2,6 +2,9 @@
  * JSForge - 沙箱验证子代理
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { sandboxTools } from '../tools/sandbox.js';
 import { patchTools } from '../tools/patch.js';
 import { envTools } from '../tools/env.js';
@@ -58,5 +61,11 @@ export const sandboxSubagent = {
     ...envTools,
     ...verifyTools,
     ...fileTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.sandbox],
+    }),
   ],
 };

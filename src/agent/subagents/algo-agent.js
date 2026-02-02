@@ -3,6 +3,9 @@
  * 方向：通过解混淆和AST分析还原算法逻辑
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { analyzerTools } from '../tools/analyzer.js';
 import { deobfuscatorTools } from '../tools/deobfuscator.js';
 import { traceTools } from '../tools/trace.js';
@@ -85,5 +88,11 @@ export const algoAgentSubagent = {
     ...correlateTools,
     ...extractorTools,
     ...storeTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.static],
+    }),
   ],
 };

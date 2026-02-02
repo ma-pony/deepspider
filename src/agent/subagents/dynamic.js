@@ -2,6 +2,9 @@
  * JSForge - 动态分析子代理
  */
 
+import { createSkillsMiddleware } from 'deepagents';
+import { SKILLS, skillsBackend } from '../skills/config.js';
+
 import { runtimeTools } from '../tools/runtime.js';
 import { debugTools } from '../tools/debug.js';
 import { captureTools } from '../tools/capture.js';
@@ -94,5 +97,11 @@ export const dynamicSubagent = {
     ...cryptoHookTools,
     ...correlateTools,
     ...tracingTools,
+  ],
+  middleware: [
+    createSkillsMiddleware({
+      backend: skillsBackend,
+      sources: [SKILLS.dynamic],
+    }),
   ],
 };
