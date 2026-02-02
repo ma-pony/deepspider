@@ -197,3 +197,31 @@ tools: [...analyzerTools, ...browserTools, ...sandboxTools]
 ## 工具使用
 - sandbox_inject(code) - 注入代码
 ```
+
+---
+
+## 常见错误
+
+### 错误 1: 所有 agent 加载全部 skills
+
+**问题**: 使用单一 `SKILLS_DIR` 让所有 agent 加载全部 skills。
+
+**后果**: 上下文膨胀，skills 内容与 agent 职责不匹配。
+
+**正确做法**: 每个 agent 只加载自己的 skills。
+
+### 错误 2: 主 agent 加载 skills
+
+**问题**: 主 agent 配置了 `skills: [SKILLS_DIR]`。
+
+**后果**: 主 agent 负责分发任务，不需要领域知识。
+
+**正确做法**: 主 agent 不配置 skills，只有子代理配置。
+
+### 错误 3: SKILL.md 写工具文档
+
+**问题**: 在 SKILL.md 中列出工具名称和参数说明。
+
+**后果**: 与 systemPrompt 重复，浪费 token。
+
+**正确做法**: Skills 只写领域经验、技巧、常见问题。
