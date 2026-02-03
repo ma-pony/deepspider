@@ -6,7 +6,7 @@
 
 ## Overview
 
-DeepSpider 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构建的 JS 逆向分析引擎。
+DeepSpider 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构建的智能爬虫 Agent。
 项目采用模块化架构，按功能职责划分目录。
 
 ---

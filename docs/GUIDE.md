@@ -1,6 +1,6 @@
 # DeepSpider 开发使用指南
 
-> JavaScript 逆向分析引擎 - Claude Code Plugin
+> 智能爬虫 Agent - 基于 DeepAgents + Patchright
 
 ## 目录
 
@@ -16,7 +16,7 @@
 
 ## 项目概述
 
-DeepSpider 是一个专业的 JavaScript 逆向分析引擎，作为 Claude Code Plugin 运行。
+DeepSpider 是一个智能爬虫 Agent，基于 DeepAgents + Patchright 构建。
 
 ### 核心能力
 

@@ -27,7 +27,7 @@ let browser = null;
 let currentPage = null;
 
 console.log('=== DeepSpider Agent ===');
-console.log('JS 逆向分析助手，输入 exit 退出\n');
+console.log('智能爬虫 Agent，输入 exit 退出\n');
 
 // 调试模式
 const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');

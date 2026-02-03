@@ -1,6 +1,6 @@
 /**
  * DeepSpider - 主入口
- * 基于 DeepAgents 的 JS 逆向分析引擎
+ * 基于 DeepAgents + Patchright 的智能爬虫 Agent
  */
 
 // Agent

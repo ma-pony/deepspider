@@ -6,7 +6,7 @@
 
 ## Overview
 
-DeepSpider 是基于 DeepAgents + Patchright 的 JS 逆向分析引擎。
+DeepSpider 是基于 DeepAgents + Patchright 的智能爬虫 Agent。
 本目录包含项目的开发规范和代码模式。
 
 ---
