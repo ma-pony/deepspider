@@ -23,6 +23,7 @@ export const SKILLS = {
   captcha: `${BASE_DIR}captcha`,
   antiDetect: `${BASE_DIR}anti-detect`,
   crawler: `${BASE_DIR}crawler`,
+  xpath: `${BASE_DIR}xpath`,
   // 通用
   report: `${BASE_DIR}report`,
   general: `${BASE_DIR}general`,
