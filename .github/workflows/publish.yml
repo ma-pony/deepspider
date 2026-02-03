@@ -23,7 +23,7 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
 
@@ -43,7 +43,7 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
