@@ -34,7 +34,36 @@ pnpm run setup:crypto
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 DEEPSPIDER_API_KEY, DEEPSPIDER_BASE_URL, DEEPSPIDER_MODEL
+# 编辑 .env 填入配置（见下方环境变量说明）
+```
+
+### 环境变量配置
+
+DeepSpider 需要配置 LLM API 才能运行。支持任何兼容 OpenAI 格式的供应商。
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `DEEPSPIDER_API_KEY` | 是 | API 密钥 |
+| `DEEPSPIDER_BASE_URL` | 是 | API 地址 |
+| `DEEPSPIDER_MODEL` | 是 | 模型名称 |
+
+**常用供应商配置示例**：
+
+```bash
+# OpenAI
+DEEPSPIDER_API_KEY=sk-xxx
+DEEPSPIDER_BASE_URL=https://api.openai.com/v1
+DEEPSPIDER_MODEL=gpt-4o
+
+# DeepSeek
+DEEPSPIDER_API_KEY=sk-xxx
+DEEPSPIDER_BASE_URL=https://api.deepseek.com/v1
+DEEPSPIDER_MODEL=deepseek-chat
+
+# 其他 OpenAI 兼容供应商
+DEEPSPIDER_API_KEY=your-key
+DEEPSPIDER_BASE_URL=https://your-provider.com/v1
+DEEPSPIDER_MODEL=model-name
 ```
 
 ### 使用
