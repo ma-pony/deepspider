@@ -108,7 +108,7 @@ export const e2eTest = tool(
     description: '端到端测试爬虫脚本',
     schema: z.object({
       script_path: z.string().describe('脚本路径'),
-      test_params: z.record(z.any()).optional().describe('测试参数'),
+      test_params: z.record(z.string(), z.unknown()).optional().describe('测试参数'),
     }),
   }
 );

@@ -247,6 +247,68 @@ export const getPageInfo = tool(
   }
 );
 
+/**
+ * 获取浏览器 Cookie - CDP
+ */
+export const getCookies = tool(
+  async ({ domain, format }) => {
+    const browser = await getBrowser();
+    const cdp = await browser.getCDPSession();
+
+    // 获取当前页面 URL 用于过滤
+    const currentUrl = await cdpEvaluate(browser, 'location.href');
+    const urls = domain ? undefined : [currentUrl];
+
+    const result = await cdp.send('Network.getCookies', { urls });
+    let cookies = result.cookies || [];
+
+    // 按域名过滤
+    if (domain) {
+      cookies = cookies.filter(c => c.domain.includes(domain));
+    }
+
+    // 根据格式返回
+    if (format === 'header') {
+      // 返回可直接用于请求头的格式
+      const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      return JSON.stringify({ success: true, cookie: cookieStr, count: cookies.length });
+    } else if (format === 'dict') {
+      // 返回字典格式，方便 Python requests 使用
+      const cookieDict = {};
+      cookies.forEach(c => { cookieDict[c.name] = c.value; });
+      return JSON.stringify({ success: true, cookies: cookieDict, count: cookies.length });
+    } else {
+      // 返回完整信息
+      return JSON.stringify({
+        success: true,
+        cookies: cookies.map(c => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain,
+          path: c.path,
+          expires: c.expires,
+          httpOnly: c.httpOnly,
+          secure: c.secure,
+        })),
+        count: cookies.length
+      });
+    }
+  },
+  {
+    name: 'get_cookies',
+    description: `获取浏览器 Cookie，用于端到端验证时构造请求。
+
+返回格式：
+- full: 完整信息（默认）
+- header: Cookie 请求头格式，如 "name1=value1; name2=value2"
+- dict: 字典格式，方便 Python requests.cookies 使用`,
+    schema: z.object({
+      domain: z.string().optional().describe('按域名过滤（可选）'),
+      format: z.enum(['full', 'header', 'dict']).default('full').describe('返回格式'),
+    }),
+  }
+);
+
 export const browserTools = [
   clickElement,
   fillInput,
@@ -258,4 +320,5 @@ export const browserTools = [
   pressKey,
   hoverElement,
   getPageInfo,
+  getCookies,
 ];
