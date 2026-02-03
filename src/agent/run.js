@@ -13,6 +13,7 @@ import { createJSForgeAgent } from './index.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
+import { browserTools } from './tools/browser.js';
 
 const args = process.argv.slice(2);
 const targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
@@ -30,6 +31,55 @@ console.log('JS 逆向分析助手，输入 exit 退出\n');
 
 // 调试模式
 const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');
+
+// 重试配置
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 2000,
+  maxDelayMs: 30000,
+};
+
+// 人工介入配置
+const INTERVENTION_CONFIG = {
+  idleTimeoutMs: 120000,  // 2分钟无响应触发提示
+  checkIntervalMs: 30000, // 30秒检测一次
+  // 从 browserTools 获取可能触发风控的工具名称
+  riskTools: browserTools.map(t => t.name),
+};
+
+/**
+ * 判断是否为工具参数错误（需要 LLM 修正）
+ */
+function isToolSchemaError(errMsg) {
+  return /did not match expected schema|Invalid input|tool input/i.test(errMsg);
+}
+
+/**
+ * 判断是否为 API 服务错误（可直接重试）
+ */
+function isApiServiceError(errMsg) {
+  return /503|502|429|rate limit|无可用渠道|timeout|ECONNRESET|ETIMEDOUT/i.test(errMsg);
+}
+
+/**
+ * 计算重试延迟（指数退避 + 抖动）
+ */
+function getRetryDelay(retryCount) {
+  const delay = Math.min(
+    RETRY_CONFIG.baseDelayMs * Math.pow(2, retryCount),
+    RETRY_CONFIG.maxDelayMs
+  );
+  // 添加 0-25% 的随机抖动
+  const jitter = delay * Math.random() * 0.25;
+  return Math.round(delay + jitter);
+}
+
+/**
+ * 延迟函数
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // DeepSeek 特殊标记清理
 const DSML_PATTERN = /｜DSML｜/g;
@@ -166,7 +216,6 @@ async function flushPanelText() {
  * 流式对话 - 显示思考过程（带重试）
  */
 async function chatStream(input, page = null, retryCount = 0) {
-  const MAX_RETRIES = 2;
   currentPage = page;
   let finalResponse = '';
   let lastEventTime = Date.now();
@@ -183,12 +232,22 @@ async function chatStream(input, page = null, retryCount = 0) {
   debug(`chatStream: 开始处理, 输入长度=${input.length}, page=${!!page}`);
 
   // 心跳检测 - 每30秒输出状态
+  let interventionNotified = false;
   const heartbeat = setInterval(() => {
     const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
     if (elapsed > 30) {
       console.log(`\n[心跳] 已等待 ${elapsed}s, 事件数=${eventCount}, 最后工具=${lastToolCall || '无'}`);
     }
-  }, 30000);
+
+    // 超时提示 - 只在风险工具调用后提示
+    const isRiskTool = lastToolCall && INTERVENTION_CONFIG.riskTools.includes(lastToolCall);
+    if (elapsed * 1000 > INTERVENTION_CONFIG.idleTimeoutMs && !interventionNotified && isRiskTool) {
+      interventionNotified = true;
+      const msg = '⚠️ 页面操作后长时间无响应，可能遇到验证码或风控，请检查浏览器';
+      console.log('\n[提示] ' + msg);
+      sendToPanel('system', msg).catch(() => {});
+    }
+  }, INTERVENTION_CONFIG.checkIntervalMs);
 
   try {
     debug('chatStream: 创建事件流');
@@ -241,24 +300,25 @@ async function chatStream(input, page = null, retryCount = 0) {
 
     console.error(`\n[异常] 事件数=${eventCount}, 最后工具=${lastToolCall || '无'}, 错误: ${errMsg}`);
 
-    // 工具调用参数错误，可以重试
-    const isRetryable = errMsg.includes('did not match expected schema') ||
-                        errMsg.includes('Invalid input') ||
-                        errMsg.includes('tool input');
+    // 检查是否可重试
+    if (retryCount < RETRY_CONFIG.maxRetries) {
+      // API 服务错误 - 从检查点恢复
+      if (isApiServiceError(errMsg)) {
+        const delay = getRetryDelay(retryCount);
+        console.log(`\n[重试 ${retryCount + 1}/${RETRY_CONFIG.maxRetries}] API错误，${delay}ms 后从检查点恢复...`);
+        await sendToPanel('system', `服务暂时不可用，${Math.round(delay/1000)}s 后重试 (${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+        await sleep(delay);
+        // 从检查点恢复：不传入新消息，使用相同 thread_id
+        return chatStreamResume(page, retryCount + 1);
+      }
 
-    if (isRetryable && retryCount < MAX_RETRIES) {
-      console.log(`\n[重试 ${retryCount + 1}/${MAX_RETRIES}] 工具调用失败，从检查点恢复...`);
-      await sendToPanel('system', `工具调用失败，从检查点恢复 (${retryCount + 1}/${MAX_RETRIES})`);
-
-      // 使用 Command.resume 从检查点恢复，而不是重新开始
-      // 发送错误信息让 LLM 修正参数
-      const resumeInput = {
-        messages: [{
-          role: 'user',
-          content: `工具调用失败: ${errMsg}\n请检查参数并重试。`
-        }]
-      };
-      return chatStreamResume(resumeInput, page, retryCount + 1);
+      // 工具参数错误 - 发送错误信息让 LLM 修正
+      if (isToolSchemaError(errMsg)) {
+        console.log(`\n[重试 ${retryCount + 1}/${RETRY_CONFIG.maxRetries}] 工具参数错误，发送修正请求...`);
+        await sendToPanel('system', `工具调用失败，正在修正 (${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+        const resumeInput = `工具调用失败: ${errMsg}\n请检查参数格式并重试。`;
+        return chatStream(resumeInput, page, retryCount + 1);
+      }
     }
 
     return `错误: ${errMsg}`;
@@ -267,39 +327,34 @@ async function chatStream(input, page = null, retryCount = 0) {
 
 /**
  * 从检查点恢复流式对话
- * 使用相同的 thread_id 继续对话，而不是从头开始
+ * 不传入新消息，使用相同 thread_id 从上次中断处继续
  */
-async function chatStreamResume(input, page = null, retryCount = 0) {
+async function chatStreamResume(page = null, retryCount = 0) {
   currentPage = page;
   let finalResponse = '';
   let lastEventTime = Date.now();
   let eventCount = 0;
-  let lastToolCall = null;
 
-  // 设置忙碌状态
   await evaluateInPage('window.__jsforge__?.setBusy?.(true)');
-
   debug(`chatStreamResume: 从检查点恢复, retryCount=${retryCount}`);
 
   const heartbeat = setInterval(() => {
     const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
     if (elapsed > 30) {
-      console.log(`\n[心跳] 已等待 ${elapsed}s, 事件数=${eventCount}`);
+      console.log(`\n[心跳] 恢复中，已等待 ${elapsed}s`);
     }
   }, 30000);
 
   try {
-    // 使用相同的 config（包含相同的 thread_id）继续对话
-    const eventStream = await agent.streamEvents(input, { ...config, version: 'v2' });
+    // 从检查点恢复：传入 null 或空消息
+    const eventStream = await agent.streamEvents(
+      { messages: [] },
+      { ...config, version: 'v2' }
+    );
 
     for await (const event of eventStream) {
       lastEventTime = Date.now();
       eventCount++;
-
-      if (event.event === 'on_tool_start') {
-        lastToolCall = event.name;
-      }
-
       await handleStreamEvent(event);
 
       if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
@@ -313,13 +368,22 @@ async function chatStreamResume(input, page = null, retryCount = 0) {
     clearInterval(heartbeat);
     await flushPanelText();
     await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
-
+    console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
     return finalResponse || '[无响应]';
   } catch (error) {
     clearInterval(heartbeat);
     await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
     const errMsg = error.message || String(error);
     console.error(`\n[恢复失败] ${errMsg}`);
+
+    // 恢复失败也可以重试
+    if (isApiServiceError(errMsg) && retryCount < RETRY_CONFIG.maxRetries) {
+      const delay = getRetryDelay(retryCount);
+      console.log(`\n[重试 ${retryCount + 1}/${RETRY_CONFIG.maxRetries}] ${delay}ms 后再次恢复...`);
+      await sleep(delay);
+      return chatStreamResume(page, retryCount + 1);
+    }
+
     return `恢复失败: ${errMsg}`;
   }
 }
@@ -424,14 +488,39 @@ async function handleBrowserMessage(data, page) {
   let userPrompt;
   if (data.type === 'analysis') {
     const iframeInfo = data.iframeSrc ? `\niframe来源: ${data.iframeSrc}` : '';
-    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求分析来源：\n"${data.text}"\nXPath: ${data.xpath}${iframeInfo}\n\n请直接使用 search_in_responses 搜索选中文本定位来源，分析加密逻辑。`;
+    const analysisType = data.analysisType || 'full';
+
+    // 根据分析类型生成不同的提示
+    const typePrompts = {
+      source: '请使用 search_in_responses 搜索选中文本，定位数据来源请求。',
+      crypto: '请分析该数据涉及的加密逻辑，识别加密算法并生成 Python 代码。',
+      full: '请使用 search_in_responses 搜索选中文本定位来源，分析加密逻辑，生成完整的 Python 代码。'
+    };
+
+    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求分析：
+"${data.text}"
+XPath: ${data.xpath}${iframeInfo}
+
+分析类型: ${analysisType}
+${typePrompts[analysisType] || typePrompts.full}`;
+  } else if (data.type === 'generate-config') {
+    // 生成爬虫配置 - 使用 crawler 子代理
+    const config = data.config;
+    userPrompt = `${browserReadyPrefix}请使用 crawler 子代理生成爬虫。
+
+用户已选择 ${config.fields.length} 个字段：
+${JSON.stringify(config.fields, null, 2)}
+
+目标URL: ${data.url}
+
+请先用 query_store 查询已有的加密代码，然后整合生成配置和脚本。`;
   } else if (data.type === 'chat') {
     userPrompt = `${browserReadyPrefix}${data.text}`;
   } else {
     return;
   }
 
-  console.log('\n[浏览器] ' + (data.type === 'analysis' ? '分析请求' : '对话'));
+  console.log('\n[浏览器] ' + (data.type === 'analysis' ? '分析请求' : data.type === 'generate-config' ? '生成配置' : '对话'));
   await chatStream(userPrompt, page);
   console.log('\n');
   // 流式输出已经同步到面板，无需再次发送
