@@ -5,8 +5,9 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
-import { antiDetectTools } from '../tools/anti-detect.js';
+import { antiDetectTools } from '../tools/index.js';
 import { browserTools } from '../tools/browser.js';
 import { fileTools } from '../tools/file.js';
 import { evolveTools } from '../tools/evolve.js';
@@ -35,6 +36,7 @@ export const antiDetectSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.antiDetect],

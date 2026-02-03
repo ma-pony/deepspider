@@ -4,8 +4,10 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { sandboxTools } from '../tools/sandbox.js';
+import { nodejsTools } from '../tools/nodejs.js';
 import { patchTools } from '../tools/patch.js';
 import { envTools } from '../tools/env.js';
 import { verifyTools } from '../tools/verify.js';
@@ -23,6 +25,10 @@ export const sandboxSubagent = {
 - 生成可独立运行的脚本
 - 验证加密结果是否正确
 
+## 执行工具选择
+- sandbox_execute: 隔离沙箱，适合不需要外部依赖的代码
+- run_node_code: Node.js 执行，适合需要 require npm 包的代码（如 crypto-js）
+
 ## 输出
 - 验证结果
 - 可执行的 JS 模块
@@ -32,6 +38,7 @@ export const sandboxSubagent = {
 - skill: "sandbox"`,
   tools: [
     ...sandboxTools,
+    ...nodejsTools,
     ...patchTools,
     ...envTools,
     ...verifyTools,
@@ -39,6 +46,7 @@ export const sandboxSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.sandbox],

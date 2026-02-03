@@ -5,8 +5,10 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { pythonTools } from '../tools/python.js';
+import { nodejsTools } from '../tools/nodejs.js';
 import { analyzerTools } from '../tools/analyzer.js';
 import { fileTools } from '../tools/file.js';
 import { evolveTools } from '../tools/evolve.js';
@@ -29,10 +31,11 @@ export const js2pythonSubagent = {
 
 ## 工作流程
 1. 分析 JS 代码，识别加密算法类型
-2. 选择转换策略
-3. 生成 Python 代码
-4. 验证结果一致性
-5. 使用 artifact_save 保存文件
+2. 使用 run_node_code 执行原始 JS 获取基准结果
+3. 选择转换策略
+4. 生成 Python 代码
+5. 验证结果一致性
+6. 使用 artifact_save 保存文件
 
 ## 输出规范
 
@@ -54,11 +57,13 @@ export const js2pythonSubagent = {
 - skill: "js2python"`,
   tools: [
     ...pythonTools,
+    ...nodejsTools,
     ...analyzerTools,
     ...fileTools,
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.js2python],

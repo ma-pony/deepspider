@@ -5,8 +5,10 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { sandboxTools } from '../tools/sandbox.js';
+import { nodejsTools } from '../tools/nodejs.js';
 import { envDumpTools } from '../tools/envdump.js';
 import { extractTools } from '../tools/extract.js';
 import { patchTools } from '../tools/patch.js';
@@ -46,6 +48,10 @@ export const envAgentSubagent = {
 3. sandbox_inject 注入
 4. sandbox_execute 执行
 
+## 执行工具选择
+- sandbox_execute: 隔离沙箱，适合补环境后的代码执行
+- run_node_code: Node.js 执行，适合需要 require npm 包的场景
+
 ## 失败处理
 如果补环境多次失败，建议切换到纯算分析方向。
 
@@ -54,6 +60,7 @@ export const envAgentSubagent = {
 - skill: "env"`,
   tools: [
     ...sandboxTools,
+    ...nodejsTools,
     ...envDumpTools,
     ...extractTools,
     ...patchTools,
@@ -66,6 +73,7 @@ export const envAgentSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.env],

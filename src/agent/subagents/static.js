@@ -4,6 +4,7 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { analyzerTools } from '../tools/analyzer.js';
 import { deobfuscatorTools } from '../tools/deobfuscator.js';
@@ -56,6 +57,7 @@ export const staticSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.static],

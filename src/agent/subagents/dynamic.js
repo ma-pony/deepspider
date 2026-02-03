@@ -4,6 +4,7 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { runtimeTools } from '../tools/runtime.js';
 import { debugTools } from '../tools/debug.js';
@@ -54,6 +55,7 @@ export const dynamicSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.dynamic],

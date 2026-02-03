@@ -5,10 +5,12 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { crawlerTools } from '../tools/crawler.js';
 import { fileTools } from '../tools/file.js';
 import { evolveTools } from '../tools/evolve.js';
+import { storeTools } from '../tools/store.js';
 
 export const crawlerSubagent = {
   name: 'crawler',
@@ -124,11 +126,13 @@ if __name__ == "__main__":
     ...crawlerTools,
     ...fileTools,
     ...evolveTools,
+    ...storeTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
-      sources: [SKILLS.crawler],
+      sources: [SKILLS.crawler, SKILLS.xpath],
     }),
   ],
 };

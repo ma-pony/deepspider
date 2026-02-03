@@ -5,6 +5,7 @@
 
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
+import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
 
 import { captchaTools } from '../tools/captcha.js';
 import { browserTools } from '../tools/browser.js';
@@ -41,6 +42,7 @@ export const captchaSubagent = {
     ...evolveTools,
   ],
   middleware: [
+    createFilterToolsMiddleware(),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: [SKILLS.captcha],
