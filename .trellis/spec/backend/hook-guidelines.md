@@ -81,3 +81,98 @@ const hook = ...;
   const hook = ...;
 })();
 ```
+
+### 3. 闭包变量陷阱
+
+```javascript
+// ❌ 错误：循环中的闭包
+for (const trap in handler) {
+  wrappedHandler[trap] = function() {
+    console.log(trap); // trap 始终是最后一个值
+  };
+}
+
+// ✅ 正确：使用函数工厂
+function wrapTrap(trapName, fn) {
+  return function() {
+    console.log(trapName);
+    return fn.apply(this, arguments);
+  };
+}
+for (const trap in handler) {
+  wrappedHandler[trap] = wrapTrap(trap, handler[trap]);
+}
+```
+
+---
+
+## Anti-Detection Patterns
+
+Hook 容易被网站检测，必须做好伪装。
+
+### 1. toString 伪装（必须）
+
+```javascript
+const originalToString = Function.prototype.toString;
+const hookedFns = new WeakMap();
+
+// 包装函数
+function native(hookFunc, originalFunc) {
+  hookedFns.set(hookFunc, originalToString.call(originalFunc));
+  return hookFunc;
+}
+
+// 重写 toString
+Function.prototype.toString = function() {
+  return hookedFns.has(this)
+    ? hookedFns.get(this)
+    : originalToString.call(this);
+};
+```
+
+### 2. getOwnPropertyDescriptor 保护
+
+```javascript
+// 网站可能检测属性描述符
+const origGetDesc = Object.getOwnPropertyDescriptor;
+Object.getOwnPropertyDescriptor = function(obj, prop) {
+  const desc = origGetDesc.call(Object, obj, prop);
+  if (desc && hookedFns.has(desc.value)) {
+    return { value: desc.value, writable: true, enumerable: false, configurable: true };
+  }
+  return desc;
+};
+```
+
+### 3. 隐藏内部属性
+
+```javascript
+// 隐藏 __jsforge__ 等内部属性
+const hiddenProps = ['__jsforge__'];
+const origKeys = Object.keys;
+Object.keys = function(obj) {
+  const keys = origKeys.call(Object, obj);
+  return obj === window ? keys.filter(k => !hiddenProps.includes(k)) : keys;
+};
+```
+
+---
+
+## Dynamic Hook Management
+
+Hook 应支持运行时动态启用/禁用。
+
+### 架构设计
+
+| 类型 | 控制方式 | 用途 |
+|------|----------|------|
+| 内置 Hook | config[name] | xhr, fetch, crypto 等 |
+| 自定义 Hook | hookRegistry | 针对特定网站 |
+
+### 性能优化
+
+| 配置项 | 默认 | 说明 |
+|--------|------|------|
+| captureStack | true | 关闭可提升性能 |
+| silent | false | 关闭控制台输出 |
+| logLimit | 50 | 每个 API 日志上限 |

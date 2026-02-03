@@ -54,3 +54,38 @@ obj.func = function(...args) {
   return r;
 };
 ```
+
+## Hook 策略经验
+
+### 何时调整 Hook
+
+**日志刷屏时**：
+- 现象：控制台被 DOM 查询日志淹没
+- 原因：网站频繁操作 DOM（如虚拟滚动、实时更新）
+- 经验：关闭 dom Hook，专注于 crypto/xhr 日志
+
+**定位 Canvas 指纹时**：
+- 现象：需要追踪指纹生成逻辑
+- 经验：启用 env Hook，观察 toDataURL/getImageData 调用
+
+**自定义加密函数**：
+- 现象：crypto 日志没有捕获到加密调用
+- 原因：网站用了自定义函数名（如 `window.encrypt`、`utils.sign`）
+- 经验：注入针对性 Hook，监控特定函数
+
+### 常见陷阱
+
+**Hook 被检测**：
+- 现象：网站检测到 Hook 后行为异常
+- 原因：检查了 `Function.prototype.toString`
+- 经验：JSForge 已内置 toString 伪装，一般不会触发
+
+**日志丢失**：
+- 现象：明明有加密调用，但日志里没有
+- 原因：加密库在 Hook 注入前就加载了
+- 经验：使用 `add_init_script` 确保 Hook 最先执行
+
+**性能问题**：
+- 现象：页面变卡
+- 原因：调用栈记录开销大
+- 经验：关闭 `captureStack` 或启用 `silent` 模式

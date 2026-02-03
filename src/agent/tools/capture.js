@@ -118,10 +118,62 @@ export const getHookLogs = tool(
     name: 'get_hook_logs',
     description: '获取 Hook 捕获的日志（XHR、Fetch、Cookie、加密调用等）',
     schema: z.object({
-      type: z.string().optional().describe('日志类型: xhr, fetch, cookie, crypto, env, debug, trace。不填则获取全部'),
+      type: z.string().optional().describe('日志类型: xhr, fetch, cookie, crypto, json, eval, storage, encoding, websocket, env, debug, dom。不填则获取全部'),
       limit: z.number().optional().default(50).describe('返回日志数量限制，默认50条'),
     }),
   }
 );
 
-export const captureTools = [collectEnv, collectProperty, autoFixEnv, getHookLogs];
+/**
+ * 搜索 Hook 日志
+ */
+export const searchHookLogs = tool(
+  async ({ keyword }) => {
+    try {
+      const browser = await getBrowser();
+      if (!browser.getPage()) {
+        return JSON.stringify({ success: false, error: '浏览器未就绪' });
+      }
+      const expression = `window.__jsforge__?.searchLogs?.('${keyword}') || '[]'`;
+      const result = await evaluateViaCDP(browser, expression);
+      return JSON.stringify({ success: true, results: JSON.parse(result || '[]') });
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message });
+    }
+  },
+  {
+    name: 'search_hook_logs',
+    description: '按关键词搜索 Hook 日志',
+    schema: z.object({
+      keyword: z.string().describe('搜索关键词'),
+    }),
+  }
+);
+
+/**
+ * 追踪值来源
+ */
+export const traceValue = tool(
+  async ({ value }) => {
+    try {
+      const browser = await getBrowser();
+      if (!browser.getPage()) {
+        return JSON.stringify({ success: false, error: '浏览器未就绪' });
+      }
+      const expression = `window.__jsforge__?.traceValue?.('${value}') || '[]'`;
+      const result = await evaluateViaCDP(browser, expression);
+      return JSON.stringify({ success: true, traces: JSON.parse(result || '[]') });
+    } catch (e) {
+      return JSON.stringify({ success: false, error: e.message });
+    }
+  },
+  {
+    name: 'trace_value',
+    description: '追踪某个值的来源（在哪个加密函数或请求中出现）',
+    schema: z.object({
+      value: z.string().describe('要追踪的值'),
+    }),
+  }
+);
+
+export const captureTools = [collectEnv, collectProperty, autoFixEnv, getHookLogs, searchHookLogs, traceValue];

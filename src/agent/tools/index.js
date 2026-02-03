@@ -33,6 +33,8 @@ export { evolveTools, evolveSkill } from './evolve.js';
 export { captchaTools } from './captcha.js';
 export { antiDetectTools } from './anti-detect.js';
 export { crawlerTools } from './crawler.js';
+export { nodejsTools, runNodeCode } from './nodejs.js';
+export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig } from './hookManager.js';
 // pythonTools 只在 js2python 子代理中使用，不导出到主工具集
 
 // 所有工具
@@ -67,6 +69,8 @@ import { evolveTools } from './evolve.js';
 import { captchaTools } from './captcha.js';
 import { antiDetectTools } from './anti-detect.js';
 import { crawlerTools } from './crawler.js';
+import { nodejsTools } from './nodejs.js';
+import { hookManagerTools } from './hookManager.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -100,6 +104,8 @@ export const allTools = [
   ...captchaTools,
   ...antiDetectTools,
   ...crawlerTools,
+  ...nodejsTools,
+  ...hookManagerTools,
 ];
 
 /**
@@ -124,4 +130,8 @@ export const coreTools = [
   ...fileTools,
   // 经验进化
   ...evolveTools,
+  // Node.js 执行（支持 require）
+  ...nodejsTools,
+  // Hook 动态管理
+  ...hookManagerTools,
 ];
