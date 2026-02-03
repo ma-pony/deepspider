@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  hono: '>=4.11.7'
+
 importers:
 
   .:
@@ -34,7 +37,7 @@ importers:
         version: 1.2.3(@langchain/core@1.1.17(openai@6.17.0(zod@4.3.6)))
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.3
-        version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.5)(zod@4.3.6)
+        version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.7)(zod@4.3.6)
       crypto-js:
         specifier: ^4.2.0
         version: 4.2.0
@@ -44,6 +47,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      hono:
+        specifier: 4.11.7
+        version: 4.11.7
       isolated-vm:
         specifier: ^6.0.2
         version: 6.0.2
@@ -221,7 +227,7 @@ packages:
     resolution: {integrity: sha512-vHL6w3ecZsky+8P5MD+eFfaGTyCeOHUIFYMGpQGbrBTSmNNoxv0if69rEZ5giu36weC5saFuznL411gRX7bJDw==}
     engines: {node: '>=18.14.1'}
     peerDependencies:
-      hono: ^4
+      hono: '>=4.11.7'
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -779,8 +785,8 @@ packages:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
 
-  hono@4.11.5:
-    resolution: {integrity: sha512-WemPi9/WfyMwZs+ZUXdiwcCh9Y+m7L+8vki9MzDw3jJ+W9Lc+12HGsd368Qc1vZi1xwW8BWMMsnK5efYKPdt4g==}
+  hono@4.11.7:
+    resolution: {integrity: sha512-l7qMiNee7t82bH3SeyUCt9UF15EVmaBvsppY2zQtrbIhl/yzBTny+YUxsVjSjQ6gaqaeVtZmGocom8TzBlA4Yw==}
     engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
@@ -1600,9 +1606,9 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@hono/node-server@1.19.9(hono@4.11.5)':
+  '@hono/node-server@1.19.9(hono@4.11.7)':
     dependencies:
-      hono: 4.11.5
+      hono: 4.11.7
 
   '@humanfs/core@0.19.1': {}
 
@@ -1694,9 +1700,9 @@ snapshots:
     transitivePeerDependencies:
       - ws
 
-  '@modelcontextprotocol/sdk@1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.5)(zod@4.3.6)':
+  '@modelcontextprotocol/sdk@1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.7)(zod@4.3.6)':
     dependencies:
-      '@hono/node-server': 1.19.9(hono@4.11.5)
+      '@hono/node-server': 1.19.9(hono@4.11.7)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -2202,7 +2208,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono@4.11.5: {}
+  hono@4.11.7: {}
 
   http-errors@2.0.1:
     dependencies:
