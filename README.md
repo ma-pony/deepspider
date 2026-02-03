@@ -1,8 +1,11 @@
 # DeepSpider
 
-> 智能爬虫工程平台 - 基于 DeepAgents + Patchright
+[![npm version](https://img.shields.io/npm/v/deepspider.svg)](https://www.npmjs.com/package/deepspider)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-从 JS 逆向分析到完整爬虫脚本的一站式 AI Agent 解决方案。
+> 智能爬虫工程平台 - 基于 DeepAgents + Patchright 的 AI 爬虫 Agent
+
+从 JS 逆向分析到完整爬虫脚本的一站式解决方案。
 
 ## 特性
 
@@ -18,7 +21,12 @@
 ### 安装
 
 ```bash
-# 安装依赖
+# 方式一：npm 全局安装
+npm install -g deepspider
+
+# 方式二：克隆仓库
+git clone https://github.com/ma-pony/deepspider.git
+cd deepspider
 pnpm install
 
 # 安装 Python 加密库（用于运行生成的 Python 代码）
@@ -128,6 +136,10 @@ deepspider/
 
 - [开发使用指南](docs/GUIDE.md)
 - [调试指南](docs/DEBUG.md)
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
 
 ## License
 

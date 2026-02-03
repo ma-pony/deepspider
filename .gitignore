@@ -25,3 +25,4 @@ logs/
 .deepspider-store/
 **/settings.local.json
 settings.local.json
+.npmrc

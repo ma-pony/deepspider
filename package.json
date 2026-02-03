@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "deepspider": "./bin/cli.js"
+    "deepspider": "./src/agent/run.js"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -29,8 +29,16 @@
     "anti-detect",
     "automation"
   ],
-  "author": "",
+  "author": "pony-ma",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ma-pony/deepspider.git"
+  },
+  "homepage": "https://github.com/ma-pony/deepspider#readme",
+  "bugs": {
+    "url": "https://github.com/ma-pony/deepspider/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
