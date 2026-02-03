@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "cli": "node bin/cli.js",
+    "cli": "node src/agent/run.js",
     "mcp": "node src/mcp/server.js",
     "agent": "node src/agent/run.js",
     "test": "node --test test/",
