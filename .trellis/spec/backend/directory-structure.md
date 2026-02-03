@@ -1,12 +1,12 @@
 # Directory Structure
 
-> JSForge 项目的代码组织结构
+> DeepSpider 项目的代码组织结构
 
 ---
 
 ## Overview
 
-JSForge 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构建的 JS 逆向分析引擎。
+DeepSpider 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构建的 JS 逆向分析引擎。
 项目采用模块化架构，按功能职责划分目录。
 
 ---
@@ -16,7 +16,7 @@ JSForge 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构建�
 ```
 src/
 ├── agent/                 # DeepAgent 系统（核心）
-│   ├── index.js           # Agent 主入口，createJSForgeAgent()
+│   ├── index.js           # Agent 主入口，createDeepSpiderAgent()
 │   ├── run.js             # Agent 运行入口
 │   ├── tools/             # LangChain 工具集（90+）
 │   │   ├── index.js       # 工具导出汇总

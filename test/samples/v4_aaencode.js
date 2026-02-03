@@ -53,7 +53,7 @@ c=(ﾟΘﾟ) =(ﾟｰﾟ)-(ﾟｰﾟ);
     return r;
   };
 
-  var ﾟΘﾟﾉ = 'jsforge_test_2024';
+  var ﾟΘﾟﾉ = 'deepspider_test_2024';
   var ﾟωﾟﾉﾉ = 'app_12345';
 
   var _genSign_ = function(p) {

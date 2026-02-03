@@ -1,4 +1,4 @@
-# JSForge - 智能爬虫工程平台
+# DeepSpider - 智能爬虫工程平台
 
 > 基于 DeepAgents + Patchright 的智能爬虫 Agent，覆盖爬虫全生命周期
 
@@ -33,7 +33,7 @@
 ## 项目结构
 
 ```
-jsforge/
+deepspider/
 ├── src/
 │   ├── agent/               # DeepAgent 系统
 │   │   ├── index.js         # 主入口
@@ -128,7 +128,7 @@ pnpm run agent https://example.com
 ┌─────────────────────────────────────┐
 │  浏览器启动，自动注入 Hook          │
 │  CDP 拦截器记录请求/脚本            │
-│  数据存储到 .jsforge-data/          │
+│  数据存储到 .deepspider-data/          │
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
@@ -175,7 +175,7 @@ async function evaluateViaCDP(browser, expression) {
 }
 
 // 使用示例
-const logs = await evaluateViaCDP(browser, `window.__jsforge__?.getAllLogs?.()`);
+const logs = await evaluateViaCDP(browser, `window.__deepspider__?.getAllLogs?.()`);
 ```
 
 ### Babel AST 遍历

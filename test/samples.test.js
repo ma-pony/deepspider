@@ -1,5 +1,5 @@
 /**
- * JSForge 综合测试 - 测试所有混淆样本
+ * DeepSpider 综合测试 - 测试所有混淆样本
  */
 
 import { ASTAnalyzer } from '../src/analyzer/ASTAnalyzer.js';
@@ -18,7 +18,7 @@ const sampleFiles = fs.readdirSync(samplesDir)
   .filter(f => f.endsWith('.js') && f.startsWith('v'))
   .sort();
 
-console.log('=== JSForge 综合测试 ===\n');
+console.log('=== DeepSpider 综合测试 ===\n');
 console.log(`发现 ${sampleFiles.length} 个测试样本\n`);
 
 // 初始化分析器

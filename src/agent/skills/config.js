@@ -1,5 +1,5 @@
 /**
- * JSForge - Skills 配置
+ * DeepSpider - Skills 配置
  * 每个 agent 只加载属于自己的 skills
  */
 

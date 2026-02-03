@@ -1,5 +1,5 @@
 /**
- * JSForge - Screen 环境模块
+ * DeepSpider - Screen 环境模块
  */
 
 export const screenCode = `

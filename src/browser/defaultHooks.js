@@ -1,5 +1,5 @@
 /**
- * JSForge - 默认 Hook 脚本
+ * DeepSpider - 默认 Hook 脚本
  * 浏览器启动时自动注入
  */
 
@@ -37,8 +37,8 @@ function getNetworkHooks() {
   return `
 // === XHR Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalXHR = XMLHttpRequest;
 
@@ -47,31 +47,31 @@ function getNetworkHooks() {
     const log = { method: '', url: '', requestHeaders: {}, requestBody: null, response: null, status: 0 };
 
     const originalOpen = xhr.open;
-    xhr.open = jsforge.native(function(method, url) {
+    xhr.open = deepspider.native(function(method, url) {
       log.method = method;
       log.url = url;
       return originalOpen.apply(xhr, arguments);
     }, originalOpen);
 
     const originalSetHeader = xhr.setRequestHeader;
-    xhr.setRequestHeader = jsforge.native(function(name, value) {
+    xhr.setRequestHeader = deepspider.native(function(name, value) {
       log.requestHeaders[name] = value;
       return originalSetHeader.apply(xhr, arguments);
     }, originalSetHeader);
 
     const originalSend = xhr.send;
-    xhr.send = jsforge.native(function(body) {
-      log.requestId = jsforge.startRequest(log.url, log.method);
+    xhr.send = deepspider.native(function(body) {
+      log.requestId = deepspider.startRequest(log.url, log.method);
       log.requestBody = body;
-      jsforge.log('xhr', { action: 'send', ...log, body: body?.toString().slice(0, 200) });
+      deepspider.log('xhr', { action: 'send', ...log, body: body?.toString().slice(0, 200) });
       return originalSend.apply(xhr, arguments);
     }, originalSend);
 
     xhr.addEventListener('load', function() {
       log.status = xhr.status;
       log.response = xhr.responseText?.slice(0, 500);
-      const ctx = jsforge.endRequest();
-      jsforge.log('xhr', {
+      const ctx = deepspider.endRequest();
+      deepspider.log('xhr', {
         action: 'response',
         url: log.url,
         status: log.status,
@@ -84,17 +84,17 @@ function getNetworkHooks() {
   };
 
   XMLHttpRequest.prototype = OriginalXHR.prototype;
-  console.log('[JSForge] XHR Hook 已启用');
+  console.log('[DeepSpider] XHR Hook 已启用');
 })();
 
 // === Fetch Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalFetch = fetch;
 
-  fetch = jsforge.native(async function(url, options = {}) {
+  fetch = deepspider.native(async function(url, options = {}) {
     const log = {
       url: typeof url === 'string' ? url : url.url,
       method: options.method || 'GET',
@@ -104,13 +104,13 @@ function getNetworkHooks() {
       status: 0
     };
 
-    log.requestId = jsforge.startRequest(log.url, log.method);
+    log.requestId = deepspider.startRequest(log.url, log.method);
 
     if (options.body) {
       log.body = typeof options.body === 'string' ? options.body.slice(0, 500) : '[FormData/Blob]';
     }
 
-    jsforge.log('fetch', { action: 'request', ...log });
+    deepspider.log('fetch', { action: 'request', ...log });
 
     const response = await OriginalFetch.apply(this, arguments);
     log.status = response.status;
@@ -119,8 +119,8 @@ function getNetworkHooks() {
       const cloned = response.clone();
       const text = await cloned.text();
       log.response = text.slice(0, 500);
-      const ctx = jsforge.endRequest();
-      jsforge.log('fetch', {
+      const ctx = deepspider.endRequest();
+      deepspider.log('fetch', {
         action: 'response',
         url: log.url,
         status: log.status,
@@ -128,13 +128,13 @@ function getNetworkHooks() {
         linkedCrypto: ctx?.cryptoCalls || []
       });
     } catch (e) {
-      jsforge.endRequest();
+      deepspider.endRequest();
     }
 
     return response;
   }, OriginalFetch);
 
-  console.log('[JSForge] Fetch Hook 已启用');
+  console.log('[DeepSpider] Fetch Hook 已启用');
 })();
 `;
 }
@@ -146,8 +146,8 @@ function getCookieHook() {
   return `
 // === Cookie Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const cookieDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie') ||
                      Object.getOwnPropertyDescriptor(HTMLDocument.prototype, 'cookie');
@@ -156,18 +156,18 @@ function getCookieHook() {
     Object.defineProperty(document, 'cookie', {
       get: function() {
         const value = cookieDesc.get.call(document);
-        jsforge.log('cookie', { action: 'read', value: value?.slice(0, 100) });
+        deepspider.log('cookie', { action: 'read', value: value?.slice(0, 100) });
         return value;
       },
       set: function(val) {
-        jsforge.log('cookie', { action: 'write', value: val });
+        deepspider.log('cookie', { action: 'write', value: val });
         return cookieDesc.set.call(document, val);
       },
       configurable: true
     });
   }
 
-  console.log('[JSForge] Cookie Hook 已启用');
+  console.log('[DeepSpider] Cookie Hook 已启用');
 })();
 `;
 }
@@ -180,17 +180,17 @@ function getJSONHooks() {
   return `
 // === JSON Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalParse = JSON.parse;
   const OriginalStringify = JSON.stringify;
   const MIN_LOG_LENGTH = 50; // 只记录长度超过 50 的数据
 
-  JSON.parse = jsforge.native(function(text, reviver) {
+  JSON.parse = deepspider.native(function(text, reviver) {
     const textStr = String(text);
     if (textStr.length >= MIN_LOG_LENGTH) {
-      jsforge.log('json', {
+      deepspider.log('json', {
         action: 'parse',
         input: textStr.slice(0, 200),
         len: textStr.length
@@ -199,10 +199,10 @@ function getJSONHooks() {
     return OriginalParse.call(JSON, text, reviver);
   }, OriginalParse);
 
-  JSON.stringify = jsforge.native(function(value, replacer, space) {
+  JSON.stringify = deepspider.native(function(value, replacer, space) {
     const result = OriginalStringify.call(JSON, value, replacer, space);
     if (result && result.length >= MIN_LOG_LENGTH) {
-      jsforge.log('json', {
+      deepspider.log('json', {
         action: 'stringify',
         output: result.slice(0, 200),
         len: result.length
@@ -211,7 +211,7 @@ function getJSONHooks() {
     return result;
   }, OriginalStringify);
 
-  console.log('[JSForge] JSON Hook 已启用');
+  console.log('[DeepSpider] JSON Hook 已启用');
 })();
 `;
 }
@@ -223,16 +223,16 @@ function getEncodingHooks() {
   return `
 // === Encoding Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   // atob/btoa Hook
   const OriginalAtob = atob;
   const OriginalBtoa = btoa;
 
-  window.atob = jsforge.native(function(data) {
+  window.atob = deepspider.native(function(data) {
     const result = OriginalAtob.call(window, data);
-    jsforge.log('encoding', {
+    deepspider.log('encoding', {
       action: 'atob',
       input: String(data).slice(0, 100),
       output: result.slice(0, 100)
@@ -240,9 +240,9 @@ function getEncodingHooks() {
     return result;
   }, OriginalAtob);
 
-  window.btoa = jsforge.native(function(data) {
+  window.btoa = deepspider.native(function(data) {
     const result = OriginalBtoa.call(window, data);
-    jsforge.log('encoding', {
+    deepspider.log('encoding', {
       action: 'btoa',
       input: String(data).slice(0, 100),
       output: result.slice(0, 100)
@@ -253,10 +253,10 @@ function getEncodingHooks() {
   // TextEncoder Hook
   if (window.TextEncoder) {
     const OriginalEncode = TextEncoder.prototype.encode;
-    TextEncoder.prototype.encode = jsforge.native(function(input) {
+    TextEncoder.prototype.encode = deepspider.native(function(input) {
       const result = OriginalEncode.call(this, input);
       if (input && input.length >= 20) {
-        jsforge.log('encoding', {
+        deepspider.log('encoding', {
           action: 'TextEncoder.encode',
           input: String(input).slice(0, 100),
           len: result.length
@@ -269,10 +269,10 @@ function getEncodingHooks() {
   // TextDecoder Hook
   if (window.TextDecoder) {
     const OriginalDecode = TextDecoder.prototype.decode;
-    TextDecoder.prototype.decode = jsforge.native(function(input) {
+    TextDecoder.prototype.decode = deepspider.native(function(input) {
       const result = OriginalDecode.call(this, input);
       if (result && result.length >= 20) {
-        jsforge.log('encoding', {
+        deepspider.log('encoding', {
           action: 'TextDecoder.decode',
           output: result.slice(0, 100),
           len: result.length
@@ -282,7 +282,7 @@ function getEncodingHooks() {
     }, OriginalDecode);
   }
 
-  console.log('[JSForge] Encoding Hook 已启用');
+  console.log('[DeepSpider] Encoding Hook 已启用');
 })();
 `;
 }
@@ -294,21 +294,21 @@ function getStorageHooks() {
   return `
 // === Storage Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   function hookStorage(storage, name) {
     const origGet = storage.getItem.bind(storage);
     const origSet = storage.setItem.bind(storage);
 
-    storage.getItem = jsforge.native(function(key) {
+    storage.getItem = deepspider.native(function(key) {
       const value = origGet(key);
-      jsforge.log('storage', { action: 'get', storage: name, key: key, value: value?.slice(0, 100) });
+      deepspider.log('storage', { action: 'get', storage: name, key: key, value: value?.slice(0, 100) });
       return value;
     }, origGet);
 
-    storage.setItem = jsforge.native(function(key, value) {
-      jsforge.log('storage', { action: 'set', storage: name, key: key, value: String(value).slice(0, 100) });
+    storage.setItem = deepspider.native(function(key, value) {
+      deepspider.log('storage', { action: 'set', storage: name, key: key, value: String(value).slice(0, 100) });
       return origSet(key, value);
     }, origSet);
   }
@@ -316,7 +316,7 @@ function getStorageHooks() {
   if (window.localStorage) hookStorage(localStorage, 'local');
   if (window.sessionStorage) hookStorage(sessionStorage, 'session');
 
-  console.log('[JSForge] Storage Hook 已启用');
+  console.log('[DeepSpider] Storage Hook 已启用');
 })();
 `;
 }
@@ -328,19 +328,19 @@ function getWebSocketHooks() {
   return `
 // === WebSocket Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
   if (!window.WebSocket) return;
 
   const OriginalWS = WebSocket;
 
   window.WebSocket = function(url, protocols) {
-    jsforge.log('websocket', { action: 'connect', url: url });
+    deepspider.log('websocket', { action: 'connect', url: url });
     const ws = new OriginalWS(url, protocols);
 
     const origSend = ws.send.bind(ws);
-    ws.send = jsforge.native(function(data) {
-      jsforge.log('websocket', {
+    ws.send = deepspider.native(function(data) {
+      deepspider.log('websocket', {
         action: 'send',
         url: url,
         data: String(data).slice(0, 200)
@@ -349,7 +349,7 @@ function getWebSocketHooks() {
     }, origSend);
 
     ws.addEventListener('message', function(e) {
-      jsforge.log('websocket', {
+      deepspider.log('websocket', {
         action: 'message',
         url: url,
         data: String(e.data).slice(0, 200)
@@ -357,11 +357,11 @@ function getWebSocketHooks() {
     });
 
     ws.addEventListener('close', function(e) {
-      jsforge.log('websocket', { action: 'close', url: url, code: e.code });
+      deepspider.log('websocket', { action: 'close', url: url, code: e.code });
     });
 
     ws.addEventListener('error', function() {
-      jsforge.log('websocket', { action: 'error', url: url });
+      deepspider.log('websocket', { action: 'error', url: url });
     });
 
     return ws;
@@ -373,7 +373,7 @@ function getWebSocketHooks() {
   window.WebSocket.CLOSING = OriginalWS.CLOSING;
   window.WebSocket.CLOSED = OriginalWS.CLOSED;
 
-  console.log('[JSForge] WebSocket Hook 已启用');
+  console.log('[DeepSpider] WebSocket Hook 已启用');
 })();
 `;
 }
@@ -385,8 +385,8 @@ function getWebpackHooks() {
   return `
 // === Webpack Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   // 加密特征检测
   const cryptoPatterns = [
@@ -403,7 +403,7 @@ function getWebpackHooks() {
     if (window.webpackJsonp && !window.webpackJsonp.__hooked__) {
       const orig = window.webpackJsonp.push;
       window.webpackJsonp.push = function(chunk) {
-        jsforge.log('env', { action: 'webpack.chunk', id: chunk[0] });
+        deepspider.log('env', { action: 'webpack.chunk', id: chunk[0] });
         return orig.apply(this, arguments);
       };
       window.webpackJsonp.__hooked__ = true;
@@ -414,7 +414,7 @@ function getWebpackHooks() {
   const check = setInterval(hookWebpack, 100);
   setTimeout(function() { clearInterval(check); }, 5000);
 
-  console.log('[JSForge] Webpack Hook 已启用');
+  console.log('[DeepSpider] Webpack Hook 已启用');
 })();
 `;
 }
@@ -426,21 +426,21 @@ function getEvalHooks() {
   return `
 // === Eval/Function Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const debuggerPattern = /\\bdebugger\\b/;
 
   // Hook eval
   const OriginalEval = eval;
-  window.eval = jsforge.native(function(code) {
+  window.eval = deepspider.native(function(code) {
     let codeStr = String(code);
     // debugger 绕过
     if (debuggerPattern.test(codeStr)) {
       codeStr = codeStr.replace(/\\bdebugger\\b/g, '/* debugger bypassed */');
-      jsforge.log('debug', { action: 'bypass', type: 'eval' });
+      deepspider.log('debug', { action: 'bypass', type: 'eval' });
     }
-    jsforge.log('eval', {
+    deepspider.log('eval', {
       action: 'eval',
       code: codeStr.slice(0, 500)
     });
@@ -449,15 +449,15 @@ function getEvalHooks() {
 
   // Hook Function constructor
   const OriginalFunction = Function;
-  window.Function = jsforge.native(function() {
+  window.Function = deepspider.native(function() {
     const args = Array.from(arguments);
     const lastIdx = args.length - 1;
     // debugger 绕过
     if (lastIdx >= 0 && typeof args[lastIdx] === 'string' && debuggerPattern.test(args[lastIdx])) {
       args[lastIdx] = args[lastIdx].replace(/\\bdebugger\\b/g, '/* debugger bypassed */');
-      jsforge.log('debug', { action: 'bypass', type: 'Function' });
+      deepspider.log('debug', { action: 'bypass', type: 'Function' });
     }
-    jsforge.log('eval', {
+    deepspider.log('eval', {
       action: 'Function',
       args: args.map(a => String(a).slice(0, 200))
     });
@@ -469,14 +469,14 @@ function getEvalHooks() {
   const OriginalSetTimeout = setTimeout;
   const OriginalSetInterval = setInterval;
 
-  window.setTimeout = jsforge.native(function(handler, delay) {
+  window.setTimeout = deepspider.native(function(handler, delay) {
     if (typeof handler === 'string') {
       // debugger 绕过
       if (debuggerPattern.test(handler)) {
         handler = handler.replace(/\\bdebugger\\b/g, '/* debugger bypassed */');
-        jsforge.log('debug', { action: 'bypass', type: 'setTimeout' });
+        deepspider.log('debug', { action: 'bypass', type: 'setTimeout' });
       }
-      jsforge.log('eval', {
+      deepspider.log('eval', {
         action: 'setTimeout',
         code: handler.slice(0, 500),
         delay: delay
@@ -486,14 +486,14 @@ function getEvalHooks() {
     return OriginalSetTimeout.apply(window, arguments);
   }, OriginalSetTimeout);
 
-  window.setInterval = jsforge.native(function(handler, delay) {
+  window.setInterval = deepspider.native(function(handler, delay) {
     if (typeof handler === 'string') {
       // debugger 绕过
       if (debuggerPattern.test(handler)) {
-        jsforge.log('debug', { action: 'bypass', type: 'setInterval' });
+        deepspider.log('debug', { action: 'bypass', type: 'setInterval' });
         return OriginalSetInterval.call(window, function(){}, delay);
       }
-      jsforge.log('eval', {
+      deepspider.log('eval', {
         action: 'setInterval',
         code: handler.slice(0, 500),
         delay: delay
@@ -503,14 +503,14 @@ function getEvalHooks() {
     if (typeof handler === 'function' && delay < 500) {
       const code = handler.toString();
       if (debuggerPattern.test(code)) {
-        jsforge.log('debug', { action: 'bypass', type: 'setInterval-func' });
+        deepspider.log('debug', { action: 'bypass', type: 'setInterval-func' });
         return OriginalSetInterval.call(window, function(){}, delay);
       }
     }
     return OriginalSetInterval.apply(window, arguments);
   }, OriginalSetInterval);
 
-  console.log('[JSForge] Eval/Function Hook 已启用');
+  console.log('[DeepSpider] Eval/Function Hook 已启用');
 })();
 `;
 }
@@ -523,13 +523,13 @@ function getCryptoHooks() {
   return `
 // === Crypto Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   // Hook CryptoJS 的方法
   function hookCryptoJS(CryptoJS) {
-    if (CryptoJS.__jsforge_hooked__) return;
-    CryptoJS.__jsforge_hooked__ = true;
+    if (CryptoJS.__deepspider_hooked__) return;
+    CryptoJS.__deepspider_hooked__ = true;
 
     // 对称加密算法
     ['AES', 'DES', 'TripleDES', 'RC4', 'Rabbit'].forEach(cipher => {
@@ -537,14 +537,14 @@ function getCryptoHooks() {
       ['encrypt', 'decrypt'].forEach(method => {
         if (CryptoJS[cipher][method]) {
           const original = CryptoJS[cipher][method];
-          CryptoJS[cipher][method] = jsforge.native(function(data, key, options) {
-            const entry = jsforge.log('crypto', {
+          CryptoJS[cipher][method] = deepspider.native(function(data, key, options) {
+            const entry = deepspider.log('crypto', {
               algo: 'CryptoJS.' + cipher + '.' + method,
               data: String(data).slice(0, 100),
               keyLen: key ? String(key).length : 0,
               options: options ? Object.keys(options) : []
             });
-            jsforge.linkCrypto(entry);
+            deepspider.linkCrypto(entry);
             return original.apply(this, arguments);
           }, original);
         }
@@ -555,12 +555,12 @@ function getCryptoHooks() {
     ['MD5', 'SHA1', 'SHA256', 'SHA512', 'SHA3', 'RIPEMD160'].forEach(algo => {
       if (CryptoJS[algo]) {
         const original = CryptoJS[algo];
-        CryptoJS[algo] = jsforge.native(function() {
-          const entry = jsforge.log('crypto', {
+        CryptoJS[algo] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', {
             algo: 'CryptoJS.' + algo,
             inputLen: arguments[0] ? String(arguments[0]).length : 0
           });
-          jsforge.linkCrypto(entry);
+          deepspider.linkCrypto(entry);
           return original.apply(this, arguments);
         }, original);
       }
@@ -570,57 +570,57 @@ function getCryptoHooks() {
     ['HmacMD5', 'HmacSHA1', 'HmacSHA256', 'HmacSHA512'].forEach(algo => {
       if (CryptoJS[algo]) {
         const original = CryptoJS[algo];
-        CryptoJS[algo] = jsforge.native(function() {
-          const entry = jsforge.log('crypto', {
+        CryptoJS[algo] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', {
             algo: 'CryptoJS.' + algo,
             inputLen: arguments[0] ? String(arguments[0]).length : 0
           });
-          jsforge.linkCrypto(entry);
+          deepspider.linkCrypto(entry);
           return original.apply(this, arguments);
         }, original);
       }
     });
 
-    console.log('[JSForge] CryptoJS Hook 已启用');
+    console.log('[DeepSpider] CryptoJS Hook 已启用');
   }
 
   // Hook JSEncrypt
   function hookJSEncrypt(JSEncrypt) {
-    if (JSEncrypt.__jsforge_hooked__) return;
-    JSEncrypt.__jsforge_hooked__ = true;
+    if (JSEncrypt.__deepspider_hooked__) return;
+    JSEncrypt.__deepspider_hooked__ = true;
 
     const proto = JSEncrypt.prototype;
     if (proto.encrypt) {
       const origEnc = proto.encrypt;
-      proto.encrypt = jsforge.native(function(data) {
-        const entry = jsforge.log('crypto', { algo: 'RSA.encrypt', data: String(data).slice(0, 100) });
-        jsforge.linkCrypto(entry);
+      proto.encrypt = deepspider.native(function(data) {
+        const entry = deepspider.log('crypto', { algo: 'RSA.encrypt', data: String(data).slice(0, 100) });
+        deepspider.linkCrypto(entry);
         return origEnc.apply(this, arguments);
       }, origEnc);
     }
-    console.log('[JSForge] RSA Hook 已启用');
+    console.log('[DeepSpider] RSA Hook 已启用');
   }
 
   // Hook SM2
   function hookSM2(sm2) {
-    if (sm2.__jsforge_hooked__) return;
-    sm2.__jsforge_hooked__ = true;
+    if (sm2.__deepspider_hooked__) return;
+    sm2.__deepspider_hooked__ = true;
 
     if (sm2.doEncrypt) {
       const origEnc = sm2.doEncrypt;
-      sm2.doEncrypt = jsforge.native(function(msg, pubKey) {
-        const entry = jsforge.log('crypto', { algo: 'SM2.encrypt', msg: String(msg).slice(0, 100) });
-        jsforge.linkCrypto(entry);
+      sm2.doEncrypt = deepspider.native(function(msg, pubKey) {
+        const entry = deepspider.log('crypto', { algo: 'SM2.encrypt', msg: String(msg).slice(0, 100) });
+        deepspider.linkCrypto(entry);
         return origEnc.apply(this, arguments);
       }, origEnc);
-      console.log('[JSForge] SM2 Hook 已启用');
+      console.log('[DeepSpider] SM2 Hook 已启用');
     }
   }
 
   // Hook node-forge
   function hookForge(forge) {
-    if (forge.__jsforge_hooked__) return;
-    forge.__jsforge_hooked__ = true;
+    if (forge.__deepspider_hooked__) return;
+    forge.__deepspider_hooked__ = true;
 
     // MD/SHA
     ['md5', 'sha1', 'sha256', 'sha512'].forEach(function(algo) {
@@ -630,7 +630,7 @@ function getCryptoHooks() {
           const md = orig.apply(this, arguments);
           const origUpdate = md.update;
           md.update = function(data) {
-            jsforge.log('crypto', { algo: 'forge.' + algo, inputLen: data?.length });
+            deepspider.log('crypto', { algo: 'forge.' + algo, inputLen: data?.length });
             return origUpdate.apply(this, arguments);
           };
           return md;
@@ -643,29 +643,29 @@ function getCryptoHooks() {
       const origCreate = forge.cipher.createCipher;
       if (origCreate) {
         forge.cipher.createCipher = function(algo, key) {
-          jsforge.log('crypto', { algo: 'forge.cipher.' + algo, keyLen: key?.length });
+          deepspider.log('crypto', { algo: 'forge.cipher.' + algo, keyLen: key?.length });
           return origCreate.apply(this, arguments);
         };
       }
     }
-    console.log('[JSForge] Forge Hook 已启用');
+    console.log('[DeepSpider] Forge Hook 已启用');
   }
 
   // Hook jsrsasign
   function hookJsrsasign(KJUR) {
-    if (KJUR.__jsforge_hooked__) return;
-    KJUR.__jsforge_hooked__ = true;
+    if (KJUR.__deepspider_hooked__) return;
+    KJUR.__deepspider_hooked__ = true;
 
     if (KJUR.crypto && KJUR.crypto.Signature) {
       const origSign = KJUR.crypto.Signature.prototype.sign;
       if (origSign) {
         KJUR.crypto.Signature.prototype.sign = function() {
-          jsforge.log('crypto', { algo: 'jsrsasign.sign' });
+          deepspider.log('crypto', { algo: 'jsrsasign.sign' });
           return origSign.apply(this, arguments);
         };
       }
     }
-    console.log('[JSForge] jsrsasign Hook 已启用');
+    console.log('[DeepSpider] jsrsasign Hook 已启用');
   }
 
   // 使用 defineProperty 拦截全局变量赋值
@@ -712,9 +712,9 @@ function getCryptoHooks() {
     ['encrypt', 'decrypt', 'sign', 'verify', 'digest'].forEach(function(method) {
       if (subtle[method]) {
         const original = subtle[method].bind(subtle);
-        subtle[method] = jsforge.native(function(algorithm) {
+        subtle[method] = deepspider.native(function(algorithm) {
           const algoName = typeof algorithm === 'string' ? algorithm : algorithm.name;
-          jsforge.log('crypto', {
+          deepspider.log('crypto', {
             algo: 'WebCrypto.' + method,
             algorithm: algoName
           });
@@ -722,7 +722,7 @@ function getCryptoHooks() {
         }, original);
       }
     });
-    console.log('[JSForge] Web Crypto API Hook 已启用');
+    console.log('[DeepSpider] Web Crypto API Hook 已启用');
   }
 })();
 `;
@@ -735,14 +735,14 @@ function getCanvasHooks() {
   return `
 // === Canvas Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   // toDataURL Hook
   const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
-  HTMLCanvasElement.prototype.toDataURL = jsforge.native(function() {
+  HTMLCanvasElement.prototype.toDataURL = deepspider.native(function() {
     const result = origToDataURL.apply(this, arguments);
-    jsforge.log('env', {
+    deepspider.log('env', {
       action: 'canvas.toDataURL',
       width: this.width,
       height: this.height,
@@ -753,16 +753,16 @@ function getCanvasHooks() {
 
   // getImageData Hook
   const origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
-  CanvasRenderingContext2D.prototype.getImageData = jsforge.native(function(x, y, w, h) {
+  CanvasRenderingContext2D.prototype.getImageData = deepspider.native(function(x, y, w, h) {
     const result = origGetImageData.apply(this, arguments);
-    jsforge.log('env', {
+    deepspider.log('env', {
       action: 'canvas.getImageData',
       x: x, y: y, w: w, h: h
     });
     return result;
   }, origGetImageData);
 
-  console.log('[JSForge] Canvas Hook 已启用');
+  console.log('[DeepSpider] Canvas Hook 已启用');
 })();
 `;
 }
@@ -774,8 +774,8 @@ function getNavigatorHooks() {
   return `
 // === Navigator Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   // 监控 navigator 属性访问
   const navProps = ['userAgent', 'platform', 'language', 'languages', 'hardwareConcurrency', 'deviceMemory', 'webdriver'];
@@ -786,7 +786,7 @@ function getNavigatorHooks() {
       Object.defineProperty(Navigator.prototype, prop, {
         get: function() {
           const val = origGet.call(this);
-          jsforge.log('env', { action: 'navigator.' + prop, value: String(val).slice(0, 100) });
+          deepspider.log('env', { action: 'navigator.' + prop, value: String(val).slice(0, 100) });
           return val;
         },
         configurable: true
@@ -794,7 +794,7 @@ function getNavigatorHooks() {
     }
   });
 
-  console.log('[JSForge] Navigator Hook 已启用');
+  console.log('[DeepSpider] Navigator Hook 已启用');
 })();
 `;
 }
@@ -806,8 +806,8 @@ function getDOMHooks() {
   return `
 // === DOM Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const methods = [
     { obj: Document.prototype, name: 'getElementById' },
@@ -823,10 +823,10 @@ function getDOMHooks() {
     const original = m.obj[m.name];
     if (!original) return;
 
-    m.obj[m.name] = jsforge.native(function() {
+    m.obj[m.name] = deepspider.native(function() {
       const selector = arguments[0];
       const result = original.apply(this, arguments);
-      jsforge.log('dom', {
+      deepspider.log('dom', {
         action: m.name,
         selector: String(selector),
         found: result ? (result.length !== undefined ? result.length : 1) : 0
@@ -835,7 +835,7 @@ function getDOMHooks() {
     }, original);
   });
 
-  console.log('[JSForge] DOM Hook 已启用');
+  console.log('[DeepSpider] DOM Hook 已启用');
 })();
 `;
 }
@@ -847,15 +847,15 @@ function getProxyHooks() {
   return `
 // === Proxy Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalProxy = Proxy;
 
   // 创建 trap 包装器（使用 IIFE 避免闭包问题）
   function wrapTrap(trapName, trapFn) {
     return function() {
-      jsforge.log('env', {
+      deepspider.log('env', {
         action: 'Proxy.' + trapName,
         args: Array.from(arguments).slice(0, 2).map(function(a) {
           return String(a).slice(0, 50);
@@ -865,8 +865,8 @@ function getProxyHooks() {
     };
   }
 
-  window.Proxy = jsforge.native(function(target, handler) {
-    jsforge.log('env', {
+  window.Proxy = deepspider.native(function(target, handler) {
+    deepspider.log('env', {
       action: 'Proxy.create',
       targetType: typeof target,
       traps: handler ? Object.keys(handler) : []
@@ -890,7 +890,7 @@ function getProxyHooks() {
   // 保留静态方法
   window.Proxy.revocable = OriginalProxy.revocable;
 
-  console.log('[JSForge] Proxy Hook 已启用');
+  console.log('[DeepSpider] Proxy Hook 已启用');
 })();
 `;
 }
@@ -902,8 +902,8 @@ function getErrorStackHooks() {
   return `
 // === Error Stack Hook ===
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const stackDesc = Object.getOwnPropertyDescriptor(Error.prototype, 'stack');
 
@@ -913,9 +913,9 @@ function getErrorStackHooks() {
       get: function() {
         let stack = origGet.call(this);
         if (stack && typeof stack === 'string') {
-          // 过滤掉 JSForge 相关的栈帧
+          // 过滤掉 DeepSpider 相关的栈帧
           stack = stack.split('\\n').filter(function(line) {
-            return !/__jsforge__|JSForge|jsforge\\.native/.test(line);
+            return !/__deepspider__|DeepSpider|deepspider\\.native/.test(line);
           }).join('\\n');
         }
         return stack;
@@ -924,7 +924,7 @@ function getErrorStackHooks() {
     });
   }
 
-  console.log('[JSForge] Error Stack Hook 已启用');
+  console.log('[DeepSpider] Error Stack Hook 已启用');
 })();
 `;
 }

@@ -6,7 +6,7 @@
 
 ## Overview
 
-JSForge 使用 DeepAgents 的状态后端和文件系统存储管理数据。
+DeepSpider 使用 DeepAgents 的状态后端和文件系统存储管理数据。
 Agent 状态通过 FilesystemBackend 持久化，采集数据通过 DataStore 存储。
 
 ---
@@ -15,8 +15,8 @@ Agent 状态通过 FilesystemBackend 持久化，采集数据通过 DataStore �
 
 | 类型 | 存储方式 | 示例 |
 |------|----------|------|
-| Agent 状态 | FilesystemBackend | `.jsforge-agent/` |
-| 采集数据 | DataStore | `.jsforge-data/` |
+| Agent 状态 | FilesystemBackend | `.deepspider-agent/` |
+| 采集数据 | DataStore | `.deepspider-data/` |
 | 会话状态 | MemorySaver | 内存中 |
 
 ---
@@ -44,7 +44,7 @@ Agent 状态后端配置：
 import { FilesystemBackend } from 'deepagents';
 
 const backend = new FilesystemBackend({
-  rootDir: './.jsforge-agent'
+  rootDir: './.deepspider-agent'
 });
 ```
 

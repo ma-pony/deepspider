@@ -1,5 +1,5 @@
 /**
- * JSForge - 反混淆器
+ * DeepSpider - 反混淆器
  * 支持：obfuscator.io、sojson、JShaman 等常见混淆器
  * 流程：字符串解码 → 控制流还原 → 死代码删除 → 变量重命名
  */
@@ -33,7 +33,7 @@ export class Deobfuscator {
       ],
       'jsfuck': [
         /^\s*\[\]\[/,
-        /\(\!\[\]\+\[\]\)/
+        /\(!?\[\]\+\[\]\)/
       ]
     };
   }

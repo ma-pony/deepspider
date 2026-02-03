@@ -1,5 +1,5 @@
 /**
- * JSForge - Hook 工具
+ * DeepSpider - Hook 工具
  * 提供网络请求和 Cookie 监控能力
  */
 
@@ -20,7 +20,7 @@ export const generateXHRHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('xhr') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('xhr') 获取日志",
     }, null, 2);
   },
   {
@@ -42,7 +42,7 @@ export const generateFetchHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('fetch') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('fetch') 获取日志",
     }, null, 2);
   },
   {
@@ -64,7 +64,7 @@ export const generateCookieHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('cookie') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('cookie') 获取日志",
     }, null, 2);
   },
   {

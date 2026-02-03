@@ -6,7 +6,7 @@
 
 ## Overview
 
-JSForge 使用 Hook 拦截浏览器 API 来采集加密调用、网络请求等数据。
+DeepSpider 使用 Hook 拦截浏览器 API 来采集加密调用、网络请求等数据。
 Hook 脚本通过 CDP 注入到页面中执行。
 
 ---
@@ -50,7 +50,7 @@ export function getCryptoHookScript() {
 |------|----------|------|
 | Hook 类 | *Hook | `CryptoHook`, `NetworkHook` |
 | 脚本函数 | get*Script | `getCryptoHookScript()` |
-| 全局对象 | __jsforge__* | `__jsforge__`, `__jsforge_send__` |
+| 全局对象 | __deepspider__* | `__deepspider__`, `__deepspider_send__` |
 
 ---
 
@@ -147,8 +147,8 @@ Object.getOwnPropertyDescriptor = function(obj, prop) {
 ### 3. 隐藏内部属性
 
 ```javascript
-// 隐藏 __jsforge__ 等内部属性
-const hiddenProps = ['__jsforge__'];
+// 隐藏 __deepspider__ 等内部属性
+const hiddenProps = ['__deepspider__'];
 const origKeys = Object.keys;
 Object.keys = function(obj) {
   const keys = origKeys.call(Object, obj);

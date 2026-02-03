@@ -1,5 +1,5 @@
 /**
- * JSForge - 静态分析子代理
+ * DeepSpider - 静态分析子代理
  */
 
 import { createSkillsMiddleware } from 'deepagents';
@@ -20,7 +20,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const staticSubagent = {
   name: 'static-agent',
   description: '静态代码分析专家。当需要分析混淆代码、还原加密算法时使用，适用于：Webpack解包、反混淆、定位加密入口、算法还原验证。',
-  systemPrompt: `你是 JSForge 的静态分析专家。
+  systemPrompt: `你是 DeepSpider 的静态分析专家。
 
 ## 职责
 - 预处理打包代码（Webpack/Vite/Rollup）

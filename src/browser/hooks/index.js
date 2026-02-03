@@ -1,5 +1,5 @@
 /**
- * JSForge - Hook 管理器
+ * DeepSpider - Hook 管理器
  */
 
 import { cryptoHook } from './crypto.js';
@@ -35,7 +35,7 @@ export class HookManager {
     // 监听 console 输出
     page.on('console', (msg) => {
       const text = msg.text();
-      if (text.includes('[JSForge:')) {
+      if (text.includes('[DeepSpider:')) {
         this.logs.push({
           type: msg.type(),
           text,

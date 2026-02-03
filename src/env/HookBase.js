@@ -1,5 +1,5 @@
 /**
- * JSForge - Hook 基础框架
+ * DeepSpider - Hook 基础框架
  * 统一的 Hook 反检测 + 日志管理
  */
 
@@ -10,9 +10,9 @@ export class HookBase {
    */
   static getBaseCode() {
     return `
-// === JSForge Hook Base ===
+// === DeepSpider Hook Base ===
 (function() {
-  if (window.__jsforge__) return;
+  if (window.__deepspider__) return;
 
   const originalToString = Function.prototype.toString;
   const hookedFns = new WeakMap();
@@ -89,8 +89,8 @@ export class HookBase {
   let requestContext = null;
   let requestIdCounter = 0;
 
-  // JSForge 全局对象
-  window.__jsforge__ = {
+  // DeepSpider 全局对象
+  window.__deepspider__ = {
     version: '1.0.0',
 
     // === 安全 Hook 函数 ===
@@ -145,7 +145,7 @@ export class HookBase {
 
       if (logCounts[countKey] > config.logLimit) {
         if (logCounts[countKey] === config.logLimit + 1) {
-          console.warn('[JSForge] ' + countKey + ' 日志已达上限 ' + config.logLimit + '，后续调用不再记录');
+          console.warn('[DeepSpider] ' + countKey + ' 日志已达上限 ' + config.logLimit + '，后续调用不再记录');
         }
         return null;
       }
@@ -181,7 +181,7 @@ export class HookBase {
           fetch: 'color: #9C27B0',
         };
         const color = colors[data.action] || colors[type] || 'color: #666';
-        console.log('%c[JSForge:' + type + ']', color, data.action || '', data);
+        console.log('%c[DeepSpider:' + type + ']', color, data.action || '', data);
       }
       return entry;
     },
@@ -195,7 +195,7 @@ export class HookBase {
         /react|vue|angular|jquery|lodash|axios/i,
         /node_modules/,
         /webpack/,
-        /__jsforge__/
+        /__deepspider__/
       ];
 
       return stack.split('\\n').slice(2).map(function(line) {
@@ -291,7 +291,7 @@ export class HookBase {
     setConfig: function(key, value) {
       if (key in config) {
         config[key] = value;
-        console.log('[JSForge] 配置已更新:', key, '=', value);
+        console.log('[DeepSpider] 配置已更新:', key, '=', value);
         return true;
       }
       return false;
@@ -302,7 +302,7 @@ export class HookBase {
       for (const key in logCounts) {
         delete logCounts[key];
       }
-      console.log('[JSForge] 日志计数器已重置');
+      console.log('[DeepSpider] 日志计数器已重置');
     },
 
     // 记录性能
@@ -427,7 +427,7 @@ export class HookBase {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'jsforge-logs-' + Date.now() + '.json';
+      a.download = 'deepspider-logs-' + Date.now() + '.json';
       a.click();
       URL.revokeObjectURL(url);
     },
@@ -437,7 +437,7 @@ export class HookBase {
     // 注册 Hook
     registerHook: function(name, options) {
       if (hookRegistry[name]) {
-        console.warn('[JSForge] Hook 已存在:', name);
+        console.warn('[DeepSpider] Hook 已存在:', name);
         return false;
       }
       hookRegistry[name] = {
@@ -454,23 +454,23 @@ export class HookBase {
       // 内置 Hook 通过 config 控制
       if (name in config && typeof config[name] === 'boolean') {
         config[name] = true;
-        console.log('[JSForge] Hook 已启用:', name);
+        console.log('[DeepSpider] Hook 已启用:', name);
         return true;
       }
       // 自定义 Hook
       const hook = hookRegistry[name];
       if (!hook) {
-        console.warn('[JSForge] Hook 不存在:', name);
+        console.warn('[DeepSpider] Hook 不存在:', name);
         return false;
       }
       if (hook.enabled) return true;
       try {
         if (hook.setup) hook.setup();
         hook.enabled = true;
-        console.log('[JSForge] Hook 已启用:', name);
+        console.log('[DeepSpider] Hook 已启用:', name);
         return true;
       } catch (e) {
-        console.error('[JSForge] 启用 Hook 失败:', name, e);
+        console.error('[DeepSpider] 启用 Hook 失败:', name, e);
         return false;
       }
     },
@@ -480,7 +480,7 @@ export class HookBase {
       // 内置 Hook 通过 config 控制
       if (name in config && typeof config[name] === 'boolean') {
         config[name] = false;
-        console.log('[JSForge] Hook 已禁用:', name);
+        console.log('[DeepSpider] Hook 已禁用:', name);
         return true;
       }
       // 自定义 Hook
@@ -490,10 +490,10 @@ export class HookBase {
       try {
         if (hook.restore) hook.restore();
         hook.enabled = false;
-        console.log('[JSForge] Hook 已禁用:', name);
+        console.log('[DeepSpider] Hook 已禁用:', name);
         return true;
       } catch (e) {
-        console.error('[JSForge] 禁用 Hook 失败:', name, e);
+        console.error('[DeepSpider] 禁用 Hook 失败:', name, e);
         return false;
       }
     },
@@ -551,8 +551,8 @@ export class HookBase {
       const results = {};
       names.forEach(function(name) {
         results[name] = enabled
-          ? window.__jsforge__.enableHook(name)
-          : window.__jsforge__.disableHook(name);
+          ? window.__deepspider__.enableHook(name)
+          : window.__deepspider__.disableHook(name);
       });
       return results;
     }
@@ -585,8 +585,8 @@ export class HookBase {
 
   // === 增强反检测：保护 Object.keys/getOwnPropertyNames ===
   if (config.protectKeys) {
-    // 隐藏 __jsforge__ 等内部属性
-    const hiddenProps = ['__jsforge__', '__jsforge_hooked__'];
+    // 隐藏 __deepspider__ 等内部属性
+    const hiddenProps = ['__deepspider__', '__deepspider_hooked__'];
 
     const origKeys = originals.keys;
     Object.keys = function(obj) {
@@ -609,7 +609,7 @@ export class HookBase {
     hookedFns.set(Object.getOwnPropertyNames, originalToString.call(origNames));
   }
 
-  console.log('[JSForge] Hook 基础框架已加载');
+  console.log('[DeepSpider] Hook 基础框架已加载');
 })();
 `;
   }

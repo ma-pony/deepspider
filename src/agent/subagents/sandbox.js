@@ -1,5 +1,5 @@
 /**
- * JSForge - 沙箱验证子代理
+ * DeepSpider - 沙箱验证子代理
  */
 
 import { createSkillsMiddleware } from 'deepagents';
@@ -17,7 +17,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const sandboxSubagent = {
   name: 'sandbox-agent',
   description: '沙箱验证专家。当需要验证提取的代码能否正确执行时使用，适用于：验证加密算法、补全缺失环境、生成可独立运行的脚本。',
-  systemPrompt: `你是 JSForge 的验证执行专家。
+  systemPrompt: `你是 DeepSpider 的验证执行专家。
 
 ## 职责
 - 在沙箱中验证提取的加密算法

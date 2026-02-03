@@ -1,5 +1,5 @@
 /**
- * JSForge - Fetch 环境模块
+ * DeepSpider - Fetch 环境模块
  */
 
 export const fetchCode = `

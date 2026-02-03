@@ -1,5 +1,5 @@
 /**
- * JSForge - 沙箱工具
+ * DeepSpider - 沙箱工具
  * 基于 @langchain/core/tools 的统一定义
  */
 

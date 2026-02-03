@@ -1,5 +1,5 @@
 /**
- * JSForge - 反检测子代理
+ * DeepSpider - 反检测子代理
  * 浏览器指纹管理、代理池、风控规避
  */
 
@@ -15,7 +15,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const antiDetectSubagent = {
   name: 'anti-detect',
   description: '反检测专家。当目标网站有风控检测、IP封禁、指纹识别时使用，适用于：代理IP配置、浏览器指纹伪装、请求特征修改、风控规避。',
-  systemPrompt: `你是 JSForge 的反检测专家，负责绑过网站的反爬虫检测。
+  systemPrompt: `你是 DeepSpider 的反检测专家，负责绑过网站的反爬虫检测。
 
 ## 核心职责
 配置反检测环境，规避风控系统，确保爬虫稳定运行。

@@ -44,7 +44,7 @@ async function test() {
     window.innerWidth;
 
     // 获取日志
-    __jsforge__.getLogs('env');
+    __deepspider__.getLogs('env');
   `;
 
   const execResult = JSON.parse(await sandboxExecute.invoke({ code: testCode, timeout: 3000 }));

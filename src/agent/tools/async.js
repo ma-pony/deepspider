@@ -1,5 +1,5 @@
 /**
- * JSForge - 异步追踪工具
+ * DeepSpider - 异步追踪工具
  */
 
 import { z } from 'zod';
@@ -14,7 +14,7 @@ export const generatePromiseHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('async') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('async') 获取日志",
     }, null, 2);
   },
   {
@@ -30,7 +30,7 @@ export const generateTimerHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('timer') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('timer') 获取日志",
     }, null, 2);
   },
   {

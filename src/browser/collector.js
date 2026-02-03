@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境数据采集器
+ * DeepSpider - 环境数据采集器
  * 从真实浏览器动态采集任意环境属性
  */
 
@@ -224,9 +224,9 @@ export class EnvCollector {
         ctx.fillStyle = '#f60';
         ctx.fillRect(0, 0, 200, 50);
         ctx.fillStyle = '#069';
-        ctx.fillText('JSForge Canvas Test', 2, 15);
+        ctx.fillText('DeepSpider Canvas Test', 2, 15);
         ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-        ctx.fillText('JSForge Canvas Test', 4, 17);
+        ctx.fillText('DeepSpider Canvas Test', 4, 17);
 
         return {
           success: true,

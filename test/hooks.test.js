@@ -1,17 +1,17 @@
 /**
- * JSForge Hook 系统测试
+ * DeepSpider Hook 系统测试
  */
 
 import { HookBase } from '../src/env/HookBase.js';
 import { getDefaultHookScript } from '../src/browser/defaultHooks.js';
 
-console.log('=== JSForge Hook 系统测试 ===\n');
+console.log('=== DeepSpider Hook 系统测试 ===\n');
 
 // 测试 1: HookBase 代码生成
 console.log('【测试1】HookBase 代码生成');
 const baseCode = HookBase.getBaseCode();
 console.log('基础代码长度:', baseCode.length);
-console.log('包含 __jsforge__:', baseCode.includes('window.__jsforge__'));
+console.log('包含 __deepspider__:', baseCode.includes('window.__deepspider__'));
 console.log('包含日志限制:', baseCode.includes('LOG_LIMIT'));
 console.log('包含配置管理:', baseCode.includes('getConfig'));
 console.log('');
@@ -73,13 +73,13 @@ console.log('');
 // 测试 4: 验证关键功能存在
 console.log('【测试4】验证关键功能');
 const features = [
-  { name: 'JSON.parse Hook', pattern: /JSON\.parse\s*=\s*jsforge\.native/ },
-  { name: 'JSON.stringify Hook', pattern: /JSON\.stringify\s*=\s*jsforge\.native/ },
-  { name: 'eval Hook', pattern: /window\.eval\s*=\s*jsforge\.native/ },
-  { name: 'Function Hook', pattern: /window\.Function\s*=\s*jsforge\.native/ },
+  { name: 'JSON.parse Hook', pattern: /JSON\.parse\s*=\s*deepspider\.native/ },
+  { name: 'JSON.stringify Hook', pattern: /JSON\.stringify\s*=\s*deepspider\.native/ },
+  { name: 'eval Hook', pattern: /window\.eval\s*=\s*deepspider\.native/ },
+  { name: 'Function Hook', pattern: /window\.Function\s*=\s*deepspider\.native/ },
   { name: 'setTimeout 字符串检测', pattern: /typeof handler === 'string'/ },
   { name: 'CryptoJS 即时 Hook', pattern: /watchGlobal\('CryptoJS'/ },
-  { name: 'DOM querySelector Hook', pattern: /m\.obj\[m\.name\]\s*=\s*jsforge\.native/ },
+  { name: 'DOM querySelector Hook', pattern: /m\.obj\[m\.name\]\s*=\s*deepspider\.native/ },
   { name: 'debugger 绕过', pattern: /debugger bypassed/ },
   { name: '日志限制', pattern: /logCounts\[countKey\].*config\.logLimit/ },
 ];
@@ -110,7 +110,7 @@ const antiDetectFeatures = [
   { name: 'getOwnPropertyDescriptor 保护', pattern: /Object\.getOwnPropertyDescriptor\s*=\s*function/ },
   { name: 'Object.keys 保护', pattern: /Object\.keys\s*=\s*function/ },
   { name: 'getOwnPropertyNames 保护', pattern: /Object\.getOwnPropertyNames\s*=\s*function/ },
-  { name: 'Error.stack 过滤', pattern: /__jsforge__|JSForge|jsforge\\.native/ },
+  { name: 'Error.stack 过滤', pattern: /__deepspider__|DeepSpider|deepspider\\.native/ },
   { name: 'Proxy 监控', pattern: /Proxy\.create/ },
 ];
 antiDetectFeatures.forEach(f => {

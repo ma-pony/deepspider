@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境自吐工具
+ * DeepSpider - 环境自吐工具
  * 提供环境监控和自吐能力
  */
 
@@ -24,7 +24,7 @@ export const generateEnvDumpCode = tool(
       success: true,
       code,
       description: '环境自吐代码已生成，请在目标代码执行前注入此代码',
-      usage: "1. 先注入基础环境 2. 注入此自吐代码 3. 执行目标代码 4. 调用 __jsforge__.getLogs('env') 获取日志",
+      usage: "1. 先注入基础环境 2. 注入此自吐代码 3. 执行目标代码 4. 调用 __deepspider__.getLogs('env') 获取日志",
     }, null, 2);
   },
   {
@@ -80,7 +80,7 @@ export const parseEnvLogs = tool(
     name: 'parse_env_logs',
     description: '解析环境自吐日志，提取缺失的环境属性和调用记录。',
     schema: z.object({
-      logsJson: z.string().describe("__jsforge__.getLogs('env') 返回的 JSON 字符串"),
+      logsJson: z.string().describe("__deepspider__.getLogs('env') 返回的 JSON 字符串"),
     }),
   }
 );

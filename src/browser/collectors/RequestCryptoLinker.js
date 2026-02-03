@@ -1,5 +1,5 @@
 /**
- * JSForge - 请求-加密关联器
+ * DeepSpider - 请求-加密关联器
  * 建立请求和加密调用的映射关系
  */
 
@@ -10,16 +10,16 @@ export class RequestCryptoLinker {
   generateLinkerScript() {
     return `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge || jsforge._cryptoLinker) return;
-  jsforge._cryptoLinker = true;
+  const deepspider = window.__deepspider__;
+  if (!deepspider || deepspider._cryptoLinker) return;
+  deepspider._cryptoLinker = true;
 
   /**
    * 分析请求的加密关联
    * @param {string} url - 请求 URL
    * @returns {Object} 关联分析结果
    */
-  jsforge.analyzeRequestCrypto = function(url) {
+  deepspider.analyzeRequestCrypto = function(url) {
     const result = {
       url,
       cryptoCalls: [],
@@ -29,9 +29,9 @@ export class RequestCryptoLinker {
     };
 
     // 获取该请求关联的加密调用
-    const xhrLogs = jsforge.logs?.xhr || [];
-    const fetchLogs = jsforge.logs?.fetch || [];
-    const cryptoLogs = jsforge.logs?.crypto || [];
+    const xhrLogs = deepspider.logs?.xhr || [];
+    const fetchLogs = deepspider.logs?.fetch || [];
+    const cryptoLogs = deepspider.logs?.crypto || [];
 
     // 找到目标请求
     const allLogs = [...xhrLogs, ...fetchLogs];
@@ -56,7 +56,7 @@ export class RequestCryptoLinker {
           timeDiff: log.timestamp - requestTime,
           data: log.data || log.message,
           key: log.key,
-          stack: jsforge.parseStack(log.stack)?.slice(0, 5)
+          stack: deepspider.parseStack(log.stack)?.slice(0, 5)
         });
       }
     });
@@ -100,7 +100,7 @@ export class RequestCryptoLinker {
     return result;
   };
 
-  console.log('[JSForge] Request-Crypto Linker 已启用');
+  console.log('[DeepSpider] Request-Crypto Linker 已启用');
 })();
 `;
   }

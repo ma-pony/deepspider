@@ -25,7 +25,7 @@
   };
 
   // 实际密钥（运行时解密）
-  var SECRET_KEY = 'jsforge_test_2024';
+  var SECRET_KEY = 'deepspider_test_2024';
   var APP_ID = 'app_12345';
 
   // 哈希函数

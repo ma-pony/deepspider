@@ -1,5 +1,5 @@
 /**
- * JSForge 分析能力测试
+ * DeepSpider 分析能力测试
  */
 
 import { ASTAnalyzer } from '../src/analyzer/ASTAnalyzer.js';
@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const originalCode = fs.readFileSync(path.join(__dirname, 'samples/original.js'), 'utf-8');
 const obfuscatedCode = fs.readFileSync(path.join(__dirname, 'samples/obfuscated.js'), 'utf-8');
 
-console.log('=== JSForge 分析能力测试 ===\n');
+console.log('=== DeepSpider 分析能力测试 ===\n');
 
 // 测试 1: 混淆器识别
 console.log('【测试1】混淆器识别');

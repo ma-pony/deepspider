@@ -1,6 +1,6 @@
 # DeepAgents 示例
 
-JSForge 项目中 DeepAgents 的使用示例。
+DeepSpider 项目中 DeepAgents 的使用示例。
 
 ## 文件说明
 

@@ -1,10 +1,10 @@
 /**
- * JSForge - 主入口
+ * DeepSpider - 主入口
  * 基于 DeepAgents 的 JS 逆向分析引擎
  */
 
 // Agent
-export { createJSForgeAgent } from './agent/index.js';
+export { createDeepSpiderAgent } from './agent/index.js';
 
 // 工具
 export { allTools } from './agent/tools/index.js';

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "jsforge": {
+    "deepspider": {
       "command": "node",
       "args": ["src/mcp/server.js"]
     }

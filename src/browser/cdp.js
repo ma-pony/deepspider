@@ -1,5 +1,5 @@
 /**
- * JSForge - CDP 会话管理
+ * DeepSpider - CDP 会话管理
  * 封装 Chrome DevTools Protocol 操作
  */
 

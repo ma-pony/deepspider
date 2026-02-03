@@ -1,4 +1,4 @@
-# JSForge 使用指南
+# DeepSpider 使用指南
 
 > JS 逆向分析引擎 - 四类加密场景分析指南
 
@@ -59,7 +59,7 @@ Agent 会执行：
 ```
 
 Agent 会：
-1. 获取日志 `__jsforge__.getAllLogs()`
+1. 获取日志 `__deepspider__.getAllLogs()`
 2. 调用 `analyze_header_encryption` 分析
 3. 调用 `locate_crypto_source` 定位源码
 

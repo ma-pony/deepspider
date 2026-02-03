@@ -1,5 +1,5 @@
 /**
- * JSForge - 自我进化 Skills 中间件
+ * DeepSpider - 自我进化 Skills 中间件
  * 合并静态 SKILL.md + 动态 evolved.md
  */
 

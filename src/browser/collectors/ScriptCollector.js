@@ -1,5 +1,5 @@
 /**
- * JSForge - JS 源码采集器
+ * DeepSpider - JS 源码采集器
  * 记录页面加载的所有 JS 代码
  */
 
@@ -14,18 +14,18 @@ export class ScriptCollector {
   generateCollectorScript() {
     return `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge || jsforge._scriptCollector) return;
-  jsforge._scriptCollector = true;
+  const deepspider = window.__deepspider__;
+  if (!deepspider || deepspider._scriptCollector) return;
+  deepspider._scriptCollector = true;
 
   // 存储所有脚本
-  jsforge.scripts = jsforge.scripts || new Map();
+  deepspider.scripts = deepspider.scripts || new Map();
 
   // 采集内联脚本
   function collectInlineScripts() {
     document.querySelectorAll('script:not([src])').forEach((el, i) => {
       if (el.textContent.trim()) {
-        jsforge.scripts.set('inline_' + i, {
+        deepspider.scripts.set('inline_' + i, {
           type: 'inline',
           source: el.textContent,
           timestamp: Date.now()
@@ -38,8 +38,8 @@ export class ScriptCollector {
   function collectExternalScripts() {
     document.querySelectorAll('script[src]').forEach((el) => {
       const url = el.src;
-      if (url && !jsforge.scripts.has(url)) {
-        jsforge.scripts.set(url, {
+      if (url && !deepspider.scripts.has(url)) {
+        deepspider.scripts.set(url, {
           type: 'external',
           url: url,
           source: null, // 需要通过 CDP 获取
@@ -55,14 +55,14 @@ export class ScriptCollector {
       m.addedNodes.forEach((node) => {
         if (node.tagName === 'SCRIPT') {
           if (node.src) {
-            jsforge.scripts.set(node.src, {
+            deepspider.scripts.set(node.src, {
               type: 'dynamic',
               url: node.src,
               source: null,
               timestamp: Date.now()
             });
           } else if (node.textContent.trim()) {
-            jsforge.scripts.set('dynamic_' + Date.now(), {
+            deepspider.scripts.set('dynamic_' + Date.now(), {
               type: 'dynamic-inline',
               source: node.textContent,
               timestamp: Date.now()
@@ -87,15 +87,15 @@ export class ScriptCollector {
   }
 
   // 获取所有脚本信息
-  jsforge.getScripts = function() {
+  deepspider.getScripts = function() {
     const result = [];
-    jsforge.scripts.forEach((info, key) => {
+    deepspider.scripts.forEach((info, key) => {
       result.push({ id: key, ...info });
     });
     return result;
   };
 
-  console.log('[JSForge] Script Collector 已启用');
+  console.log('[DeepSpider] Script Collector 已启用');
 })();
 `;
   }

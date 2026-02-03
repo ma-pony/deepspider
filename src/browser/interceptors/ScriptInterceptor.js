@@ -1,5 +1,5 @@
 /**
- * JSForge - CDP 脚本拦截器
+ * DeepSpider - CDP 脚本拦截器
  * 通过 CDP 捕获 JS 脚本源码，按站点存储到文件系统
  */
 

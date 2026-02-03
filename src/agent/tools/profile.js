@@ -1,5 +1,5 @@
 /**
- * JSForge - 浏览器 Profile 工具
+ * DeepSpider - 浏览器 Profile 工具
  * 提供浏览器指纹配置加载能力
  */
 

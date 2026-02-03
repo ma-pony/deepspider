@@ -5,7 +5,7 @@
  */
 
 (function() {
-  var _0x = { s: 'jsforge_test_2024', a: 'app_12345' };
+  var _0x = { s: 'deepspider_test_2024', a: 'app_12345' };
   var _state = 0x7a3f;
   var _vars = {};
   var _result = null;

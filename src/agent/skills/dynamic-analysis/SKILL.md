@@ -78,7 +78,7 @@ obj.func = function(...args) {
 **Hook 被检测**：
 - 现象：网站检测到 Hook 后行为异常
 - 原因：检查了 `Function.prototype.toString`
-- 经验：JSForge 已内置 toString 伪装，一般不会触发
+- 经验：DeepSpider 已内置 toString 伪装，一般不会触发
 
 **日志丢失**：
 - 现象：明明有加密调用，但日志里没有

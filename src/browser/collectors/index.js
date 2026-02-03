@@ -1,5 +1,5 @@
 /**
- * JSForge - 数据采集器索引
+ * DeepSpider - 数据采集器索引
  */
 
 export { ScriptCollector } from './ScriptCollector.js';

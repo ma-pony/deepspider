@@ -1,5 +1,5 @@
 /**
- * JSForge - 验证码处理工具
+ * DeepSpider - 验证码处理工具
  */
 
 import { z } from 'zod';

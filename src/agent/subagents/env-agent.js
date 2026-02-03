@@ -1,5 +1,5 @@
 /**
- * JSForge - 补环境子代理
+ * DeepSpider - 补环境子代理
  * 方向：通过补全浏览器环境让代码直接运行
  */
 
@@ -23,7 +23,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const envAgentSubagent = {
   name: 'env-agent',
   description: '补环境专家。当需要让混淆代码在沙箱中直接运行时使用，适用于：环境检测多、算法复杂难还原、需要快速获取结果的场景。',
-  systemPrompt: `你是 JSForge 的补环境专家。
+  systemPrompt: `你是 DeepSpider 的补环境专家。
 
 ## 分析方向
 补环境是 JS 逆向的黑盒方向，目标是让混淆代码在沙箱中直接运行，无需理解算法逻辑。

@@ -45,7 +45,7 @@
   };
 
   // 核心逻辑
-  var SECRET = 'jsforge_test_2024';
+  var SECRET = 'deepspider_test_2024';
   var APPID = 'app_12345';
 
   var hash = function(str) {

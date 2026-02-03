@@ -1,5 +1,5 @@
 /**
- * JSForge - 浏览器 API 列表
+ * DeepSpider - 浏览器 API 列表
  * 借鉴 v_jstools 的 v_getsetfunc_list.js
  * 用于批量 Hook 和环境代码生成
  */

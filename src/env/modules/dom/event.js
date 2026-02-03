@@ -1,5 +1,5 @@
 /**
- * JSForge - Event 环境模块
+ * DeepSpider - Event 环境模块
  */
 
 export const eventCode = `

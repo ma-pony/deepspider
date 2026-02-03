@@ -1,5 +1,5 @@
 /**
- * JSForge - Storage 环境模块
+ * DeepSpider - Storage 环境模块
  */
 
 export const storageCode = `

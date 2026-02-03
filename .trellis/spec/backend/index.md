@@ -1,12 +1,12 @@
-# JSForge Development Guidelines
+# DeepSpider Development Guidelines
 
-> JSForge 项目开发规范
+> DeepSpider 项目开发规范
 
 ---
 
 ## Overview
 
-JSForge 是基于 DeepAgents + Patchright 的 JS 逆向分析引擎。
+DeepSpider 是基于 DeepAgents + Patchright 的 JS 逆向分析引擎。
 本目录包含项目的开发规范和代码模式。
 
 ---

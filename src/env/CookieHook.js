@@ -1,5 +1,5 @@
 /**
- * JSForge - Cookie 监控模块
+ * DeepSpider - Cookie 监控模块
  * 监控 document.cookie 的读写操作
  */
 
@@ -14,8 +14,8 @@ export class CookieHook {
 
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const cookieDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie') ||
                      Object.getOwnPropertyDescriptor(HTMLDocument.prototype, 'cookie');
@@ -25,13 +25,13 @@ export class CookieHook {
       ${trackRead ? `
       get: function() {
         const value = cookieDesc.get.call(document);
-        jsforge.log('cookie', { action: 'read', value: value?.slice(0, 100) });
+        deepspider.log('cookie', { action: 'read', value: value?.slice(0, 100) });
         return value;
       },
       ` : 'get: cookieDesc.get,'}
       ${trackWrite ? `
       set: function(val) {
-        jsforge.log('cookie', { action: 'write', value: val });
+        deepspider.log('cookie', { action: 'write', value: val });
         return cookieDesc.set.call(document, val);
       },
       ` : 'set: cookieDesc.set,'}
@@ -39,7 +39,7 @@ export class CookieHook {
     });
   }
 
-  console.log('[JSForge:cookie] Cookie Hook 已启用');
+  console.log('[DeepSpider:cookie] Cookie Hook 已启用');
 })();
 `;
   }

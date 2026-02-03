@@ -1,5 +1,5 @@
 /**
- * JSForge - 关联分析工具
+ * DeepSpider - 关联分析工具
  * 分析请求与加密调用的关联关系
  */
 
@@ -67,7 +67,7 @@ export const analyzeCorrelation = tool(
     name: 'analyze_correlation',
     description: '分析请求与加密调用的关联关系，找出每个请求使用了哪些加密',
     schema: z.object({
-      logs: z.string().describe('__jsforge__.getAllLogs() 返回的日志'),
+      logs: z.string().describe('__deepspider__.getAllLogs() 返回的日志'),
     }),
   }
 );
@@ -103,7 +103,7 @@ export const locateCryptoSource = tool(
     // 过滤掉 Hook 相关的栈帧
     const filtered = stack.filter(frame => {
       if (!frame.file) return true;
-      return !frame.file.includes('jsforge') &&
+      return !frame.file.includes('deepspider') &&
              !frame.func?.includes('native') &&
              !frame.func?.includes('hook');
     });
@@ -170,7 +170,7 @@ export const analyzeHeaderEncryption = tool(
     name: 'analyze_header_encryption',
     description: '分析指定 Header 的加密来源',
     schema: z.object({
-      logs: z.string().describe('__jsforge__.getAllLogs() 返回的日志'),
+      logs: z.string().describe('__deepspider__.getAllLogs() 返回的日志'),
       headerName: z.string().describe('要分析的 Header 名称，如 X-Sign'),
     }),
   }
@@ -231,7 +231,7 @@ export const analyzeCookieEncryption = tool(
     name: 'analyze_cookie_encryption',
     description: '分析指定 Cookie 的加密来源（通过时间和调用栈关联）',
     schema: z.object({
-      logs: z.string().describe('__jsforge__.getAllLogs() 返回的日志'),
+      logs: z.string().describe('__deepspider__.getAllLogs() 返回的日志'),
       cookieName: z.string().describe('要分析的 Cookie 名称'),
     }),
   }
@@ -288,7 +288,7 @@ export const analyzeResponseDecryption = tool(
     name: 'analyze_response_decryption',
     description: '分析响应后的解密调用（通过时间窗口关联）',
     schema: z.object({
-      logs: z.string().describe('__jsforge__.getAllLogs() 返回的日志'),
+      logs: z.string().describe('__deepspider__.getAllLogs() 返回的日志'),
       urlPattern: z.string().optional().describe('URL 匹配模式'),
     }),
   }

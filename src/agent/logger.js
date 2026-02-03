@@ -1,14 +1,14 @@
 /**
- * JSForge - 日志回调处理器
+ * DeepSpider - 日志回调处理器
  * 记录 AI 交互、工具调用等详细日志
  */
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { appendFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
-import { JSFORGE_HOME } from '../config/paths.js';
+import { DEEPSPIDER_HOME } from '../config/paths.js';
 
-const LOG_DIR = join(JSFORGE_HOME, 'logs');
+const LOG_DIR = join(DEEPSPIDER_HOME, 'logs');
 const LOG_FILE = join(LOG_DIR, 'agent.log');
 
 function ensureLogDir() {

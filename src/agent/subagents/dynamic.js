@@ -1,5 +1,5 @@
 /**
- * JSForge - 动态分析子代理
+ * DeepSpider - 动态分析子代理
  */
 
 import { createSkillsMiddleware } from 'deepagents';
@@ -18,7 +18,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const dynamicSubagent = {
   name: 'dynamic-agent',
   description: '动态分析专家。当需要在浏览器中调试分析时使用，适用于：设置断点捕获运行时数据、分析请求与加密的关联、采集真实环境数据。',
-  systemPrompt: `你是 JSForge 的动态分析专家。
+  systemPrompt: `你是 DeepSpider 的动态分析专家。
 
 ## 职责
 - 控制浏览器执行

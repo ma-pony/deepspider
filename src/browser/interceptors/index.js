@@ -1,5 +1,5 @@
 /**
- * JSForge - 拦截器索引
+ * DeepSpider - 拦截器索引
  */
 
 export { NetworkInterceptor } from './NetworkInterceptor.js';

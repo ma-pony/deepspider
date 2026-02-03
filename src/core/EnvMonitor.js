@@ -1,6 +1,6 @@
 /**
- * JSForge - 环境监控系统
- * Node.js 端监控核心，API 风格与浏览器端 __jsforge__ 保持一致
+ * DeepSpider - 环境监控系统
+ * Node.js 端监控核心，API 风格与浏览器端 __deepspider__ 保持一致
  */
 
 export class EnvMonitor {
@@ -14,7 +14,7 @@ export class EnvMonitor {
       mockEnabled: true
     };
 
-    // 统一日志结构，与浏览器端 __jsforge__ 保持一致
+    // 统一日志结构，与浏览器端 __deepspider__ 保持一致
     this.logs = {
       env: [],      // 环境访问
       call: [],     // 方法调用
@@ -34,7 +34,7 @@ export class EnvMonitor {
     return `log_${++this._logId}_${Date.now()}`;
   }
 
-  // 统一日志方法，与 __jsforge__.log() 风格一致
+  // 统一日志方法，与 __deepspider__.log() 风格一致
   log(type, data) {
     if (!this.config.enabled) return;
 
@@ -114,7 +114,7 @@ export class EnvMonitor {
            path in this.mocks.returnValues;
   }
 
-  // 查询方法 - 与 __jsforge__.getLogs() 风格一致
+  // 查询方法 - 与 __deepspider__.getLogs() 风格一致
   getLogs(type) {
     if (type) {
       return this.logs[type] || [];

@@ -1,5 +1,5 @@
 /**
- * JSForge - 反反调试模块
+ * DeepSpider - 反反调试模块
  * 绕过常见的反调试检测
  */
 
@@ -12,37 +12,37 @@ export class AntiAntiDebug {
   generateAntiDebuggerCode() {
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const origCtor = Function.prototype.constructor;
-  Function.prototype.constructor = jsforge.native(function(...args) {
+  Function.prototype.constructor = deepspider.native(function(...args) {
     if (args[0] && args[0].includes('debugger')) {
-      jsforge.log('debug', { action: 'block.debugger.constructor' });
+      deepspider.log('debug', { action: 'block.debugger.constructor' });
       return function() {};
     }
     return origCtor.apply(this, args);
   }, origCtor);
 
   const origEval = eval;
-  eval = jsforge.native(function(code) {
+  eval = deepspider.native(function(code) {
     if (typeof code === 'string' && code.includes('debugger')) {
-      jsforge.log('debug', { action: 'block.debugger.eval' });
+      deepspider.log('debug', { action: 'block.debugger.eval' });
       code = code.replace(/debugger/g, '');
     }
     return origEval(code);
   }, origEval);
 
   const origSetInterval = setInterval;
-  setInterval = jsforge.native(function(fn, delay) {
+  setInterval = deepspider.native(function(fn, delay) {
     if (fn.toString().includes('debugger')) {
-      jsforge.log('debug', { action: 'block.debugger.setInterval' });
+      deepspider.log('debug', { action: 'block.debugger.setInterval' });
       return 0;
     }
     return origSetInterval(fn, delay);
   }, origSetInterval);
 
-  console.log('[JSForge:debug] 无限 debugger 防护已启用');
+  console.log('[DeepSpider:debug] 无限 debugger 防护已启用');
 })();
 `;
   }
@@ -53,16 +53,16 @@ export class AntiAntiDebug {
   generateAntiConsoleDetectCode() {
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
   Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight + 100 });
 
   const origLog = console.log;
-  console.log = jsforge.native(function(...args) {
+  console.log = deepspider.native(function(...args) {
     if (args[0]?.toString?.().includes('devtools')) {
-      jsforge.log('debug', { action: 'block.console.devtools' });
+      deepspider.log('debug', { action: 'block.console.devtools' });
       return;
     }
     return origLog.apply(console, args);
@@ -71,7 +71,7 @@ export class AntiAntiDebug {
   console.table = function() {};
   console.clear = function() {};
 
-  console.log('[JSForge:debug] 控制台检测防护已启用');
+  console.log('[DeepSpider:debug] 控制台检测防护已启用');
 })();
 `;
   }
@@ -91,7 +91,7 @@ export class AntiAntiDebug {
     configurable: true
   });
 
-  console.log('[JSForge:debug] CDP 检测防护已启用');
+  console.log('[DeepSpider:debug] CDP 检测防护已启用');
 })();
 `;
   }

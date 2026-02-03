@@ -6,7 +6,7 @@
 
 ## Overview
 
-JSForge 使用 `@langchain/core/tools` 定义 Agent 工具。
+DeepSpider 使用 `@langchain/core/tools` 定义 Agent 工具。
 每个工具是一个独立的功能单元，通过 Zod schema 定义参数类型。
 
 ---

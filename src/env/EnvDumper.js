@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境自吐模块
+ * DeepSpider - 环境自吐模块
  * 通过 Proxy 递归代理全局对象，记录所有环境访问
  */
 
@@ -26,9 +26,9 @@ export class EnvDumper {
 
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__ || global.__jsforge__;
-  if (!jsforge) {
-    console.error('[JSForge:env] 请先注入 HookBase');
+  const deepspider = window.__deepspider__ || global.__deepspider__;
+  if (!deepspider) {
+    console.error('[DeepSpider:env] 请先注入 HookBase');
     return;
   }
   const MAX_VALUE_LENGTH = ${maxValueLength};
@@ -80,25 +80,25 @@ export class EnvDumper {
     if (ENABLE_CALL_STACK) {
       entry.stack = new Error().stack;
     }
-    jsforge.log('env', entry);
+    deepspider.log('env', entry);
 
     // 格式化输出
     const pathStr = ('"' + path + '"').padEnd(50, " ");
     switch (type) {
       case 'get':
-        console.log(\`[JSForge:env] 获取: \${pathStr} | 值= \${truncateValue(details.value)}\`);
+        console.log(\`[DeepSpider:env] 获取: \${pathStr} | 值= \${truncateValue(details.value)}\`);
         break;
       case 'set':
-        console.log(\`[JSForge:env] 设置: \${pathStr} | 值= \${truncateValue(details.value)}\`);
+        console.log(\`[DeepSpider:env] 设置: \${pathStr} | 值= \${truncateValue(details.value)}\`);
         break;
       case 'call':
-        console.log(\`[JSForge:env] 调用: \${pathStr} | 参数= \${truncateValue(details.args)}\`);
+        console.log(\`[DeepSpider:env] 调用: \${pathStr} | 参数= \${truncateValue(details.args)}\`);
         break;
       case 'construct':
-        console.log(\`[JSForge:env] 构造: \${pathStr} | 参数= \${truncateValue(details.args)}\`);
+        console.log(\`[DeepSpider:env] 构造: \${pathStr} | 参数= \${truncateValue(details.args)}\`);
         break;
       case 'missing':
-        console.log(\`[JSForge:env] 缺失: \${pathStr}\`);
+        console.log(\`[DeepSpider:env] 缺失: \${pathStr}\`);
         if (typeof __recordMissing__ === 'function') {
           __recordMissing__(path);
         }
@@ -221,12 +221,12 @@ export class EnvDumper {
       try {
         global[target] = new Proxy(global[target], createHandler(target));
       } catch (e) {
-        console.log('[JSForge:env] 无法代理:', target, e.message);
+        console.log('[DeepSpider:env] 无法代理:', target, e.message);
       }
     }
   }
 
-  console.log('[JSForge:env] 环境自吐已启用，监控目标:', targets.join(', '));
+  console.log('[DeepSpider:env] 环境自吐已启用，监控目标:', targets.join(', '));
 })();
 `;
   }

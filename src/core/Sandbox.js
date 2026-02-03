@@ -1,5 +1,5 @@
 /**
- * JSForge - 沙箱管理器
+ * DeepSpider - 沙箱管理器
  * 基于 isolated-vm 的安全执行环境
  */
 
@@ -40,9 +40,9 @@ export class Sandbox {
   async _injectBase(jail) {
     // console
     await jail.set('console', {
-      log: new ivm.Callback((...args) => console.log('[JSForge:sandbox]', ...args)),
-      error: new ivm.Callback((...args) => console.error('[JSForge:sandbox]', ...args)),
-      warn: new ivm.Callback((...args) => console.warn('[JSForge:sandbox]', ...args))
+      log: new ivm.Callback((...args) => console.log('[DeepSpider:sandbox]', ...args)),
+      error: new ivm.Callback((...args) => console.error('[DeepSpider:sandbox]', ...args)),
+      warn: new ivm.Callback((...args) => console.warn('[DeepSpider:sandbox]', ...args))
     }, { copy: true });
 
     // Base64

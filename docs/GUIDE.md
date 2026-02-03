@@ -1,4 +1,4 @@
-# JSForge 开发使用指南
+# DeepSpider 开发使用指南
 
 > JavaScript 逆向分析引擎 - Claude Code Plugin
 
@@ -16,7 +16,7 @@
 
 ## 项目概述
 
-JSForge 是一个专业的 JavaScript 逆向分析引擎，作为 Claude Code Plugin 运行。
+DeepSpider 是一个专业的 JavaScript 逆向分析引擎，作为 Claude Code Plugin 运行。
 
 ### 核心能力
 
@@ -31,7 +31,7 @@ JSForge 是一个专业的 JavaScript 逆向分析引擎，作为 Claude Code Pl
 ### 项目结构
 
 ```
-jsforge/
+deepspider/
 ├── src/
 │   ├── agent/               # DeepAgent 系统
 │   │   ├── tools/           # 39个工具
@@ -56,20 +56,20 @@ jsforge/
 ### 依赖安装
 
 ```bash
-cd /path/to/jsforge
+cd /path/to/deepspider
 pnpm install
 ```
 
 ### 作为 Plugin 安装
 
 ```bash
-claude /install /path/to/jsforge
+claude /install /path/to/deepspider
 ```
 
 ### 本地开发测试 (不安装)
 
 ```bash
-claude --plugin-dir /path/to/jsforge
+claude --plugin-dir /path/to/deepspider
 ```
 
 ### 独立 CLI 使用
@@ -86,15 +86,15 @@ pnpm run cli analyze target.js  # 分析代码
 ### 方式一: Commands (斜杠命令)
 
 ```
-/jsforge:run <file.js>      # 在沙箱中执行并自动补环境
-/jsforge:analyze <file.js>  # 分析代码结构和加密
-/jsforge:deob <file.js>     # 反混淆代码
-/jsforge:trace <param>      # 追踪参数生成逻辑
+/deepspider:run <file.js>      # 在沙箱中执行并自动补环境
+/deepspider:analyze <file.js>  # 分析代码结构和加密
+/deepspider:deob <file.js>     # 反混淆代码
+/deepspider:trace <param>      # 追踪参数生成逻辑
 ```
 
 ### 方式二: Agent 对话
 
-直接与 JSForge Agent 对话:
+直接与 DeepSpider Agent 对话:
 
 ```
 分析这段 JS 代码的加密逻辑
@@ -106,9 +106,9 @@ pnpm run cli analyze target.js  # 分析代码
 ### 方式三: MCP 工具调用
 
 Claude 会自动调用 MCP 工具，工具命名格式:
-- `mcp__jsforge__sandbox_execute`
-- `mcp__jsforge__analyze_ast`
-- `mcp__jsforge__deobfuscate`
+- `mcp__deepspider__sandbox_execute`
+- `mcp__deepspider__analyze_ast`
+- `mcp__deepspider__deobfuscate`
 
 ---
 
@@ -247,7 +247,7 @@ Claude 会自动调用 MCP 工具，工具命名格式:
 
 ```bash
 # 开启调试模式
-claude --debug --plugin-dir /path/to/jsforge
+claude --debug --plugin-dir /path/to/deepspider
 ```
 
 ### MCP Inspector
@@ -259,7 +259,7 @@ npx @modelcontextprotocol/inspector node src/mcp/server.js
 ### 查看工具调用日志
 
 ```bash
-tail -f logs/jsforge-debug.log
+tail -f logs/deepspider-debug.log
 ```
 
 ### 常见问题
@@ -308,10 +308,10 @@ export const myTool = tool(
 
 ### 知识库
 
-知识库存储在 `.jsforge-store/` 目录:
+知识库存储在 `.deepspider-store/` 目录:
 
 ```
-.jsforge-store/
+.deepspider-store/
 ├── index.json      # 索引
 ├── env/            # 环境补丁
 └── analysis/       # 分析结果

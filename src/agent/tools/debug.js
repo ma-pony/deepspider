@@ -1,5 +1,5 @@
 /**
- * JSForge - CDP 调试工具
+ * DeepSpider - CDP 调试工具
  */
 
 import { z } from 'zod';

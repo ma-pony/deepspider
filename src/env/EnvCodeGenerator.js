@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境代码生成器
+ * DeepSpider - 环境代码生成器
  * 借鉴 v_jstools 的 make_env_1_v3.js
  * 根据 Hook 收集的数据生成可在 Node.js 运行的浏览器环境代码
  */
@@ -45,7 +45,7 @@ export class EnvCodeGenerator {
    */
   generateCode() {
     const lines = [];
-    lines.push('// JSForge 生成的浏览器环境代码');
+    lines.push('// DeepSpider 生成的浏览器环境代码');
     lines.push('// 生成时间: ' + new Date().toISOString());
     lines.push('');
     lines.push(this.generateSafeWrapper());

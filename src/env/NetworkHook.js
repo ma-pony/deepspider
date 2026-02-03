@@ -1,5 +1,5 @@
 /**
- * JSForge - 网络请求 Hook 模块
+ * DeepSpider - 网络请求 Hook 模块
  * 拦截 XHR 和 Fetch 请求/响应
  */
 
@@ -18,8 +18,8 @@ export class NetworkHook {
 
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalXHR = XMLHttpRequest;
 
@@ -36,7 +36,7 @@ export class NetworkHook {
 
     // Hook open
     const originalOpen = xhr.open;
-    xhr.open = jsforge.native(function(method, url) {
+    xhr.open = deepspider.native(function(method, url) {
       log.method = method;
       log.url = url;
       return originalOpen.apply(xhr, arguments);
@@ -44,18 +44,18 @@ export class NetworkHook {
 
     // Hook setRequestHeader
     const originalSetHeader = xhr.setRequestHeader;
-    xhr.setRequestHeader = jsforge.native(function(name, value) {
+    xhr.setRequestHeader = deepspider.native(function(name, value) {
       log.requestHeaders[name] = value;
       return originalSetHeader.apply(xhr, arguments);
     }, originalSetHeader);
 
     // Hook send
     const originalSend = xhr.send;
-    xhr.send = jsforge.native(function(body) {
+    xhr.send = deepspider.native(function(body) {
       // 开始请求上下文
-      log.requestId = jsforge.startRequest(log.url, log.method);
+      log.requestId = deepspider.startRequest(log.url, log.method);
       ${captureBody ? `log.requestBody = body;` : ''}
-      jsforge.log('xhr', { action: 'send', ...log, body: body?.toString().slice(0, 200) });
+      deepspider.log('xhr', { action: 'send', ...log, body: body?.toString().slice(0, 200) });
       return originalSend.apply(xhr, arguments);
     }, originalSend);
 
@@ -64,8 +64,8 @@ export class NetworkHook {
       log.status = xhr.status;
       log.response = xhr.responseText?.slice(0, 500);
       // 结束请求上下文，获取关联的加密调用
-      const ctx = jsforge.endRequest();
-      jsforge.log('xhr', {
+      const ctx = deepspider.endRequest();
+      deepspider.log('xhr', {
         action: 'response',
         url: log.url,
         status: log.status,
@@ -79,7 +79,7 @@ export class NetworkHook {
   };
 
   XMLHttpRequest.prototype = OriginalXHR.prototype;
-  console.log('[JSForge:xhr] XHR Hook 已启用');
+  console.log('[DeepSpider:xhr] XHR Hook 已启用');
 })();
 `;
   }
@@ -92,12 +92,12 @@ export class NetworkHook {
 
     return HookBase.getBaseCode() + `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge) return;
+  const deepspider = window.__deepspider__;
+  if (!deepspider) return;
 
   const OriginalFetch = fetch;
 
-  fetch = jsforge.native(async function(url, options = {}) {
+  fetch = deepspider.native(async function(url, options = {}) {
     const log = {
       url: typeof url === 'string' ? url : url.url,
       method: options.method || 'GET',
@@ -108,7 +108,7 @@ export class NetworkHook {
     };
 
     // 开始请求上下文
-    log.requestId = jsforge.startRequest(log.url, log.method);
+    log.requestId = deepspider.startRequest(log.url, log.method);
 
     ${captureBody ? `
     if (options.body) {
@@ -116,7 +116,7 @@ export class NetworkHook {
     }
     ` : ''}
 
-    jsforge.log('fetch', { action: 'request', ...log });
+    deepspider.log('fetch', { action: 'request', ...log });
 
     const response = await OriginalFetch.apply(this, arguments);
     log.status = response.status;
@@ -127,8 +127,8 @@ export class NetworkHook {
       const text = await cloned.text();
       log.response = text.slice(0, 500);
       // 结束请求上下文
-      const ctx = jsforge.endRequest();
-      jsforge.log('fetch', {
+      const ctx = deepspider.endRequest();
+      deepspider.log('fetch', {
         action: 'response',
         url: log.url,
         status: log.status,
@@ -136,14 +136,14 @@ export class NetworkHook {
         linkedCrypto: ctx?.cryptoCalls || []
       });
     } catch (e) {
-      jsforge.endRequest();
+      deepspider.endRequest();
     }
-    ` : 'jsforge.endRequest();'}
+    ` : 'deepspider.endRequest();'}
 
     return response;
   }, OriginalFetch);
 
-  console.log('[JSForge:fetch] Fetch Hook 已启用');
+  console.log('[DeepSpider:fetch] Fetch Hook 已启用');
 })();
 `;
   }

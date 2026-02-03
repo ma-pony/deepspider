@@ -1,5 +1,5 @@
 /**
- * JSForge - Webcrack 解包工具
+ * DeepSpider - Webcrack 解包工具
  * 用于解包 Webpack/Browserify 打包的代码
  */
 

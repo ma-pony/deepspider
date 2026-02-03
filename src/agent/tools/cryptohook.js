@@ -1,5 +1,5 @@
 /**
- * JSForge - 加密函数 Hook 工具
+ * DeepSpider - 加密函数 Hook 工具
  */
 
 import { z } from 'zod';
@@ -14,7 +14,7 @@ export const generateCryptoJSHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('crypto') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('crypto') 获取日志",
     }, null, 2);
   },
   {
@@ -30,7 +30,7 @@ export const generateSMCryptoHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('crypto') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('crypto') 获取日志",
     }, null, 2);
   },
   {
@@ -46,7 +46,7 @@ export const generateRSAHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('crypto') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('crypto') 获取日志",
     }, null, 2);
   },
   {
@@ -62,7 +62,7 @@ export const generateGenericCryptoHook = tool(
     return JSON.stringify({
       success: true,
       code,
-      usage: "注入后通过 __jsforge__.getLogs('crypto') 获取日志",
+      usage: "注入后通过 __deepspider__.getLogs('crypto') 获取日志",
     }, null, 2);
   },
   {

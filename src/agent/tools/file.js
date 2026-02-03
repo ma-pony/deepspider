@@ -1,13 +1,13 @@
 /**
- * JSForge - 文件操作工具
- * 统一存储到 ~/.jsforge/output/
+ * DeepSpider - 文件操作工具
+ * 统一存储到 ~/.deepspider/output/
  */
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 import { writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { dirname, join, isAbsolute, relative } from 'path';
-import { PATHS, ensureDir, JSFORGE_HOME } from '../../config/paths.js';
+import { PATHS, ensureDir, DEEPSPIDER_HOME } from '../../config/paths.js';
 
 const OUTPUT_DIR = PATHS.OUTPUT_DIR;
 
@@ -18,8 +18,8 @@ function ensureFileDir(filePath) {
 
 function getSafePath(filePath) {
   if (isAbsolute(filePath)) {
-    // 如果是 ~/.jsforge/ 目录下的路径，直接使用
-    if (filePath.startsWith(JSFORGE_HOME)) {
+    // 如果是 ~/.deepspider/ 目录下的路径，直接使用
+    if (filePath.startsWith(DEEPSPIDER_HOME)) {
       return filePath;
     }
     // 其他绝对路径：放到 OUTPUT_DIR 下
@@ -42,7 +42,7 @@ export const artifactSave = tool(
   },
   {
     name: 'artifact_save',
-    description: '保存逆向分析产出文件（代码、数据、报告等）到 ~/.jsforge/output/ 目录',
+    description: '保存逆向分析产出文件（代码、数据、报告等）到 ~/.deepspider/output/ 目录',
     schema: z.object({
       file_path: z.string().describe('文件路径（相对于 output 目录）'),
       content: z.string().describe('文件内容'),
@@ -65,7 +65,7 @@ export const artifactLoad = tool(
   },
   {
     name: 'artifact_load',
-    description: '读取逆向分析产出文件（从 ~/.jsforge/output/ 目录）',
+    description: '读取逆向分析产出文件（从 ~/.deepspider/output/ 目录）',
     schema: z.object({
       file_path: z.string().describe('文件路径（相对于 output 目录）'),
     }),

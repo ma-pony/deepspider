@@ -1,7 +1,7 @@
 /**
- * JSForge - 知识库存储
+ * DeepSpider - 知识库存储
  * 文件系统持久化，支持分类索引
- * 统一存储到 ~/.jsforge/store/
+ * 统一存储到 ~/.deepspider/store/
  */
 
 import fs from 'fs';

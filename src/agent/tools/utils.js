@@ -1,6 +1,6 @@
 /**
- * JSForge - 工具函数
- * 统一使用 ~/.jsforge/ 目录
+ * DeepSpider - 工具函数
+ * 统一使用 ~/.deepspider/ 目录
  */
 
 import { join } from 'path';

@@ -1,5 +1,5 @@
 /**
- * JSForge - XMLHttpRequest 环境模块
+ * DeepSpider - XMLHttpRequest 环境模块
  */
 
 export const xhrCode = `
@@ -30,7 +30,7 @@ export const xhrCode = `
     getResponseHeader: function(k) { return null; },
     getAllResponseHeaders: function() { return ''; },
     send: function(data) {
-      console.log('[JSForge:xhr]', this._method, this._url);
+      console.log('[DeepSpider:xhr]', this._method, this._url);
       this.readyState = 4;
       this.status = 200;
       if (this.onreadystatechange) this.onreadystatechange();

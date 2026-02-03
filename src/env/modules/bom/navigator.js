@@ -1,5 +1,5 @@
 /**
- * JSForge - Navigator 环境模块
+ * DeepSpider - Navigator 环境模块
  */
 
 export const navigatorCode = `

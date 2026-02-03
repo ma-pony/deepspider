@@ -1,5 +1,5 @@
 /**
- * JSForge - DeepAgent 主入口
+ * DeepSpider - DeepAgent 主入口
  * 基于 DeepAgents 最佳实践重构
  */
 
@@ -41,9 +41,9 @@ function createModel(options = {}) {
 }
 
 /**
- * 创建 JSForge Agent
+ * 创建 DeepSpider Agent
  */
-export function createJSForgeAgent(options = {}) {
+export function createDeepSpiderAgent(options = {}) {
   const {
     model = config.model,
     apiKey = config.apiKey,
@@ -58,7 +58,7 @@ export function createJSForgeAgent(options = {}) {
 
   // 后端配置：使用文件系统持久化
   const backend = enableMemory
-    ? new FilesystemBackend({ rootDir: './.jsforge-agent' })
+    ? new FilesystemBackend({ rootDir: './.deepspider-agent' })
     : new StateBackend();
 
   // Checkpointer：保存对话状态，支持断点恢复
@@ -79,7 +79,7 @@ export function createJSForgeAgent(options = {}) {
   ];
 
   return createDeepAgent({
-    name: 'jsforge',
+    name: 'deepspider',
     model: llm,
     tools: coreTools,
     subagents: allSubagents,
@@ -92,6 +92,6 @@ export function createJSForgeAgent(options = {}) {
 }
 
 // 默认导出
-export const agent = createJSForgeAgent();
+export const agent = createDeepSpiderAgent();
 
 export default agent;

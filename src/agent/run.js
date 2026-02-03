@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * JSForge Agent 独立运行入口
+ * DeepSpider Agent 独立运行入口
  * 使用 CDP binding 接收浏览器消息
  * 支持流式输出显示思考过程
  */
@@ -9,7 +9,7 @@ import 'dotenv/config';
 import readline from 'readline';
 import { readFileSync } from 'fs';
 import { marked } from 'marked';
-import { createJSForgeAgent } from './index.js';
+import { createDeepSpiderAgent } from './index.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
@@ -26,7 +26,7 @@ const rl = readline.createInterface({
 let browser = null;
 let currentPage = null;
 
-console.log('=== JSForge Agent ===');
+console.log('=== DeepSpider Agent ===');
 console.log('JS 逆向分析助手，输入 exit 退出\n');
 
 // 调试模式
@@ -99,10 +99,10 @@ async function onReportReady(mdFilePath) {
 }
 
 // 创建 Agent，传入报告回调
-const agent = createJSForgeAgent({ onReportReady });
+const agent = createDeepSpiderAgent({ onReportReady });
 
 const config = {
-  configurable: { thread_id: `jsforge-${Date.now()}` },
+  configurable: { thread_id: `deepspider-${Date.now()}` },
   recursionLimit: 5000,
   callbacks: logger ? [logger] : [],
 };
@@ -128,7 +128,7 @@ async function sendToPanel(role, content) {
 
   try {
     const escaped = JSON.stringify(content.trim());
-    const code = `window.__jsforge__?.addMessage?.('${role}', ${escaped})`;
+    const code = `window.__deepspider__?.addMessage?.('${role}', ${escaped})`;
     await evaluateInPage(code);
   } catch (e) {
     // ignore
@@ -185,7 +185,7 @@ async function flushPanelText() {
 
     if (!hasStartedAssistantMsg) {
       const code = `(function() {
-        const fn = window.__jsforge__?.addMessage;
+        const fn = window.__deepspider__?.addMessage;
         if (typeof fn === 'function') {
           fn('assistant', ${escaped});
           return { ok: true };
@@ -196,7 +196,7 @@ async function flushPanelText() {
       hasStartedAssistantMsg = true;
     } else {
       const code = `(function() {
-        const fn = window.__jsforge__?.appendToLastMessage;
+        const fn = window.__deepspider__?.appendToLastMessage;
         if (typeof fn === 'function') {
           fn('assistant', ${escaped});
           return { ok: true };
@@ -227,7 +227,7 @@ async function chatStream(input, page = null, retryCount = 0) {
   hasStartedAssistantMsg = false;
 
   // 设置忙碌状态
-  await evaluateInPage('window.__jsforge__?.setBusy?.(true)');
+  await evaluateInPage('window.__deepspider__?.setBusy?.(true)');
 
   debug(`chatStream: 开始处理, 输入长度=${input.length}, page=${!!page}`);
 
@@ -287,7 +287,7 @@ async function chatStream(input, page = null, retryCount = 0) {
     await flushPanelText();
 
     // 清除忙碌状态
-    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+    await evaluateInPage('window.__deepspider__?.setBusy?.(false)');
 
     debug(`chatStream: 完成, 响应长度=${finalResponse.length}`);
     return finalResponse || '[无响应]';
@@ -296,7 +296,7 @@ async function chatStream(input, page = null, retryCount = 0) {
     const errMsg = error.message || String(error);
 
     // 清除忙碌状态
-    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+    await evaluateInPage('window.__deepspider__?.setBusy?.(false)');
 
     console.error(`\n[异常] 事件数=${eventCount}, 最后工具=${lastToolCall || '无'}, 错误: ${errMsg}`);
 
@@ -335,7 +335,7 @@ async function chatStreamResume(page = null, retryCount = 0) {
   let lastEventTime = Date.now();
   let eventCount = 0;
 
-  await evaluateInPage('window.__jsforge__?.setBusy?.(true)');
+  await evaluateInPage('window.__deepspider__?.setBusy?.(true)');
   debug(`chatStreamResume: 从检查点恢复, retryCount=${retryCount}`);
 
   const heartbeat = setInterval(() => {
@@ -367,12 +367,12 @@ async function chatStreamResume(page = null, retryCount = 0) {
 
     clearInterval(heartbeat);
     await flushPanelText();
-    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+    await evaluateInPage('window.__deepspider__?.setBusy?.(false)');
     console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
     return finalResponse || '[无响应]';
   } catch (error) {
     clearInterval(heartbeat);
-    await evaluateInPage('window.__jsforge__?.setBusy?.(false)');
+    await evaluateInPage('window.__deepspider__?.setBusy?.(false)');
     const errMsg = error.message || String(error);
     console.error(`\n[恢复失败] ${errMsg}`);
 
@@ -468,7 +468,7 @@ async function showReportFromFile(mdFilePath) {
     // 使用 marked 转换为 HTML
     const htmlContent = marked.parse(content);
     const escaped = JSON.stringify(htmlContent);
-    const code = `window.__jsforge__?.showReport?.(${escaped}, true)`;
+    const code = `window.__deepspider__?.showReport?.(${escaped}, true)`;
     await evaluateInPage(code);
     console.log('[report] 已显示分析报告');
   } catch (e) {

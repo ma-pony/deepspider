@@ -1,5 +1,5 @@
 /**
- * JSForge - CDP 网络拦截器
+ * DeepSpider - CDP 网络拦截器
  * 通过 CDP 捕获网络请求/响应，按站点存储到文件系统
  */
 

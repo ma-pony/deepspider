@@ -1,5 +1,5 @@
 /**
- * JSForge - Hook 管理工具
+ * DeepSpider - Hook 管理工具
  * 供 Agent 在运行时动态控制 Hook
  */
 
@@ -32,7 +32,7 @@ export const listHooks = tool(
       }
       const result = await evaluateViaCDP(
         browser,
-        `JSON.stringify(window.__jsforge__?.listHooks?.() || [])`
+        `JSON.stringify(window.__deepspider__?.listHooks?.() || [])`
       );
       return JSON.stringify({
         success: true,
@@ -61,7 +61,7 @@ export const enableHook = tool(
       }
       const result = await evaluateViaCDP(
         browser,
-        `window.__jsforge__?.enableHook?.('${name}')`
+        `window.__deepspider__?.enableHook?.('${name}')`
       );
       return JSON.stringify({ success: result === true, name });
     } catch (e) {
@@ -89,7 +89,7 @@ export const disableHook = tool(
       }
       const result = await evaluateViaCDP(
         browser,
-        `window.__jsforge__?.disableHook?.('${name}')`
+        `window.__deepspider__?.disableHook?.('${name}')`
       );
       return JSON.stringify({ success: result === true, name });
     } catch (e) {
@@ -122,7 +122,7 @@ export const injectHook = tool(
 
       const result = await evaluateViaCDP(
         browser,
-        `JSON.stringify(window.__jsforge__?.injectHook?.('${escapedCode}'))`
+        `JSON.stringify(window.__deepspider__?.injectHook?.('${escapedCode}'))`
       );
       return result || JSON.stringify({ success: false, error: '注入失败' });
     } catch (e) {
@@ -151,7 +151,7 @@ export const setHookConfig = tool(
       const val = typeof value === 'string' ? `'${value}'` : value;
       const result = await evaluateViaCDP(
         browser,
-        `window.__jsforge__?.setConfig?.('${key}', ${val})`
+        `window.__deepspider__?.setConfig?.('${key}', ${val})`
       );
       return JSON.stringify({ success: result === true, key, value });
     } catch (e) {

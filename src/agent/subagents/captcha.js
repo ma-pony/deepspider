@@ -1,5 +1,5 @@
 /**
- * JSForge - 验证码处理子代理
+ * DeepSpider - 验证码处理子代理
  * 识别和绕过各类验证码
  */
 
@@ -15,7 +15,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const captchaSubagent = {
   name: 'captcha',
   description: '验证码处理专家。当遇到验证码需要识别或绕过时使用，适用于：图片验证码OCR、滑块验证码、点选验证码、短信验证码处理。',
-  systemPrompt: `你是 JSForge 的验证码处理专家，负责识别和绕过各类验证码。
+  systemPrompt: `你是 DeepSpider 的验证码处理专家，负责识别和绕过各类验证码。
 
 ## 核心职责
 识别验证码类型，选择最优处理策略，确保验证通过。

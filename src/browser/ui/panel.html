@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>JSForge Panel</title>
+  <title>DeepSpider Panel</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -79,7 +79,7 @@
 </head>
 <body>
   <div class="header">
-    <span class="header-title">JSForge</span>
+    <span class="header-title">DeepSpider</span>
     <div class="header-btns">
       <button id="btn-select" title="选择元素">⦿ 选择</button>
       <button id="btn-clear" title="清空消息">清空</button>
@@ -123,8 +123,8 @@
       if (!text) return;
       chatInput.value = '';
       addMessage('user', text);
-      if (typeof __jsforge_send__ === 'function') {
-        __jsforge_send__(JSON.stringify({ type: 'chat', text }));
+      if (typeof __deepspider_send__ === 'function') {
+        __deepspider_send__(JSON.stringify({ type: 'chat', text }));
       }
     }
 
@@ -135,8 +135,8 @@
 
     // 选择模式
     document.getElementById('btn-select').onclick = () => {
-      if (typeof __jsforge_send__ === 'function') {
-        __jsforge_send__(JSON.stringify({ type: 'start-select' }));
+      if (typeof __deepspider_send__ === 'function') {
+        __deepspider_send__(JSON.stringify({ type: 'start-select' }));
       }
     };
 

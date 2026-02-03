@@ -1,6 +1,6 @@
 /**
- * JSForge MCP Server
- * 通过 MCP 协议暴露 JSForge 工具
+ * DeepSpider MCP Server
+ * 通过 MCP 协议暴露 DeepSpider 工具
  * 复用 Agent 工具定义
  */
 
@@ -14,7 +14,7 @@ import {
 import { allTools } from '../agent/tools/index.js';
 
 const server = new Server(
-  { name: 'jsforge', version: '1.0.0' },
+  { name: 'deepspider', version: '1.0.0' },
   { capabilities: { tools: {} } }
 );
 
@@ -83,7 +83,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('JSForge MCP server running');
+  console.error('DeepSpider MCP server running');
 }
 
 main().catch(console.error);

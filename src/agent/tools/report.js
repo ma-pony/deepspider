@@ -1,7 +1,7 @@
 /**
- * JSForge - 分析报告工具
+ * DeepSpider - 分析报告工具
  * 保存分析结果、生成 HTML 报告
- * 统一存储到 ~/.jsforge/output/reports/
+ * 统一存储到 ~/.deepspider/output/reports/
  */
 
 import { z } from 'zod';
@@ -33,7 +33,7 @@ function generateHtmlPage(title, markdown, pythonCode, jsCode) {
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>${escapeHtml(title)} - JSForge</title>
+  <title>${escapeHtml(title)} - DeepSpider</title>
   <style>
     body { font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 20px; background: #0d1117; color: #c9d1d9; }
     h1,h2,h3 { color: #58a6ff; }

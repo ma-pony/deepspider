@@ -1,5 +1,5 @@
 /**
- * JSForge - evolve_skill 工具
+ * DeepSpider - evolve_skill 工具
  * 让 Agent 可以追加经验到 evolved.md
  */
 

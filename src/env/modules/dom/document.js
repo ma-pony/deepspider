@@ -1,5 +1,5 @@
 /**
- * JSForge - Document 环境模块（基础版）
+ * DeepSpider - Document 环境模块（基础版）
  */
 
 export const documentCode = `

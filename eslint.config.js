@@ -26,19 +26,26 @@ export default [
         navigator: 'readonly',
         localStorage: 'readonly',
         sessionStorage: 'readonly',
+        screen: 'readonly',
+        Image: 'readonly',
+        btoa: 'readonly',
+        atob: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': 'off',
       'no-case-declarations': 'off',
+      'no-control-regex': 'off',
+      'no-useless-escape': 'warn',
     },
   },
   {
     ignores: [
       'node_modules/**',
-      '.jsforge-data/**',
+      '.deepspider-data/**',
       'dist/**',
+      'test/samples/**',
     ],
   },
 ];

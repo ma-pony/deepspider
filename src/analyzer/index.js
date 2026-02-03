@@ -1,5 +1,5 @@
 /**
- * JSForge - 分析器注册表
+ * DeepSpider - 分析器注册表
  */
 
 import { ASTAnalyzer } from './ASTAnalyzer.js';

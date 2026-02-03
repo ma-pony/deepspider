@@ -1,12 +1,12 @@
 # DeepAgents 框架使用指南
 
-> JSForge 项目的 DeepAgents 框架规范
+> DeepSpider 项目的 DeepAgents 框架规范
 
 ---
 
 ## Overview
 
-DeepAgents 是基于 LangGraph 的 Agent 框架，JSForge 使用它构建多代理系统。
+DeepAgents 是基于 LangGraph 的 Agent 框架，DeepSpider 使用它构建多代理系统。
 
 ---
 
@@ -19,12 +19,12 @@ import { createDeepAgent, FilesystemBackend } from 'deepagents';
 import { ChatOpenAI } from '@langchain/openai';
 
 const agent = createDeepAgent({
-  name: 'jsforge',
+  name: 'deepspider',
   model: new ChatOpenAI({ model: 'gpt-4o' }),
   tools: coreTools,
   subagents: allSubagents,
   systemPrompt,
-  backend: new FilesystemBackend({ rootDir: './.jsforge-agent' }),
+  backend: new FilesystemBackend({ rootDir: './.deepspider-agent' }),
 });
 ```
 
@@ -190,7 +190,7 @@ systemPrompt: `...原有内容...
 import { FilesystemBackend } from 'deepagents';
 
 const backend = new FilesystemBackend({
-  rootDir: './.jsforge-agent',
+  rootDir: './.deepspider-agent',
 });
 ```
 

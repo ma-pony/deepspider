@@ -1,5 +1,5 @@
 /**
- * JSForge - 爬虫编排子代理
+ * DeepSpider - 爬虫编排子代理
  * 智能调度、流程规划、脚本生成
  */
 
@@ -15,7 +15,7 @@ import { storeTools } from '../tools/store.js';
 export const crawlerSubagent = {
   name: 'crawler',
   description: '爬虫编排专家。当需要规划完整爬虫流程、生成爬虫脚本、进行端到端测试时使用。负责分析目标网站复杂度，按需调度其他子代理，输出完整可运行的爬虫代码。',
-  systemPrompt: `你是 JSForge 的爬虫编排专家，负责生成完整可运行的 Python 爬虫脚本。
+  systemPrompt: `你是 DeepSpider 的爬虫编排专家，负责生成完整可运行的 Python 爬虫脚本。
 
 ## 核心职责
 **最终目标：输出一份用户可以直接 python crawler.py 运行的完整爬虫代码**
@@ -82,7 +82,7 @@ export const crawlerSubagent = {
 
 \`\`\`python
 """
-<domain> 爬虫 - 由 JSForge 生成
+<domain> 爬虫 - 由 DeepSpider 生成
 """
 import requests
 

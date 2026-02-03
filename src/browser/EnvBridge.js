@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境补全桥接器
+ * DeepSpider - 环境补全桥接器
  * 连接 EnvDumper（发现缺失）与 EnvCollector（采集真实数据）
  */
 
@@ -147,7 +147,7 @@ export class EnvBridge {
       grouped.get(root).push(code);
     }
 
-    const lines = ['// JSForge Auto-Generated Patch'];
+    const lines = ['// DeepSpider Auto-Generated Patch'];
     for (const [root, codes] of grouped) {
       lines.push(`\n// === ${root} ===`);
       lines.push(...codes);
@@ -160,7 +160,7 @@ export class EnvBridge {
    * 完整的补环境流程
    */
   async runFullPipeline(missingPaths) {
-    console.log(`[JSForge:bridge] 开始补环境，共 ${missingPaths.length} 个缺失属性`);
+    console.log(`[DeepSpider:bridge] 开始补环境，共 ${missingPaths.length} 个缺失属性`);
 
     // 1. 采集并生成补丁
     const result = await this.autoFix(missingPaths);

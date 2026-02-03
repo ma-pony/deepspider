@@ -2,7 +2,7 @@
  * 模拟 obfuscator.io 混淆后的代码
  */
 
-var _0x3a8f = ['jsforge_test_2024', 'app_12345', 'charCodeAt', 'length', 'toString', 'floor', 'random', 'charAt', 'stringify', 'log', 'Result:', 'user', 'test', 'action', 'login', 'sign', 'timestamp', 'nonce', 'app_id', 'encrypted', 'abcdef0123456789'];
+var _0x3a8f = ['deepspider_test_2024', 'app_12345', 'charCodeAt', 'length', 'toString', 'floor', 'random', 'charAt', 'stringify', 'log', 'Result:', 'user', 'test', 'action', 'login', 'sign', 'timestamp', 'nonce', 'app_id', 'encrypted', 'abcdef0123456789'];
 
 var _0x5c2d = function(_0x2a1b, _0x3c4e) {
   return _0x3a8f[_0x2a1b - 0x100];

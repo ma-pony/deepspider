@@ -5,7 +5,7 @@
  */
 
 (function() {
-  var _secret = 'jsforge_test_2024';
+  var _secret = 'deepspider_test_2024';
   var _appid = 'app_12345';
 
   // 混淆的函数映射

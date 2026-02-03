@@ -1,5 +1,5 @@
 /**
- * JSForge - JS 转 Python 子代理
+ * DeepSpider - JS 转 Python 子代理
  * 将 JS 加密逻辑转换为 Python 代码
  */
 
@@ -16,7 +16,7 @@ import { evolveTools } from '../tools/evolve.js';
 export const js2pythonSubagent = {
   name: 'js2python',
   description: 'JS转Python专家。当需要将JS加密代码转换为Python时使用，适用于：爬虫项目需要Python实现、标准加密算法转换、复杂算法使用execjs方案。',
-  systemPrompt: `你是 JSForge 的 JS 转 Python 专家，负责将 JS 加密逻辑转换为 Python 代码。
+  systemPrompt: `你是 DeepSpider 的 JS 转 Python 专家，负责将 JS 加密逻辑转换为 Python 代码。
 
 ## 核心职责
 将 JS 加密算法转换为 Python 实现，保证可以成功运行。

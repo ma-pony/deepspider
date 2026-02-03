@@ -1,5 +1,5 @@
 /**
- * JSForge - 浏览器环境提取工具
+ * DeepSpider - 浏览器环境提取工具
  */
 
 import { z } from 'zod';

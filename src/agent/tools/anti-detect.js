@@ -1,5 +1,5 @@
 /**
- * JSForge - 反检测工具
+ * DeepSpider - 反检测工具
  */
 
 import { z } from 'zod';

@@ -1,5 +1,5 @@
 /**
- * JSForge - 数据采集工具
+ * DeepSpider - 数据采集工具
  */
 
 import { z } from 'zod';
@@ -90,8 +90,8 @@ export const getHookLogs = tool(
 
       // 通过 CDP 从浏览器获取日志
       const expression = type
-        ? `window.__jsforge__?.getLogs?.('${type}') || '[]'`
-        : `window.__jsforge__?.getAllLogs?.() || '[]'`;
+        ? `window.__deepspider__?.getLogs?.('${type}') || '[]'`
+        : `window.__deepspider__?.getAllLogs?.() || '[]'`;
 
       const logsJson = await evaluateViaCDP(browser, expression);
       if (!logsJson) {
@@ -134,7 +134,7 @@ export const searchHookLogs = tool(
       if (!browser.getPage()) {
         return JSON.stringify({ success: false, error: '浏览器未就绪' });
       }
-      const expression = `window.__jsforge__?.searchLogs?.('${keyword}') || '[]'`;
+      const expression = `window.__deepspider__?.searchLogs?.('${keyword}') || '[]'`;
       const result = await evaluateViaCDP(browser, expression);
       return JSON.stringify({ success: true, results: JSON.parse(result || '[]') });
     } catch (e) {
@@ -160,7 +160,7 @@ export const traceValue = tool(
       if (!browser.getPage()) {
         return JSON.stringify({ success: false, error: '浏览器未就绪' });
       }
-      const expression = `window.__jsforge__?.traceValue?.('${value}') || '[]'`;
+      const expression = `window.__deepspider__?.traceValue?.('${value}') || '[]'`;
       const result = await evaluateViaCDP(browser, expression);
       return JSON.stringify({ success: true, traces: JSON.parse(result || '[]') });
     } catch (e) {

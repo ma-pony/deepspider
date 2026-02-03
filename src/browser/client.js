@@ -1,5 +1,5 @@
 /**
- * JSForge - Patchright 浏览器客户端
+ * DeepSpider - Patchright 浏览器客户端
  * 使用反检测版 Playwright
  */
 
@@ -97,11 +97,11 @@ export class BrowserClient {
       await cdp.send('Runtime.enable');
 
       // 2. 添加 CDP binding（前端调用此函数，后端接收）
-      await cdp.send('Runtime.addBinding', { name: '__jsforge_send__' });
+      await cdp.send('Runtime.addBinding', { name: '__deepspider_send__' });
 
       // 3. 监听 binding 调用
       cdp.on('Runtime.bindingCalled', (event) => {
-        if (event.name === '__jsforge_send__') {
+        if (event.name === '__deepspider_send__') {
           try {
             const data = JSON.parse(event.payload);
             console.log('[BrowserClient] 收到消息:', data.type);

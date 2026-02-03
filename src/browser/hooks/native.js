@@ -1,5 +1,5 @@
 /**
- * JSForge - Hook 反检测工具
+ * DeepSpider - Hook 反检测工具
  * 已废弃，请使用 src/env/HookBase.js
  */
 

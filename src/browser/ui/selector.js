@@ -1,14 +1,14 @@
 /**
- * JSForge - 元素选择器模式
+ * DeepSpider - 元素选择器模式
  * 类似开发者工具的元素选择功能
  */
 
 export function generateSelectorScript() {
   return `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge || jsforge._selector) return;
-  jsforge._selector = true;
+  const deepspider = window.__deepspider__;
+  if (!deepspider || deepspider._selector) return;
+  deepspider._selector = true;
 
   let isActive = false;
   let overlay = null;
@@ -18,7 +18,7 @@ export function generateSelectorScript() {
   // 创建高亮覆盖层
   function createOverlay() {
     overlay = document.createElement('div');
-    overlay.id = 'jsforge-selector-overlay';
+    overlay.id = 'deepspider-selector-overlay';
     overlay.style.cssText = \`
       position: fixed;
       pointer-events: none;
@@ -32,7 +32,7 @@ export function generateSelectorScript() {
 
     // 元素信息框
     infoBox = document.createElement('div');
-    infoBox.id = 'jsforge-selector-info';
+    infoBox.id = 'deepspider-selector-info';
     infoBox.style.cssText = \`
       position: fixed;
       background: #333;
@@ -76,7 +76,7 @@ export function generateSelectorScript() {
 
     const target = document.elementFromPoint(e.clientX, e.clientY);
     if (!target || target === overlay || target === infoBox) return;
-    if (target.id?.startsWith('jsforge-')) return;
+    if (target.id?.startsWith('deepspider-')) return;
 
     currentElement = target;
     const rect = target.getBoundingClientRect();
@@ -113,7 +113,7 @@ export function generateSelectorScript() {
     stopSelector();
 
     // 显示确认弹窗
-    jsforge.showConfirmDialog({
+    deepspider.showConfirmDialog({
       text,
       xpath,
       tagName: element.tagName.toLowerCase(),
@@ -140,7 +140,7 @@ export function generateSelectorScript() {
     document.addEventListener('keydown', onKeyDown, true);
     document.body.style.cursor = 'crosshair';
 
-    console.log('[JSForge] 选择器模式已开启，点击选择元素，ESC 退出');
+    console.log('[DeepSpider] 选择器模式已开启，点击选择元素，ESC 退出');
   }
 
   // 停止选择器
@@ -158,11 +158,11 @@ export function generateSelectorScript() {
   }
 
   // 暴露 API
-  jsforge.startSelector = startSelector;
-  jsforge.stopSelector = stopSelector;
-  jsforge.isSelectingMode = () => isActive;
+  deepspider.startSelector = startSelector;
+  deepspider.stopSelector = stopSelector;
+  deepspider.isSelectingMode = () => isActive;
 
-  console.log('[JSForge] Selector 已加载');
+  console.log('[DeepSpider] Selector 已加载');
 })();
 `;
 }

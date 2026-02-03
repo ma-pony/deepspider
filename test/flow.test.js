@@ -1,5 +1,5 @@
 /**
- * JSForge 完整流程测试 - 单样本深度分析
+ * DeepSpider 完整流程测试 - 单样本深度分析
  */
 
 import { ASTAnalyzer } from '../src/analyzer/ASTAnalyzer.js';
@@ -20,7 +20,7 @@ const code = fs.readFileSync(
   'utf-8'
 );
 
-console.log('=== JSForge 完整流程测试 ===\n');
+console.log('=== DeepSpider 完整流程测试 ===\n');
 console.log('目标: v2_ob_advanced.js\n');
 
 // Step 1: 混淆识别

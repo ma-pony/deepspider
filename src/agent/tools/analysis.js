@@ -1,5 +1,5 @@
 /**
- * JSForge - 浏览器分析交互工具
+ * DeepSpider - 浏览器分析交互工具
  */
 
 import { z } from 'zod';
@@ -31,10 +31,10 @@ export const getPendingAnalysis = tool(
 
     const data = await evaluateViaCDP(client, `
       (function() {
-        const jsforge = window.__jsforge__;
-        if (!jsforge?.pendingAnalysis) return null;
-        const result = jsforge.pendingAnalysis;
-        jsforge.pendingAnalysis = null;
+        const deepspider = window.__deepspider__;
+        if (!deepspider?.pendingAnalysis) return null;
+        const result = deepspider.pendingAnalysis;
+        deepspider.pendingAnalysis = null;
         return result;
       })()
     `);
@@ -60,10 +60,10 @@ export const getPendingChat = tool(
 
     const data = await evaluateViaCDP(client, `
       (function() {
-        const jsforge = window.__jsforge__;
-        if (!jsforge?.pendingChat) return null;
-        const result = jsforge.pendingChat;
-        jsforge.pendingChat = null;
+        const deepspider = window.__deepspider__;
+        if (!deepspider?.pendingChat) return null;
+        const result = deepspider.pendingChat;
+        deepspider.pendingChat = null;
         return result;
       })()
     `);
@@ -89,7 +89,7 @@ export const sendPanelMessage = tool(
 
     const escaped = JSON.stringify(message);
     const r = role || 'assistant';
-    await evaluateViaCDP(client, `window.__jsforge__?.addMessage?.('${r}', ${escaped})`);
+    await evaluateViaCDP(client, `window.__deepspider__?.addMessage?.('${r}', ${escaped})`);
 
     return JSON.stringify({ success: true });
   },
@@ -114,8 +114,8 @@ export const startSelector = tool(
     }
 
     await evaluateViaCDP(client, `
-      window.__jsforge__?.startSelector?.();
-      window.__jsforge__?.showPanel?.();
+      window.__deepspider__?.startSelector?.();
+      window.__deepspider__?.showPanel?.();
     `);
 
     return JSON.stringify({ success: true, message: '选择器模式已开启' });

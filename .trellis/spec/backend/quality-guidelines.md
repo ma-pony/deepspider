@@ -1,12 +1,12 @@
 # Quality Guidelines
 
-> JSForge 代码质量规范
+> DeepSpider 代码质量规范
 
 ---
 
 ## Overview
 
-JSForge 遵循 CLAUDE.md 中定义的代码规范，重点关注：
+DeepSpider 遵循 CLAUDE.md 中定义的代码规范，重点关注：
 - CDP 优先的浏览器交互
 - Babel AST 遍历模式
 - LangChain 工具定义规范

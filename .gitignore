@@ -21,7 +21,7 @@ htmlcov/
 out/
 output/
 logs/
-.jsforge-data/
-.jsforge-store/
+.deepspider-data/
+.deepspider-store/
 **/settings.local.json
 settings.local.json

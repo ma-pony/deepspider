@@ -1,32 +1,32 @@
 /**
- * JSForge - 统一路径配置
- * 所有存储路径统一到 ~/.jsforge/ 目录
+ * DeepSpider - 统一路径配置
+ * 所有存储路径统一到 ~/.deepspider/ 目录
  */
 
 import { join } from 'path';
 import { homedir } from 'os';
 import { mkdirSync, existsSync } from 'fs';
 
-// 基础目录：~/.jsforge/
-export const JSFORGE_HOME = join(homedir(), '.jsforge');
+// 基础目录：~/.deepspider/
+export const DEEPSPIDER_HOME = join(homedir(), '.deepspider');
 
 // 子目录
 export const PATHS = {
   // 采集数据（响应、脚本）
-  DATA_DIR: join(JSFORGE_HOME, 'data'),
-  SITES_DIR: join(JSFORGE_HOME, 'data', 'sites'),
+  DATA_DIR: join(DEEPSPIDER_HOME, 'data'),
+  SITES_DIR: join(DEEPSPIDER_HOME, 'data', 'sites'),
 
   // 知识库（加密模式、环境补丁等）
-  STORE_DIR: join(JSFORGE_HOME, 'store'),
+  STORE_DIR: join(DEEPSPIDER_HOME, 'store'),
 
   // Agent 输出
-  OUTPUT_DIR: join(JSFORGE_HOME, 'output'),
-  REPORTS_DIR: join(JSFORGE_HOME, 'output', 'reports'),
-  SCREENSHOTS_DIR: join(JSFORGE_HOME, 'output', 'screenshots'),
-  UNPACKED_DIR: join(JSFORGE_HOME, 'output', 'unpacked'),
+  OUTPUT_DIR: join(DEEPSPIDER_HOME, 'output'),
+  REPORTS_DIR: join(DEEPSPIDER_HOME, 'output', 'reports'),
+  SCREENSHOTS_DIR: join(DEEPSPIDER_HOME, 'output', 'screenshots'),
+  UNPACKED_DIR: join(DEEPSPIDER_HOME, 'output', 'unpacked'),
 
   // 配置（预留）
-  CONFIG_DIR: join(JSFORGE_HOME, 'config'),
+  CONFIG_DIR: join(DEEPSPIDER_HOME, 'config'),
 };
 
 /**

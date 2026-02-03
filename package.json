@@ -1,11 +1,11 @@
 {
-  "name": "jsforge",
+  "name": "deepspider",
   "version": "0.1.0",
   "description": "智能爬虫工程平台 - 从JS逆向到完整爬虫脚本的一站式解决方案",
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "jsforge": "./bin/cli.js"
+    "deepspider": "./bin/cli.js"
   },
   "scripts": {
     "start": "node src/index.js",

@@ -1,5 +1,5 @@
 /**
- * JSForge - Location 环境模块
+ * DeepSpider - Location 环境模块
  */
 
 export const locationCode = `

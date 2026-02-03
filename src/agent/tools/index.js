@@ -1,5 +1,5 @@
 /**
- * JSForge - 工具索引
+ * DeepSpider - 工具索引
  */
 
 export { sandboxTools, sandboxExecute, sandboxInject, sandboxReset, getSandbox } from './sandbox.js';

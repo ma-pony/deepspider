@@ -1,5 +1,5 @@
 /**
- * JSForge - 浏览器交互工具
+ * DeepSpider - 浏览器交互工具
  * 混合实现：复杂交互用 Playwright，简单操作用 CDP
  */
 

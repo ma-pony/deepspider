@@ -1,5 +1,5 @@
 /**
- * JSForge - 环境模块索引
+ * DeepSpider - 环境模块索引
  */
 
 import { navigatorCode } from './bom/navigator.js';

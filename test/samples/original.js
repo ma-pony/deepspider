@@ -4,7 +4,7 @@
  */
 
 // 密钥配置
-const SECRET_KEY = 'jsforge_test_2024';
+const SECRET_KEY = 'deepspider_test_2024';
 const APP_ID = 'app_12345';
 
 // 简单的哈希函数

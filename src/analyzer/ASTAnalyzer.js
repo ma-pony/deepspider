@@ -1,5 +1,5 @@
 /**
- * JSForge - AST 分析器
+ * DeepSpider - AST 分析器
  * 函数依赖图、变量作用域、调用链追踪、代码切片
  */
 

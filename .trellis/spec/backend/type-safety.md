@@ -6,7 +6,7 @@
 
 ## Overview
 
-JSForge 是纯 JavaScript 项目，使用 Zod 进行运行时类型验证。
+DeepSpider 是纯 JavaScript 项目，使用 Zod 进行运行时类型验证。
 主要用于 LangChain 工具的参数 schema 定义。
 
 ---

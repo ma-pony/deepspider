@@ -1,5 +1,5 @@
 /**
- * JSForge - 补丁验证器
+ * DeepSpider - 补丁验证器
  */
 
 export class Validator {

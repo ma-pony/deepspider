@@ -1,5 +1,5 @@
 /**
- * JSForge - 加密模式配置
+ * DeepSpider - 加密模式配置
  */
 
 export const cryptoPatterns = {

@@ -1,5 +1,5 @@
 /**
- * JSForge - 响应搜索器
+ * DeepSpider - 响应搜索器
  * 在所有记录的响应中搜索文本，定位数据来源
  */
 
@@ -10,23 +10,23 @@ export class ResponseSearcher {
   generateSearchScript() {
     return `
 (function() {
-  const jsforge = window.__jsforge__;
-  if (!jsforge || jsforge._responseSearcher) return;
-  jsforge._responseSearcher = true;
+  const deepspider = window.__deepspider__;
+  if (!deepspider || deepspider._responseSearcher) return;
+  deepspider._responseSearcher = true;
 
   /**
    * 在所有响应中搜索文本
    * @param {string} text - 要搜索的文本
    * @returns {Array} 匹配的请求列表
    */
-  jsforge.searchInResponses = function(text) {
+  deepspider.searchInResponses = function(text) {
     if (!text || text.length < 2) return [];
 
     const results = [];
     const searchText = text.trim();
 
     // 搜索 XHR 日志
-    const xhrLogs = jsforge.logs?.xhr || [];
+    const xhrLogs = deepspider.logs?.xhr || [];
     xhrLogs.forEach((log, index) => {
       if (log.action === 'response' && log.response) {
         if (log.response.includes(searchText)) {
@@ -44,7 +44,7 @@ export class ResponseSearcher {
     });
 
     // 搜索 Fetch 日志
-    const fetchLogs = jsforge.logs?.fetch || [];
+    const fetchLogs = deepspider.logs?.fetch || [];
     fetchLogs.forEach((log, index) => {
       if (log.action === 'response' && log.response) {
         if (log.response.includes(searchText)) {
@@ -70,8 +70,8 @@ export class ResponseSearcher {
   /**
    * 获取指定请求的完整信息
    */
-  jsforge.getRequestDetail = function(type, index) {
-    const logs = jsforge.logs?.[type] || [];
+  deepspider.getRequestDetail = function(type, index) {
+    const logs = deepspider.logs?.[type] || [];
 
     // 找到对应的 send 和 response
     const responseLogs = logs.filter(l => l.action === 'response');
@@ -98,7 +98,7 @@ export class ResponseSearcher {
     };
   };
 
-  console.log('[JSForge] Response Searcher 已启用');
+  console.log('[DeepSpider] Response Searcher 已启用');
 })();
 `;
   }
