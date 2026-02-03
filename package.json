@@ -14,7 +14,10 @@
     "mcp": "node src/mcp/server.js",
     "agent": "node src/agent/run.js",
     "test": "node --test test/",
-    "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt"
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt",
+    "prepare": "husky"
   },
   "keywords": [
     "crawler",
@@ -41,13 +44,26 @@
     "@langchain/langgraph": "^1.1.2",
     "@langchain/openai": "^1.2.3",
     "@modelcontextprotocol/sdk": "^1.25.3",
+    "crypto-js": "^4.2.0",
     "deepagents": "^1.6.0",
     "dotenv": "^17.2.3",
     "isolated-vm": "^6.0.2",
+    "js-md5": "^0.8.3",
+    "js-sha256": "^0.11.1",
+    "jsencrypt": "^3.5.4",
     "langchain": "^1.2.15",
     "marked": "^17.0.1",
     "patchright": "^1.57.0",
+    "sm-crypto": "^0.4.0",
     "webcrack": "^2.15.1",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
+  },
+  "lint-staged": {
+    "*.js": "eslint --fix"
   }
 }
