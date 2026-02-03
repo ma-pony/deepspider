@@ -22,6 +22,7 @@ DeepSpider 是基于 DeepAgents + Patchright 的智能爬虫 Agent。
 | [State Management](./state-management.md) | Agent 状态与数据存储 | Done |
 | [Quality Guidelines](./quality-guidelines.md) | 代码质量规范 | Done |
 | [Type Safety](./type-safety.md) | Zod 类型验证规范 | Done |
+| [CI/CD Guidelines](./ci-cd-guidelines.md) | GitHub Actions 自动发布规范 | Done |
 
 ---
 
