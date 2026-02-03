@@ -14,13 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'pnpm'
 
       - run: pnpm install --no-frozen-lockfile
@@ -33,13 +36,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
