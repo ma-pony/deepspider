@@ -82,15 +82,16 @@ jsforge/
 
 ### 子代理体系
 
-| 子代理 | 职责 | 工具 |
-|--------|------|------|
-| crawler-agent | 爬虫编排：流程规划、脚本生成、E2E测试 | flow, script, e2e |
-| static-agent | 静态分析：预处理、解包、反混淆、加密定位 | preprocess, webcrack, deobfuscate, analyze |
-| dynamic-agent | 动态分析：浏览器控制、断点、Hook、数据采集 | browser, debug, capture, trigger |
-| sandbox-agent | 沙箱执行：环境补全、代码执行、补丁生成 | sandbox, env, patch, profile |
-| js2python | JS转Python：加密代码转换、验证测试 | python, analyzer, file |
-| captcha-agent | 验证码处理：识别、绕过、打码平台 | captcha_ocr, captcha_slide, captcha_click |
-| anti-detect-agent | 反检测：指纹管理、代理池、风控规避 | proxy, fingerprint, ua |
+| 子代理 | 职责 | 核心工具 |
+|--------|------|----------|
+| crawler | 爬虫编排：整合各模块、生成完整脚本 | file, store, crawler |
+| static | 静态分析：解包、反混淆、加密定位 | webcrack, deobfuscate, analyze |
+| dynamic | 动态分析：浏览器控制、Hook、数据采集 | browser, debug, capture |
+| sandbox | 沙箱执行：环境补全、代码执行 | sandbox, env, patch |
+| js2python | JS转Python：加密代码转换、验证 | python, analyzer |
+| env-agent | 环境补全：生成浏览器环境模拟代码 | env, sandbox |
+| captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
+| anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |
 
 ### 智能调度流程
 
@@ -137,12 +138,19 @@ pnpm run agent https://example.com
          ↓
 ┌─────────────────────────────────────┐
 │  用户点击面板选择按钮(⦿)           │
-│  选择目标数据，发送分析             │
+│  选择元素 → 显示操作菜单            │
+│                                     │
+│  操作选项：                         │
+│  - 添加为字段（爬虫配置）           │
+│  - 追踪数据来源                     │
+│  - 分析加密逻辑                     │
+│  - 完整流程分析                     │
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
-│  Agent 智能调度分析                 │
-│  生成完整可运行的爬虫代码           │
+│  选择多个字段后点击"生成配置"      │
+│  crawler 子代理整合分析结果         │
+│  输出 config.json + crawler.py      │
 └─────────────────────────────────────┘
 ```
 
