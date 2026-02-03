@@ -265,9 +265,9 @@ pnpm run setup:crypto
 # 配置环境变量
 cp .env.example .env
 # 编辑 .env 填入:
-#   LLM_API_KEY=your-api-key
-#   LLM_BASE_URL=https://api.openai.com/v1  # 可选，兼容 OpenAI 格式的任意供应商
-#   LLM_MODEL=gpt-4o                        # 可选，默认 gpt-4o
+#   DEEPSPIDER_API_KEY=your-api-key
+#   DEEPSPIDER_BASE_URL=https://api.openai.com/v1
+#   DEEPSPIDER_MODEL=gpt-4o
 
 # Agent 模式（推荐）- 指定目标网站
 pnpm run agent https://example.com

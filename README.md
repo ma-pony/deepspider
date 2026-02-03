@@ -34,7 +34,7 @@ pnpm run setup:crypto
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 LLM_API_KEY
+# 编辑 .env 填入 DEEPSPIDER_API_KEY, DEEPSPIDER_BASE_URL, DEEPSPIDER_MODEL
 ```
 
 ### 使用

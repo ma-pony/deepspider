@@ -16,9 +16,9 @@ import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 
 // 从环境变量读取配置
 const config = {
-  apiKey: process.env.LLM_API_KEY,
-  baseUrl: process.env.LLM_BASE_URL,
-  model: process.env.LLM_MODEL || 'gpt-4o',
+  apiKey: process.env.DEEPSPIDER_API_KEY,
+  baseUrl: process.env.DEEPSPIDER_BASE_URL,
+  model: process.env.DEEPSPIDER_MODEL || 'gpt-4o',
 };
 
 /**

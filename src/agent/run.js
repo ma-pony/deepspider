@@ -14,6 +14,7 @@ import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
 import { browserTools } from './tools/browser.js';
+import { ensureConfig } from './setup.js';
 
 const args = process.argv.slice(2);
 const targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
@@ -548,6 +549,12 @@ function prompt() {
 
 async function init() {
   debug('init: 启动');
+
+  // 首次运行检测：确保环境变量已配置
+  if (!ensureConfig()) {
+    process.exit(1);
+  }
+
   if (DEBUG) {
     console.log('[DEBUG] 调试模式已启用');
   }
