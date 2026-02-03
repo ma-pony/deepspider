@@ -157,11 +157,29 @@ export function getAnalysisPanelScript() {
 
   // 状态 - 从 sessionStorage 恢复消息
   const STORAGE_KEY = 'jsforge_chat_messages';
+  const STAGES_STORAGE_KEY = 'jsforge_stages';
+  const CURRENT_STAGE_KEY = 'jsforge_current_stage';
   try {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     jsforge.chatMessages = saved ? JSON.parse(saved) : [];
   } catch (e) {
     jsforge.chatMessages = [];
+  }
+  // 阶段配置 - 支持多阶段爬取流程
+  try {
+    const savedStages = sessionStorage.getItem(STAGES_STORAGE_KEY);
+    jsforge.stages = savedStages ? JSON.parse(savedStages) : [
+      { name: 'list', fields: [], entry: null, pagination: null }
+    ];
+  } catch (e) {
+    jsforge.stages = [{ name: 'list', fields: [], entry: null, pagination: null }];
+  }
+  // 当前选中的阶段
+  try {
+    const savedCurrentStage = sessionStorage.getItem(CURRENT_STAGE_KEY);
+    jsforge.currentStageIndex = savedCurrentStage ? parseInt(savedCurrentStage) : 0;
+  } catch (e) {
+    jsforge.currentStageIndex = 0;
   }
   let isSelectMode = false;
   let currentElement = null;
@@ -172,6 +190,16 @@ export function getAnalysisPanelScript() {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(jsforge.chatMessages));
     } catch (e) {
       console.warn('[JSForge] 保存消息失败:', e);
+    }
+  }
+
+  // 保存阶段配置到 sessionStorage
+  function saveStages() {
+    try {
+      sessionStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(jsforge.stages));
+      sessionStorage.setItem(CURRENT_STAGE_KEY, String(jsforge.currentStageIndex));
+    } catch (e) {
+      console.warn('[JSForge] 保存阶段配置失败:', e);
     }
   }
 
@@ -613,6 +641,154 @@ export function getAnalysisPanelScript() {
         box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         border: 1px solid rgba(99, 179, 237, 0.2);
       }
+      /* 元素选择后的操作菜单 */
+      #jsforge-action-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(13, 17, 23, 0.85);
+        backdrop-filter: blur(4px);
+        z-index: 2147483648;
+        justify-content: center;
+        align-items: center;
+        padding: 24px;
+      }
+      #jsforge-action-modal.visible { display: flex; }
+      #jsforge-config-modal.visible { display: flex !important; }
+      .jsforge-action-container {
+        width: 420px;
+        max-height: 80vh;
+        background: linear-gradient(180deg, #1e2530 0%, #161b22 100%);
+        border: 1px solid rgba(99, 179, 237, 0.2);
+        border-radius: 16px;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+        overflow: hidden;
+        animation: jsforge-modal-in 0.2s ease-out;
+      }
+      .jsforge-action-header {
+        padding: 16px 20px;
+        background: linear-gradient(180deg, rgba(99, 179, 237, 0.08) 0%, transparent 100%);
+        border-bottom: 1px solid rgba(99, 179, 237, 0.15);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .jsforge-action-header h4 {
+        margin: 0;
+        color: #63b3ed;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .jsforge-action-close {
+        background: transparent;
+        border: none;
+        color: #8b949e;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+      .jsforge-action-close:hover { color: #f85149; }
+      .jsforge-action-content {
+        padding: 16px 20px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .jsforge-action-preview {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(99, 179, 237, 0.1);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: #8b949e;
+        max-height: 80px;
+        overflow: hidden;
+      }
+      .jsforge-action-preview .xpath {
+        color: #79c0ff;
+        font-family: monospace;
+        font-size: 11px;
+        margin-top: 6px;
+        word-break: break-all;
+      }
+      .jsforge-action-section {
+        margin-bottom: 16px;
+      }
+      .jsforge-action-section label {
+        display: block;
+        color: #8b949e;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+      .jsforge-action-input {
+        width: 100%;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        color: #c9d1d9;
+        font-size: 13px;
+        outline: none;
+        box-sizing: border-box;
+      }
+      .jsforge-action-input:focus {
+        border-color: rgba(99, 179, 237, 0.5);
+      }
+      .jsforge-action-select {
+        width: 100%;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        color: #c9d1d9;
+        font-size: 13px;
+        outline: none;
+        cursor: pointer;
+      }
+      .jsforge-action-btns {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .jsforge-action-btn {
+        padding: 12px 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.05);
+        color: #c9d1d9;
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .jsforge-action-btn:hover {
+        background: rgba(99, 179, 237, 0.15);
+        border-color: rgba(99, 179, 237, 0.3);
+      }
+      .jsforge-action-btn.primary {
+        background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
+        border-color: transparent;
+        color: #fff;
+      }
+      .jsforge-action-btn.primary:hover {
+        box-shadow: 0 4px 12px rgba(99, 179, 237, 0.4);
+      }
+      .jsforge-action-btn.success {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        border-color: transparent;
+        color: #fff;
+      }
+      .jsforge-action-btn-icon { font-size: 16px; }
+      .jsforge-action-btn-text { flex: 1; }
+      .jsforge-action-btn-desc {
+        font-size: 11px;
+        color: rgba(255,255,255,0.6);
+        margin-top: 2px;
+      }
     \`;
     document.head.appendChild(style);
 
@@ -658,6 +834,522 @@ export function getAnalysisPanelScript() {
       </div>
     \`;
     document.body.appendChild(reportModal);
+
+    // ========== 创建元素操作菜单 ==========
+    const actionModal = document.createElement('div');
+    actionModal.id = 'jsforge-action-modal';
+    actionModal.innerHTML = \`
+      <div class="jsforge-action-container">
+        <div class="jsforge-action-header">
+          <h4>🎯 元素已选中</h4>
+          <button class="jsforge-action-close" id="jsforge-action-close">&times;</button>
+        </div>
+        <div class="jsforge-action-content">
+          <div class="jsforge-action-preview" id="jsforge-action-preview">
+            <div class="text"></div>
+            <div class="xpath"></div>
+          </div>
+          <div class="jsforge-action-section">
+            <label>字段名称（用于爬虫配置）</label>
+            <input type="text" class="jsforge-action-input" id="jsforge-field-name" placeholder="例如: title, price, content">
+          </div>
+          <div class="jsforge-action-section">
+            <label>字段类型</label>
+            <select class="jsforge-action-select" id="jsforge-field-type">
+              <option value="str">文本 (str)</option>
+              <option value="url">链接 (url)</option>
+              <option value="entry">入口链接 (entry) - 进入下一阶段</option>
+              <option value="html">HTML</option>
+              <option value="file">文件</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div class="jsforge-action-section" id="jsforge-entry-target-section" style="display:none;">
+            <label>目标阶段</label>
+            <select class="jsforge-action-select" id="jsforge-entry-target"></select>
+          </div>
+          <div class="jsforge-action-btns" id="jsforge-action-btns"></div>
+        </div>
+      </div>
+    \`;
+    document.body.appendChild(actionModal);
+
+    // ========== 创建配置弹窗 ==========
+    const configModal = document.createElement('div');
+    configModal.id = 'jsforge-config-modal';
+    configModal.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(13,17,23,0.85);z-index:2147483649;justify-content:center;align-items:center;';
+    configModal.innerHTML = \`
+      <div style="width:400px;background:linear-gradient(180deg,#1e2530,#161b22);border:1px solid rgba(99,179,237,0.2);border-radius:16px;overflow:hidden;">
+        <div style="padding:16px 20px;background:linear-gradient(180deg,rgba(99,179,237,0.08),transparent);border-bottom:1px solid rgba(99,179,237,0.15);display:flex;justify-content:space-between;align-items:center;">
+          <h4 style="margin:0;color:#63b3ed;font-size:15px;">⚙️ 配置爬虫</h4>
+          <button id="jsforge-config-close" style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:16px 20px;">
+          <div style="margin-bottom:16px;">
+            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">抓取方式</label>
+            <select id="jsforge-grab-method" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;">
+              <option value="browser">浏览器渲染 (browser)</option>
+              <option value="html">静态HTML (html)</option>
+              <option value="api">API请求 (api)</option>
+            </select>
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">最大页数</label>
+            <input type="number" id="jsforge-max-page" value="10" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">下一页按钮 XPath（可选）</label>
+            <input type="text" id="jsforge-next-xpath" placeholder="例如: //a[contains(text(),'下一页')]" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;box-sizing:border-box;">
+          </div>
+          <button id="jsforge-config-submit" style="width:100%;padding:12px;background:linear-gradient(135deg,#48bb78,#38a169);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">生成爬虫</button>
+        </div>
+      </div>
+    \`;
+    document.body.appendChild(configModal);
+
+    // 配置弹窗事件
+    document.getElementById('jsforge-config-close').onclick = () => {
+      configModal.classList.remove('visible');
+    };
+    configModal.addEventListener('click', (e) => {
+      if (e.target === configModal) configModal.classList.remove('visible');
+    });
+    document.getElementById('jsforge-config-submit').onclick = submitConfig;
+
+    // 操作菜单状态
+    let pendingSelection = null;
+
+    // 关闭操作菜单
+    document.getElementById('jsforge-action-close').onclick = () => {
+      actionModal.classList.remove('visible');
+      pendingSelection = null;
+    };
+    actionModal.addEventListener('click', (e) => {
+      if (e.target === actionModal) {
+        actionModal.classList.remove('visible');
+        pendingSelection = null;
+      }
+    });
+
+    // 显示操作菜单
+    function showActionMenu(selection) {
+      pendingSelection = selection;
+      const preview = document.getElementById('jsforge-action-preview');
+      preview.querySelector('.text').textContent = selection.text.slice(0, 100) + (selection.text.length > 100 ? '...' : '');
+      preview.querySelector('.xpath').textContent = selection.xpath;
+      document.getElementById('jsforge-field-name').value = '';
+      document.getElementById('jsforge-field-type').value = 'str';
+
+      // 更新目标阶段选择器
+      const entryTargetSection = document.getElementById('jsforge-entry-target-section');
+      const entryTargetSelect = document.getElementById('jsforge-entry-target');
+      const fieldTypeSelect = document.getElementById('jsforge-field-type');
+
+      function updateEntryTargetOptions() {
+        entryTargetSelect.innerHTML = jsforge.stages
+          .map((s, i) => '<option value="' + i + '"' + (i === jsforge.currentStageIndex ? ' disabled' : '') + '>' + s.name + (i === jsforge.currentStageIndex ? ' (当前)' : '') + '</option>')
+          .join('') + '<option value="__new__">+ 新建阶段</option>';
+      }
+
+      fieldTypeSelect.onchange = () => {
+        if (fieldTypeSelect.value === 'entry') {
+          updateEntryTargetOptions();
+          entryTargetSection.style.display = 'block';
+        } else {
+          entryTargetSection.style.display = 'none';
+        }
+      };
+      entryTargetSection.style.display = 'none';
+
+      const btnsContainer = document.getElementById('jsforge-action-btns');
+      btnsContainer.innerHTML = \`
+        <button class="jsforge-action-btn primary" data-action="add-field">
+          <span class="jsforge-action-btn-icon">➕</span>
+          <div class="jsforge-action-btn-text">
+            添加为字段
+            <div class="jsforge-action-btn-desc">添加到爬虫配置，可继续选择更多字段</div>
+          </div>
+        </button>
+        <button class="jsforge-action-btn" data-action="analyze-source">
+          <span class="jsforge-action-btn-icon">🔍</span>
+          <div class="jsforge-action-btn-text">
+            追踪数据来源
+            <div class="jsforge-action-btn-desc">分析该数据从哪个请求返回</div>
+          </div>
+        </button>
+        <button class="jsforge-action-btn" data-action="analyze-crypto">
+          <span class="jsforge-action-btn-icon">🔐</span>
+          <div class="jsforge-action-btn-text">
+            分析加密逻辑
+            <div class="jsforge-action-btn-desc">识别加密算法并生成 Python 代码</div>
+          </div>
+        </button>
+        <button class="jsforge-action-btn" data-action="full-analysis">
+          <span class="jsforge-action-btn-icon">📊</span>
+          <div class="jsforge-action-btn-text">
+            完整流程分析
+            <div class="jsforge-action-btn-desc">追踪来源 + 加密分析 + 生成代码</div>
+          </div>
+        </button>
+      \`;
+
+      // 绑定按钮事件
+      btnsContainer.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => handleAction(btn.dataset.action);
+      });
+
+      actionModal.classList.add('visible');
+    }
+
+    // 处理操作菜单的动作
+    function handleAction(action) {
+      if (!pendingSelection) return;
+      const fieldName = document.getElementById('jsforge-field-name').value.trim();
+      const fieldType = document.getElementById('jsforge-field-type').value;
+
+      switch (action) {
+        case 'add-field':
+          addField(fieldName, fieldType);
+          break;
+        case 'analyze-source':
+          sendAnalysis('source', pendingSelection);
+          break;
+        case 'analyze-crypto':
+          sendAnalysis('crypto', pendingSelection);
+          break;
+        case 'full-analysis':
+          sendAnalysis('full', pendingSelection);
+          break;
+      }
+      actionModal.classList.remove('visible');
+    }
+
+    // 创建空阶段对象
+    function createStage(name) {
+      return { name: name, fields: [], entry: null, pagination: null };
+    }
+
+    // 添加字段到当前阶段
+    function addField(name, type) {
+      if (!pendingSelection) return;
+      const currentStage = jsforge.stages[jsforge.currentStageIndex];
+      if (!currentStage) return;
+
+      // 处理入口类型
+      if (type === 'entry') {
+        const targetIndex = document.getElementById('jsforge-entry-target').value;
+        let targetStageName;
+
+        if (targetIndex === '__new__') {
+          const newStageName = 'stage_' + (jsforge.stages.length + 1);
+          jsforge.stages.push(createStage(newStageName));
+          targetStageName = newStageName;
+        } else {
+          const idx = parseInt(targetIndex);
+          if (idx < 0 || idx >= jsforge.stages.length) return;
+          targetStageName = jsforge.stages[idx].name;
+        }
+
+        const entryName = name || 'entry_link';
+        currentStage.entry = {
+          field: entryName,
+          xpath: pendingSelection.xpath,
+          to_stage: targetStageName
+        };
+        saveStages();
+        panel.classList.add('visible');
+        addMessage('system', '✅ 已设置入口: ' + entryName + ' → ' + targetStageName);
+        updateStagesPanel();
+        return;
+      }
+
+      // 普通字段
+      const fieldName = name || 'field_' + (currentStage.fields.length + 1);
+      const field = {
+        name: fieldName,
+        xpath: pendingSelection.xpath,
+        type: type,
+        value: pendingSelection.text.slice(0, 100),
+        time: Date.now()
+      };
+      currentStage.fields.push(field);
+      saveStages();
+
+      panel.classList.add('visible');
+      addMessage('system', '✅ 已添加字段: ' + field.name + ' (阶段: ' + currentStage.name + ')');
+      updateStagesPanel();
+    }
+
+    // 发送分析请求
+    function sendAnalysis(analysisType, selection) {
+      panel.classList.add('visible');
+      const typeLabels = {
+        source: '追踪数据来源',
+        crypto: '分析加密逻辑',
+        full: '完整流程分析'
+      };
+      addMessage('user', typeLabels[analysisType] + ': ' + selection.text.slice(0, 80));
+      addMessage('system', '分析中...');
+
+      if (typeof __jsforge_send__ === 'function') {
+        __jsforge_send__(JSON.stringify({
+          type: 'analysis',
+          analysisType: analysisType,
+          text: selection.text,
+          xpath: selection.xpath,
+          url: location.href,
+          iframeSrc: selection.iframeSrc
+        }));
+      }
+    }
+
+    // 更新阶段面板显示
+    function updateStagesPanel() {
+      let stagesPanel = document.getElementById('jsforge-stages-panel');
+      if (!stagesPanel) {
+        stagesPanel = document.createElement('div');
+        stagesPanel.id = 'jsforge-stages-panel';
+        stagesPanel.style.cssText = 'padding:10px 14px;border-top:1px solid rgba(99,179,237,0.15);background:rgba(0,0,0,0.1);';
+        const inputArea = panel.querySelector('.jsforge-input');
+        panel.insertBefore(stagesPanel, inputArea);
+      }
+
+      const totalFields = jsforge.stages.reduce((sum, s) => sum + s.fields.length, 0);
+      if (totalFields === 0 && !jsforge.stages.some(s => s.entry)) {
+        stagesPanel.style.display = 'none';
+        return;
+      }
+
+      stagesPanel.style.display = 'block';
+      const currentStage = jsforge.stages[jsforge.currentStageIndex];
+
+      // 阶段标签
+      const stageTabs = jsforge.stages.map((s, i) => {
+        const isActive = i === jsforge.currentStageIndex;
+        const fieldCount = s.fields.length;
+        const hasEntry = s.entry ? ' →' : '';
+        return '<span data-stage="' + i + '" style="' +
+          'background:' + (isActive ? 'rgba(99,179,237,0.3)' : 'rgba(99,179,237,0.1)') + ';' +
+          'border:1px solid ' + (isActive ? 'rgba(99,179,237,0.5)' : 'rgba(99,179,237,0.2)') + ';' +
+          'padding:4px 10px;border-radius:6px;font-size:11px;color:#63b3ed;cursor:pointer;' +
+          'display:inline-flex;align-items:center;gap:4px;">' +
+          s.name + ' (' + fieldCount + ')' + hasEntry + '</span>';
+      }).join('');
+
+      // 当前阶段的字段
+      const fieldTags = currentStage.fields.map((f, i) =>
+        '<span style="background:rgba(72,187,120,0.15);border:1px solid rgba(72,187,120,0.2);' +
+        'padding:4px 8px;border-radius:6px;font-size:11px;color:#48bb78;' +
+        'display:inline-flex;align-items:center;gap:4px;">' +
+        f.name + '<span style="cursor:pointer;color:#8b949e;" data-remove="' + i + '">&times;</span></span>'
+      ).join('');
+
+      // 入口显示
+      const entryTag = currentStage.entry ?
+        '<span style="background:rgba(237,137,54,0.15);border:1px solid rgba(237,137,54,0.2);' +
+        'padding:4px 8px;border-radius:6px;font-size:11px;color:#ed8936;' +
+        'display:inline-flex;align-items:center;gap:4px;">' +
+        currentStage.entry.field + ' → ' + currentStage.entry.to_stage +
+        '<span style="cursor:pointer;color:#8b949e;" data-remove-entry="1">&times;</span></span>' : '';
+
+      stagesPanel.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + stageTabs +
+        '<span id="jsforge-add-stage" style="background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.2);' +
+        'padding:4px 10px;border-radius:6px;font-size:11px;color:#8b949e;cursor:pointer;">+ 阶段</span></div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button id="jsforge-gen-config" style="background:linear-gradient(135deg,#48bb78,#38a169);' +
+        'border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">生成配置</button>' +
+        '<button id="jsforge-clear-all" style="background:rgba(248,81,73,0.2);border:1px solid rgba(248,81,73,0.3);' +
+        'color:#f85149;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">清空</button>' +
+        '</div></div>' +
+        '<div style="margin-bottom:6px;font-size:11px;color:#8b949e;">阶段: ' + currentStage.name + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + fieldTags + entryTag + '</div>';
+
+      bindStagesPanelEvents(stagesPanel);
+    }
+
+    // 绑定阶段面板事件
+    function bindStagesPanelEvents(stagesPanel) {
+      // 阶段切换
+      stagesPanel.querySelectorAll('[data-stage]').forEach(tab => {
+        tab.onclick = () => {
+          const idx = parseInt(tab.dataset.stage);
+          if (idx >= 0 && idx < jsforge.stages.length) {
+            jsforge.currentStageIndex = idx;
+            saveStages();
+            updateStagesPanel();
+          }
+        };
+      });
+      // 添加阶段
+      document.getElementById('jsforge-add-stage').onclick = addStage;
+      // 生成配置
+      document.getElementById('jsforge-gen-config').onclick = generateConfig;
+      // 清空
+      document.getElementById('jsforge-clear-all').onclick = clearAll;
+      // 移除字段
+      stagesPanel.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.onclick = () => removeField(parseInt(btn.dataset.remove));
+      });
+      // 移除入口
+      stagesPanel.querySelectorAll('[data-remove-entry]').forEach(btn => {
+        btn.onclick = removeEntry;
+      });
+    }
+
+    // 移除当前阶段的字段
+    function removeField(index) {
+      const currentStage = jsforge.stages[jsforge.currentStageIndex];
+      if (!currentStage || index < 0 || index >= currentStage.fields.length) return;
+      currentStage.fields.splice(index, 1);
+      saveStages();
+      updateStagesPanel();
+    }
+
+    // 移除当前阶段的入口
+    function removeEntry() {
+      const currentStage = jsforge.stages[jsforge.currentStageIndex];
+      if (!currentStage) return;
+      currentStage.entry = null;
+      saveStages();
+      updateStagesPanel();
+    }
+
+    // 添加新阶段
+    function addStage() {
+      const name = 'stage_' + (jsforge.stages.length + 1);
+      jsforge.stages.push(createStage(name));
+      jsforge.currentStageIndex = jsforge.stages.length - 1;
+      saveStages();
+      updateStagesPanel();
+      addMessage('system', '✅ 已添加阶段: ' + name);
+    }
+
+    // 清空所有阶段
+    function clearAll() {
+      jsforge.stages = [createStage('list')];
+      jsforge.currentStageIndex = 0;
+      saveStages();
+      updateStagesPanel();
+    }
+
+    // 生成爬虫配置 - 显示配置弹窗
+    function generateConfig() {
+      showConfigModal();
+    }
+
+    // 显示配置弹窗
+    function showConfigModal() {
+      const modal = document.getElementById('jsforge-config-modal');
+      if (!modal) return;
+
+      // 更新阶段分页配置区域
+      const stagesConfigHtml = jsforge.stages.map((stage, i) => {
+        const hasPagination = stage.pagination !== null;
+        return '<div style="margin-bottom:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+          '<span style="color:#63b3ed;font-size:12px;font-weight:600;">' + stage.name + '</span>' +
+          '<span style="color:#8b949e;font-size:11px;">' + stage.fields.length + ' 字段' +
+          (stage.entry ? ' → ' + stage.entry.to_stage : '') + '</span></div>' +
+          '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<label style="color:#8b949e;font-size:11px;white-space:nowrap;">分页:</label>' +
+          '<input type="checkbox" data-stage-pagination="' + i + '"' + (hasPagination ? ' checked' : '') + '>' +
+          '<input type="text" data-stage-xpath="' + i + '" placeholder="下一页XPath" ' +
+          'value="' + (stage.pagination?.next_page_xpath || '') + '" ' +
+          'style="flex:1;padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
+          'border-radius:4px;color:#c9d1d9;font-size:11px;' + (hasPagination ? '' : 'opacity:0.5;') + '">' +
+          '<input type="number" data-stage-max="' + i + '" placeholder="页数" ' +
+          'value="' + (stage.pagination?.max_page || 10) + '" ' +
+          'style="width:50px;padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
+          'border-radius:4px;color:#c9d1d9;font-size:11px;' + (hasPagination ? '' : 'opacity:0.5;') + '">' +
+          '</div></div>';
+      }).join('');
+
+      const configContent = modal.querySelector('div > div:last-child');
+      configContent.innerHTML =
+        '<div style="margin-bottom:16px;">' +
+        '<label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">抓取方式</label>' +
+        '<select id="jsforge-grab-method" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);' +
+        'border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;">' +
+        '<option value="browser">浏览器渲染 (browser)</option>' +
+        '<option value="html">静态HTML (html)</option>' +
+        '<option value="api">API请求 (api)</option></select></div>' +
+        '<div style="margin-bottom:16px;">' +
+        '<label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">阶段配置</label>' +
+        stagesConfigHtml + '</div>' +
+        '<button id="jsforge-config-submit" style="width:100%;padding:12px;' +
+        'background:linear-gradient(135deg,#48bb78,#38a169);border:none;border-radius:8px;' +
+        'color:#fff;font-size:13px;font-weight:600;cursor:pointer;">生成爬虫</button>';
+
+      // 绑定分页复选框事件
+      configContent.querySelectorAll('[data-stage-pagination]').forEach(checkbox => {
+        checkbox.onchange = () => {
+          const idx = checkbox.dataset.stagePagination;
+          const xpathInput = configContent.querySelector('[data-stage-xpath="' + idx + '"]');
+          const maxInput = configContent.querySelector('[data-stage-max="' + idx + '"]');
+          xpathInput.style.opacity = checkbox.checked ? '1' : '0.5';
+          maxInput.style.opacity = checkbox.checked ? '1' : '0.5';
+        };
+      });
+
+      document.getElementById('jsforge-config-submit').onclick = submitConfig;
+      modal.classList.add('visible');
+    }
+
+    // 提交配置
+    function submitConfig() {
+      const modal = document.getElementById('jsforge-config-modal');
+      const grabMethod = document.getElementById('jsforge-grab-method')?.value || 'browser';
+
+      // 收集各阶段的分页配置
+      jsforge.stages.forEach((stage, i) => {
+        const checkbox = modal.querySelector('[data-stage-pagination="' + i + '"]');
+        const xpathInput = modal.querySelector('[data-stage-xpath="' + i + '"]');
+        const maxInput = modal.querySelector('[data-stage-max="' + i + '"]');
+
+        if (checkbox?.checked && xpathInput?.value) {
+          stage.pagination = {
+            next_page_xpath: xpathInput.value,
+            max_page: parseInt(maxInput?.value) || 10
+          };
+        } else {
+          stage.pagination = null;
+        }
+      });
+      saveStages();
+
+      // 构建阶段化配置
+      const config = {
+        url: location.href,
+        grab_method: grabMethod,
+        stages: jsforge.stages.map(s => ({
+          name: s.name,
+          fields: s.fields.map(f => ({
+            name: f.name,
+            xpath: f.xpath,
+            type: f.type
+          })),
+          entry: s.entry,
+          pagination: s.pagination
+        }))
+      };
+
+      modal?.classList.remove('visible');
+      panel.classList.add('visible');
+
+      const totalFields = jsforge.stages.reduce((sum, s) => sum + s.fields.length, 0);
+      addMessage('user', '生成爬虫配置 (' + jsforge.stages.length + ' 阶段, ' + totalFields + ' 字段)');
+      addMessage('system', '正在生成配置...');
+
+      if (typeof __jsforge_send__ === 'function') {
+        __jsforge_send__(JSON.stringify({
+          type: 'generate-config',
+          config: config,
+          url: location.href
+        }));
+      }
+    }
 
     // 点击背景关闭模态框
     reportModal.addEventListener('click', (e) => {
@@ -790,20 +1482,8 @@ export function getAnalysisPanelScript() {
       const xpath = getXPath(currentElement);
       stopSelectMode();
 
-      // 显示面板并添加消息
-      panel.classList.add('visible');
-      addMessage('user', '分析: ' + text.slice(0, 100) + (text.length > 100 ? '...' : ''));
-      addMessage('system', '分析中...');
-
-      // 通过 CDP binding 发送
-      if (typeof __jsforge_send__ === 'function') {
-        __jsforge_send__(JSON.stringify({
-          type: 'analysis',
-          text,
-          xpath,
-          url: location.href
-        }));
-      }
+      // 显示操作菜单而不是直接发送分析
+      showActionMenu({ text, xpath, url: location.href });
     }
 
     function onSelectKey(e) {
@@ -886,21 +1566,8 @@ export function getAnalysisPanelScript() {
         const { text, xpath, iframeSrc } = e.data;
         stopSelectMode();
 
-        // 显示面板并添加消息
-        panel.classList.add('visible');
-        addMessage('user', '[iframe] 分析: ' + text.slice(0, 100) + (text.length > 100 ? '...' : ''));
-        addMessage('system', '分析中...');
-
-        // 通过 CDP binding 发送
-        if (typeof __jsforge_send__ === 'function') {
-          __jsforge_send__(JSON.stringify({
-            type: 'analysis',
-            text,
-            xpath,
-            url: location.href,
-            iframeSrc
-          }));
-        }
+        // 显示操作菜单而不是直接发送分析
+        showActionMenu({ text, xpath, url: location.href, iframeSrc });
       }
     });
 
@@ -1083,11 +1750,15 @@ export function getAnalysisPanelScript() {
     jsforge.setBusy = setBusy;
     jsforge.minimize = minimize;
     jsforge.maximize = maximize;
+    jsforge.getStages = () => jsforge.stages;
+    jsforge.clearStages = clearAll;
 
     // 自动显示面板
     panel.classList.add('visible');
     // 渲染恢复的消息
     renderMessages();
+    // 恢复阶段面板
+    updateStagesPanel();
     console.log('[JSForge UI] 分析面板已加载');
   }
 
