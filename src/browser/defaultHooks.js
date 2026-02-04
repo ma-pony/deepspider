@@ -380,41 +380,327 @@ function getWebSocketHooks() {
 
 /**
  * Webpack 模块 Hook - 检测闭包内的加密库
+ * 通过特征检测而非变量名来识别加密库
  */
 function getWebpackHooks() {
   return `
-// === Webpack Hook ===
+// === Webpack Module Hook ===
 (function() {
   const deepspider = window.__deepspider__;
   if (!deepspider) return;
 
-  // 加密特征检测
-  const cryptoPatterns = [
-    { name: 'CryptoJS', pattern: /CryptoJS|crypto-js/i },
-    { name: 'MD5', pattern: /\\bmd5\\b/i },
-    { name: 'SHA', pattern: /\\bsha(1|256|512)\\b/i },
-    { name: 'AES', pattern: /\\baes\\b/i },
-    { name: 'RSA', pattern: /\\brsa\\b/i },
-    { name: 'Base64', pattern: /base64|btoa|atob/i }
-  ];
+  // 已 Hook 的对象集合
+  const hookedObjects = new WeakSet();
 
-  // Hook webpackJsonp
-  function hookWebpack() {
-    if (window.webpackJsonp && !window.webpackJsonp.__hooked__) {
-      const orig = window.webpackJsonp.push;
-      window.webpackJsonp.push = function(chunk) {
-        deepspider.log('env', { action: 'webpack.chunk', id: chunk[0] });
-        return orig.apply(this, arguments);
-      };
-      window.webpackJsonp.__hooked__ = true;
+  // === 特征检测函数 ===
+
+  // 检测 CryptoJS 特征
+  function isCryptoJS(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    // CryptoJS 特征：有 AES/DES/MD5 等属性，且有 enc.Utf8
+    return (obj.AES && obj.AES.encrypt && obj.AES.decrypt) ||
+           (obj.enc && obj.enc.Utf8 && obj.enc.Hex) ||
+           (obj.MD5 && typeof obj.MD5 === 'function') ||
+           (obj.SHA256 && typeof obj.SHA256 === 'function');
+  }
+
+  // 检测 JSEncrypt 特征
+  function isJSEncrypt(obj) {
+    if (!obj || typeof obj !== 'function') return false;
+    const proto = obj.prototype;
+    return proto && proto.encrypt && proto.decrypt && proto.setPublicKey;
+  }
+
+  // 检测 SM2/SM3/SM4 国密特征
+  function isSMCrypto(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    return (obj.doEncrypt && obj.doDecrypt) ||
+           (obj.sm2 && obj.sm3) ||
+           (typeof obj.encrypt === 'function' && obj.cipherMode !== undefined);
+  }
+
+  // 检测 node-forge 特征
+  function isForge(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    return (obj.cipher && obj.md && obj.util) ||
+           (obj.pki && obj.pki.rsa);
+  }
+
+  // === Hook 函数 ===
+
+  // Hook CryptoJS 对象
+  function hookCryptoJSObject(obj, source) {
+    if (hookedObjects.has(obj)) return;
+    hookedObjects.add(obj);
+
+    // Hook 对称加密
+    ['AES', 'DES', 'TripleDES', 'RC4', 'Rabbit'].forEach(function(cipher) {
+      if (!obj[cipher]) return;
+      ['encrypt', 'decrypt'].forEach(function(method) {
+        if (!obj[cipher][method]) return;
+        const original = obj[cipher][method];
+        obj[cipher][method] = deepspider.native(function(data, key, options) {
+          const entry = deepspider.log('crypto', {
+            algo: cipher + '.' + method,
+            source: source,
+            data: String(data).slice(0, 100),
+            keyLen: key ? String(key).length : 0
+          });
+          deepspider.linkCrypto(entry);
+          return original.apply(this, arguments);
+        }, original);
+      });
+    });
+
+    // Hook 哈希算法
+    ['MD5', 'SHA1', 'SHA256', 'SHA512', 'SHA3', 'RIPEMD160'].forEach(function(algo) {
+      if (!obj[algo] || typeof obj[algo] !== 'function') return;
+      const original = obj[algo];
+      obj[algo] = deepspider.native(function() {
+        const entry = deepspider.log('crypto', {
+          algo: algo,
+          source: source,
+          inputLen: arguments[0] ? String(arguments[0]).length : 0
+        });
+        deepspider.linkCrypto(entry);
+        return original.apply(this, arguments);
+      }, original);
+    });
+
+    // Hook HMAC
+    ['HmacMD5', 'HmacSHA1', 'HmacSHA256', 'HmacSHA512'].forEach(function(algo) {
+      if (!obj[algo] || typeof obj[algo] !== 'function') return;
+      const original = obj[algo];
+      obj[algo] = deepspider.native(function() {
+        const entry = deepspider.log('crypto', {
+          algo: algo,
+          source: source,
+          inputLen: arguments[0] ? String(arguments[0]).length : 0
+        });
+        deepspider.linkCrypto(entry);
+        return original.apply(this, arguments);
+      }, original);
+    });
+
+    console.log('[DeepSpider] CryptoJS Hook 已启用 (来源: ' + source + ')');
+  }
+
+  // Hook JSEncrypt 构造函数
+  function hookJSEncryptObject(JSEncrypt, source) {
+    if (hookedObjects.has(JSEncrypt)) return;
+    hookedObjects.add(JSEncrypt);
+
+    const proto = JSEncrypt.prototype;
+    if (proto.encrypt) {
+      const origEnc = proto.encrypt;
+      proto.encrypt = deepspider.native(function(data) {
+        const entry = deepspider.log('crypto', {
+          algo: 'RSA.encrypt',
+          source: source,
+          data: String(data).slice(0, 100)
+        });
+        deepspider.linkCrypto(entry);
+        return origEnc.apply(this, arguments);
+      }, origEnc);
+    }
+    if (proto.decrypt) {
+      const origDec = proto.decrypt;
+      proto.decrypt = deepspider.native(function(data) {
+        const entry = deepspider.log('crypto', {
+          algo: 'RSA.decrypt',
+          source: source
+        });
+        deepspider.linkCrypto(entry);
+        return origDec.apply(this, arguments);
+      }, origDec);
+    }
+    console.log('[DeepSpider] JSEncrypt Hook 已启用 (来源: ' + source + ')');
+  }
+
+  // Hook SM 国密对象
+  function hookSMCryptoObject(obj, source) {
+    if (hookedObjects.has(obj)) return;
+    hookedObjects.add(obj);
+
+    if (obj.doEncrypt) {
+      const origEnc = obj.doEncrypt;
+      obj.doEncrypt = deepspider.native(function(msg, pubKey) {
+        const entry = deepspider.log('crypto', {
+          algo: 'SM2.encrypt',
+          source: source,
+          msg: String(msg).slice(0, 100)
+        });
+        deepspider.linkCrypto(entry);
+        return origEnc.apply(this, arguments);
+      }, origEnc);
+    }
+    console.log('[DeepSpider] SM Crypto Hook 已启用 (来源: ' + source + ')');
+  }
+
+  // === 扫描并 Hook 模块导出 ===
+  function scanAndHook(exports, source) {
+    if (!exports || typeof exports !== 'object') return;
+
+    try {
+      // 直接检测导出对象
+      if (isCryptoJS(exports)) {
+        hookCryptoJSObject(exports, source);
+        return;
+      }
+      if (isJSEncrypt(exports)) {
+        hookJSEncryptObject(exports, source);
+        return;
+      }
+      if (isSMCrypto(exports)) {
+        hookSMCryptoObject(exports, source);
+        return;
+      }
+
+      // 检测 default 导出
+      if (exports.default) {
+        if (isCryptoJS(exports.default)) {
+          hookCryptoJSObject(exports.default, source + '.default');
+        } else if (isJSEncrypt(exports.default)) {
+          hookJSEncryptObject(exports.default, source + '.default');
+        }
+      }
+
+      // 遍历导出的属性（限制深度避免性能问题）
+      const keys = Object.keys(exports);
+      for (let i = 0; i < Math.min(keys.length, 20); i++) {
+        const key = keys[i];
+        const val = exports[key];
+        if (val && typeof val === 'object' && !hookedObjects.has(val)) {
+          if (isCryptoJS(val)) {
+            hookCryptoJSObject(val, source + '.' + key);
+          }
+        }
+        if (val && typeof val === 'function') {
+          if (isJSEncrypt(val)) {
+            hookJSEncryptObject(val, source + '.' + key);
+          }
+        }
+      }
+    } catch (e) {
+      // 忽略访问错误
     }
   }
 
-  // 定期检查
-  const check = setInterval(hookWebpack, 100);
-  setTimeout(function() { clearInterval(check); }, 5000);
+  // === Hook Webpack 模块系统 ===
 
-  console.log('[DeepSpider] Webpack Hook 已启用');
+  // Hook Webpack 4 webpackJsonp
+  function hookWebpackJsonp() {
+    const jsonp = window.webpackJsonp;
+    if (!jsonp || jsonp.__deepspider_hooked__) return;
+
+    const origPush = jsonp.push;
+    jsonp.push = function(chunk) {
+      const result = origPush.apply(this, arguments);
+
+      // chunk[1] 是模块对象 { moduleId: function(module, exports, require) {} }
+      if (chunk && chunk[1]) {
+        const modules = chunk[1];
+        Object.keys(modules).forEach(function(moduleId) {
+          // 延迟扫描，等模块执行完
+          setTimeout(function() {
+            try {
+              // 尝试获取模块导出
+              if (window.__webpack_require__ && window.__webpack_require__.c) {
+                const mod = window.__webpack_require__.c[moduleId];
+                if (mod && mod.exports) {
+                  scanAndHook(mod.exports, 'webpack:' + moduleId);
+                }
+              }
+            } catch (e) {}
+          }, 10);
+        });
+      }
+      return result;
+    };
+    jsonp.__deepspider_hooked__ = true;
+    console.log('[DeepSpider] Webpack4 jsonp Hook 已启用');
+  }
+
+  // Hook Webpack 5 webpackChunk
+  function hookWebpackChunk() {
+    // Webpack 5 使用 self["webpackChunk" + name]
+    const chunkNames = Object.keys(self).filter(function(k) {
+      return k.startsWith('webpackChunk');
+    });
+
+    chunkNames.forEach(function(name) {
+      const chunk = self[name];
+      if (!chunk || chunk.__deepspider_hooked__) return;
+
+      const origPush = chunk.push.bind(chunk);
+      chunk.push = function(data) {
+        const result = origPush(data);
+
+        // data[1] 是模块对象
+        if (data && data[1]) {
+          Object.keys(data[1]).forEach(function(moduleId) {
+            setTimeout(function() {
+              try {
+                // Webpack 5 的 require cache
+                const cache = window.__webpack_require__ && window.__webpack_require__.c;
+                if (cache && cache[moduleId] && cache[moduleId].exports) {
+                  scanAndHook(cache[moduleId].exports, 'webpack5:' + moduleId);
+                }
+              } catch (e) {}
+            }, 10);
+          });
+        }
+        return result;
+      };
+      chunk.__deepspider_hooked__ = true;
+      console.log('[DeepSpider] Webpack5 chunk Hook 已启用: ' + name);
+    });
+  }
+
+  // Hook __webpack_require__ 直接拦截模块加载
+  function hookWebpackRequire() {
+    if (!window.__webpack_require__ || window.__webpack_require__.__deepspider_hooked__) return;
+
+    const origRequire = window.__webpack_require__;
+    window.__webpack_require__ = function(moduleId) {
+      const result = origRequire.apply(this, arguments);
+      // 扫描返回的模块
+      setTimeout(function() {
+        scanAndHook(result, 'require:' + moduleId);
+      }, 0);
+      return result;
+    };
+    // 复制原有属性
+    Object.keys(origRequire).forEach(function(key) {
+      window.__webpack_require__[key] = origRequire[key];
+    });
+    window.__webpack_require__.__deepspider_hooked__ = true;
+    console.log('[DeepSpider] __webpack_require__ Hook 已启用');
+  }
+
+  // 定期检查并 Hook
+  function checkAndHook() {
+    hookWebpackJsonp();
+    hookWebpackChunk();
+    hookWebpackRequire();
+
+    // 扫描已加载的模块缓存
+    if (window.__webpack_require__ && window.__webpack_require__.c) {
+      const cache = window.__webpack_require__.c;
+      Object.keys(cache).forEach(function(moduleId) {
+        if (cache[moduleId] && cache[moduleId].exports) {
+          scanAndHook(cache[moduleId].exports, 'cache:' + moduleId);
+        }
+      });
+    }
+  }
+
+  // 启动检查
+  checkAndHook();
+  const interval = setInterval(checkAndHook, 200);
+  setTimeout(function() { clearInterval(interval); }, 10000);
+
+  console.log('[DeepSpider] Webpack Module Hook 已启用');
 })();
 `;
 }

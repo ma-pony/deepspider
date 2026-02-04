@@ -1,38 +1,34 @@
 /**
  * DeepSpider - Hook 管理器
+ * 注意：Hook 脚本已由 browser/client.js 通过 defaultHooks.js 自动注入
+ * 此类仅用于日志管理和状态跟踪
  */
-
-import { cryptoHook } from './crypto.js';
-import { networkHook } from './network.js';
-import { nativeProtect } from './native.js';
 
 export class HookManager {
   constructor() {
     this.logs = [];
     this.onLog = null;
+    this.injected = false;
   }
 
   /**
-   * 获取完整的 Hook 脚本
+   * 标记 Hook 已注入（由 client.js 调用）
    */
-  getCombinedScript() {
-    return [
-      nativeProtect,
-      cryptoHook,
-      networkHook,
-    ].join('\n\n');
+  markInjected() {
+    this.injected = true;
   }
 
   /**
-   * 注入 Hook 到页面
+   * 检查是否已注入
    */
-  async inject(page) {
-    const script = this.getCombinedScript();
+  isInjected() {
+    return this.injected;
+  }
 
-    // 在新文档加载前注入
-    await page.addInitScript(script);
-
-    // 监听 console 输出
+  /**
+   * 绑定页面 console 监听（用于收集 Hook 日志）
+   */
+  bindConsole(page) {
     page.on('console', (msg) => {
       const text = msg.text();
       if (text.includes('[DeepSpider:')) {

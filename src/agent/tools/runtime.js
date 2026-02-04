@@ -12,10 +12,12 @@ let hookManager = null;
 
 /**
  * 标记 Hook 已注入（供外部调用）
+ * 注意：Hook 脚本由 browser/client.js 自动注入，此处仅标记状态
  */
 export function markHookInjected() {
   if (!hookManager) {
     hookManager = new HookManager();
+    hookManager.markInjected();
   }
 }
 
@@ -25,13 +27,13 @@ export function markHookInjected() {
 export const launchBrowser = tool(
   async ({ headless }) => {
     const browser = await getBrowser({ headless });
-    // 检查是否已经注入过 Hook
+    // Hook 已由 browser/client.js 自动注入，此处仅标记状态
     if (!hookManager) {
       hookManager = new HookManager();
-      await hookManager.inject(browser.getPage());
-      return JSON.stringify({ success: true, message: '浏览器已启动，Hook 已注入' });
+      hookManager.markInjected();
+      hookManager.bindConsole(browser.getPage());
     }
-    return JSON.stringify({ success: true, message: '浏览器已就绪' });
+    return JSON.stringify({ success: true, message: '浏览器已就绪，Hook 已注入' });
   },
   {
     name: 'launch_browser',
