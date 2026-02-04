@@ -152,15 +152,22 @@ export class HookBase {
 
       // 性能优化：可配置是否记录调用栈
       let stack = null;
+      let caller = null;
       if (config.captureStack) {
         const err = new Error();
         stack = err.stack;
+        // 解析调用栈，提取文件和行号信息
+        const parsed = window.__deepspider__.parseStack(stack, config.stackDepth);
+        if (parsed.length > 0) {
+          caller = parsed[0];  // 第一个有效调用位置
+        }
       }
 
       const entry = {
         ...data,
         timestamp: Date.now(),
         stack: stack,
+        caller: caller,  // 解析后的调用位置 { func, file, line, col }
         requestId: requestContext?.id || null
       };
 
@@ -181,7 +188,9 @@ export class HookBase {
           fetch: 'color: #9C27B0',
         };
         const color = colors[data.action] || colors[type] || 'color: #666';
-        console.log('%c[DeepSpider:' + type + ']', color, data.action || '', data);
+        // 显示调用位置
+        const loc = caller ? ' @ ' + (caller.file || '').split('/').pop() + ':' + caller.line : '';
+        console.log('%c[DeepSpider:' + type + ']' + loc, color, data.action || '', data);
       }
       return entry;
     },
@@ -190,30 +199,41 @@ export class HookBase {
     parseStack: function(stack, depth) {
       if (!stack) return [];
       const maxDepth = depth || config.stackDepth || 5;
-      // 过滤框架代码的关键词
-      const frameworkPatterns = [
+      // 过滤 Hook 框架和常见库的调用栈
+      const skipPatterns = [
+        /__deepspider__/,
+        /deepspider\\.native/,
+        /hookFunc|hooked|origEnc|origDec|original/i,
+        /^Error$/,
+        /at Object\\.log/,
+        /at Object\\.parseStack/,
         /react|vue|angular|jquery|lodash|axios/i,
         /node_modules/,
-        /webpack/,
-        /__deepspider__/
+        /^webpack:/,
+        /\\(native\\)/,
+        /<anonymous>:\\d+:\\d+$/
       ];
 
-      return stack.split('\\n').slice(2).map(function(line) {
-        const match = line.match(/at\\s+(.+?)\\s+\\((.+?):(\\d+):(\\d+)\\)/) ||
-                      line.match(/at\\s+(.+?):(\\d+):(\\d+)/);
+      return stack.split('\\n').slice(1).map(function(line) {
+        // Chrome/Node 格式: at funcName (file:line:col) 或 at file:line:col
+        let match = line.match(/at\\s+(.+?)\\s+\\((.+?):(\\d+):(\\d+)\\)/);
         if (match) {
-          return {
-            func: match[1] || 'anonymous',
-            file: match[2] || match[1],
-            line: parseInt(match[3] || match[2]),
-            col: parseInt(match[4] || match[3])
-          };
+          return { func: match[1], file: match[2], line: parseInt(match[3]), col: parseInt(match[4]) };
         }
-        return { raw: line.trim() };
+        match = line.match(/at\\s+(.+?):(\\d+):(\\d+)/);
+        if (match) {
+          return { func: 'anonymous', file: match[1], line: parseInt(match[2]), col: parseInt(match[3]) };
+        }
+        // Firefox 格式: funcName@file:line:col
+        match = line.match(/(.+?)@(.+?):(\\d+):(\\d+)/);
+        if (match) {
+          return { func: match[1] || 'anonymous', file: match[2], line: parseInt(match[3]), col: parseInt(match[4]) };
+        }
+        return null;
       }).filter(function(f) {
-        if (!f.func && !f.raw) return false;
-        const str = f.file || f.raw || '';
-        return !frameworkPatterns.some(p => p.test(str));
+        if (!f || !f.file) return false;
+        const str = f.func + ' ' + f.file;
+        return !skipPatterns.some(function(p) { return p.test(str); });
       }).slice(0, maxDepth);
     },
 
