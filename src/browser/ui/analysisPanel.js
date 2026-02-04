@@ -1524,12 +1524,11 @@ export function getAnalysisPanelScript() {
       } else {
         messagesEl.innerHTML = msgs.map(m => {
           // assistant 消息使用 Markdown 解析，其他消息转义
-          let content = m.role === 'assistant' ? parseMarkdown(m.content) : escapeHtml(m.content);
-          // 对所有消息应用文件路径链接化
-          content = linkifyFilePaths(content);
+          const content = m.role === 'assistant' ? parseMarkdown(m.content) : escapeHtml(m.content);
           return '<div class="deepspider-msg deepspider-msg-' + m.role + '">' + content + '</div>';
         }).join('');
-        // 绑定文件路径点击事件
+        // 在 DOM 上处理文件路径链接化
+        linkifyFilePaths(messagesEl);
         bindFilePathClicks(messagesEl);
       }
       messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1539,15 +1538,36 @@ export function getAnalysisPanelScript() {
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // 检测并链接化文件路径
-    function linkifyFilePaths(html) {
-      // 匹配文件路径: ~/.deepspider/..., /Users/..., /home/..., 或任意绝对路径
-      const pathRegex = /(~?\\/[\\w.\\-\\/]+(?:\\.\\w+)?)/g;
-      return html.replace(pathRegex, (match) => {
-        // 过滤掉太短或明显不是文件路径的
-        if (match.length < 5 || match === '/') return match;
-        // 展开 ~ 为实际路径（前端无法获取，保持原样传给后端）
-        return '<span class="deepspider-file-link" data-file-path="' + match + '">' + match + '</span>';
+    // 检测并链接化文件路径（DOM 方式，避免破坏 HTML 结构）
+    function linkifyFilePaths(container) {
+      const pathRegex = /(~\\/\\.deepspider\\/[\\w.\\-\\/]+|\\/(?:Users|home|var|tmp|opt|etc)\\/[\\w.\\-\\/]+)/g;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      textNodes.forEach(node => {
+        const text = node.textContent;
+        if (!pathRegex.test(text)) return;
+        pathRegex.lastIndex = 0;
+
+        const frag = document.createDocumentFragment();
+        let lastIndex = 0;
+        let match;
+        while ((match = pathRegex.exec(text)) !== null) {
+          if (match.index > lastIndex) {
+            frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+          }
+          const span = document.createElement('span');
+          span.className = 'deepspider-file-link';
+          span.dataset.filePath = match[0];
+          span.textContent = match[0];
+          frag.appendChild(span);
+          lastIndex = pathRegex.lastIndex;
+        }
+        if (lastIndex < text.length) {
+          frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+        node.parentNode.replaceChild(frag, node);
       });
     }
 
