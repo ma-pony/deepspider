@@ -1707,6 +1707,9 @@ export function getAnalysisPanelScript() {
         reportContentEl.innerHTML = reportHtmlContent;
         // 处理代码块，添加复制按钮
         processCodeBlocks(reportContentEl);
+        // 处理文件路径，支持点击打开
+        linkifyFilePaths(reportContentEl);
+        bindFilePathClicks(reportContentEl);
         reportModal.classList.add('visible');
       } else if (reportPath) {
         // 降级：打开文件
