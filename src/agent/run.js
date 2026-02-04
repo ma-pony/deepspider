@@ -519,8 +519,12 @@ ${JSON.stringify(config.fields, null, 2)}
     userPrompt = `${browserReadyPrefix}${data.text}`;
   } else if (data.type === 'open-file') {
     // 打开文件 - 使用系统默认程序
-    const filePath = data.path;
+    let filePath = data.path;
     if (filePath && typeof filePath === 'string') {
+      // 展开 ~ 为 home 目录
+      if (filePath.startsWith('~/')) {
+        filePath = filePath.replace('~', process.env.HOME || process.env.USERPROFILE);
+      }
       const { exec } = await import('child_process');
       const platform = process.platform;
       const cmd = platform === 'darwin' ? `open "${filePath}"` :
