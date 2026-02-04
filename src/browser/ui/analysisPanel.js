@@ -862,25 +862,6 @@ export function getAnalysisPanelScript() {
             <div class="text"></div>
             <div class="xpath"></div>
           </div>
-          <div class="deepspider-action-section">
-            <label>字段名称（用于爬虫配置）</label>
-            <input type="text" class="deepspider-action-input" id="deepspider-field-name" placeholder="例如: title, price, content">
-          </div>
-          <div class="deepspider-action-section">
-            <label>字段类型</label>
-            <select class="deepspider-action-select" id="deepspider-field-type">
-              <option value="str">文本 (str)</option>
-              <option value="url">链接 (url)</option>
-              <option value="entry">入口链接 (entry) - 进入下一阶段</option>
-              <option value="html">HTML</option>
-              <option value="file">文件</option>
-              <option value="json">JSON</option>
-            </select>
-          </div>
-          <div class="deepspider-action-section" id="deepspider-entry-target-section" style="display:none;">
-            <label>目标阶段</label>
-            <select class="deepspider-action-select" id="deepspider-entry-target"></select>
-          </div>
           <div class="deepspider-action-btns" id="deepspider-action-btns"></div>
         </div>
       </div>
@@ -950,58 +931,14 @@ export function getAnalysisPanelScript() {
       const preview = document.getElementById('deepspider-action-preview');
       preview.querySelector('.text').textContent = selection.text.slice(0, 100) + (selection.text.length > 100 ? '...' : '');
       preview.querySelector('.xpath').textContent = selection.xpath;
-      document.getElementById('deepspider-field-name').value = '';
-      document.getElementById('deepspider-field-type').value = 'str';
-
-      // 更新目标阶段选择器
-      const entryTargetSection = document.getElementById('deepspider-entry-target-section');
-      const entryTargetSelect = document.getElementById('deepspider-entry-target');
-      const fieldTypeSelect = document.getElementById('deepspider-field-type');
-
-      function updateEntryTargetOptions() {
-        entryTargetSelect.innerHTML = deepspider.stages
-          .map((s, i) => '<option value="' + i + '"' + (i === deepspider.currentStageIndex ? ' disabled' : '') + '>' + s.name + (i === deepspider.currentStageIndex ? ' (当前)' : '') + '</option>')
-          .join('') + '<option value="__new__">+ 新建阶段</option>';
-      }
-
-      fieldTypeSelect.onchange = () => {
-        if (fieldTypeSelect.value === 'entry') {
-          updateEntryTargetOptions();
-          entryTargetSection.style.display = 'block';
-        } else {
-          entryTargetSection.style.display = 'none';
-        }
-      };
-      entryTargetSection.style.display = 'none';
 
       const btnsContainer = document.getElementById('deepspider-action-btns');
       btnsContainer.innerHTML = \`
-        <button class="deepspider-action-btn primary" data-action="add-field">
-          <span class="deepspider-action-btn-icon">➕</span>
-          <div class="deepspider-action-btn-text">
-            添加为字段
-            <div class="deepspider-action-btn-desc">添加到爬虫配置，可继续选择更多字段</div>
-          </div>
-        </button>
-        <button class="deepspider-action-btn" data-action="analyze-source">
-          <span class="deepspider-action-btn-icon">🔍</span>
-          <div class="deepspider-action-btn-text">
-            追踪数据来源
-            <div class="deepspider-action-btn-desc">分析该数据从哪个请求返回</div>
-          </div>
-        </button>
-        <button class="deepspider-action-btn" data-action="analyze-crypto">
-          <span class="deepspider-action-btn-icon">🔐</span>
-          <div class="deepspider-action-btn-text">
-            分析加密逻辑
-            <div class="deepspider-action-btn-desc">识别加密算法并生成 Python 代码</div>
-          </div>
-        </button>
-        <button class="deepspider-action-btn" data-action="full-analysis">
+        <button class="deepspider-action-btn primary" data-action="full-analysis">
           <span class="deepspider-action-btn-icon">📊</span>
           <div class="deepspider-action-btn-text">
-            完整流程分析
-            <div class="deepspider-action-btn-desc">追踪来源 + 加密分析 + 生成代码</div>
+            分析数据来源
+            <div class="deepspider-action-btn-desc">定位接口 + 分析加密 + 生成代码</div>
           </div>
         </button>
       \`;
@@ -1017,19 +954,8 @@ export function getAnalysisPanelScript() {
     // 处理操作菜单的动作
     function handleAction(action) {
       if (!pendingSelection) return;
-      const fieldName = document.getElementById('deepspider-field-name').value.trim();
-      const fieldType = document.getElementById('deepspider-field-type').value;
 
       switch (action) {
-        case 'add-field':
-          addField(fieldName, fieldType);
-          break;
-        case 'analyze-source':
-          sendAnalysis('source', pendingSelection);
-          break;
-        case 'analyze-crypto':
-          sendAnalysis('crypto', pendingSelection);
-          break;
         case 'full-analysis':
           sendAnalysis('full', pendingSelection);
           break;
@@ -1040,57 +966,6 @@ export function getAnalysisPanelScript() {
     // 创建空阶段对象
     function createStage(name) {
       return { name: name, fields: [], entry: null, pagination: null };
-    }
-
-    // 添加字段到当前阶段
-    function addField(name, type) {
-      if (!pendingSelection) return;
-      const currentStage = deepspider.stages[deepspider.currentStageIndex];
-      if (!currentStage) return;
-
-      // 处理入口类型
-      if (type === 'entry') {
-        const targetIndex = document.getElementById('deepspider-entry-target').value;
-        let targetStageName;
-
-        if (targetIndex === '__new__') {
-          const newStageName = 'stage_' + (deepspider.stages.length + 1);
-          deepspider.stages.push(createStage(newStageName));
-          targetStageName = newStageName;
-        } else {
-          const idx = parseInt(targetIndex);
-          if (idx < 0 || idx >= deepspider.stages.length) return;
-          targetStageName = deepspider.stages[idx].name;
-        }
-
-        const entryName = name || 'entry_link';
-        currentStage.entry = {
-          field: entryName,
-          xpath: pendingSelection.xpath,
-          to_stage: targetStageName
-        };
-        saveStages();
-        panel.classList.add('visible');
-        addMessage('system', '✅ 已设置入口: ' + entryName + ' → ' + targetStageName);
-        updateStagesPanel();
-        return;
-      }
-
-      // 普通字段
-      const fieldName = name || 'field_' + (currentStage.fields.length + 1);
-      const field = {
-        name: fieldName,
-        xpath: pendingSelection.xpath,
-        type: type,
-        value: pendingSelection.text.slice(0, 100),
-        time: Date.now()
-      };
-      currentStage.fields.push(field);
-      saveStages();
-
-      panel.classList.add('visible');
-      addMessage('system', '✅ 已添加字段: ' + field.name + ' (阶段: ' + currentStage.name + ')');
-      updateStagesPanel();
     }
 
     // 发送分析请求
