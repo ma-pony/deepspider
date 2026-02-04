@@ -517,6 +517,21 @@ ${JSON.stringify(config.fields, null, 2)}
 请先用 query_store 查询已有的加密代码，然后整合生成配置和脚本。`;
   } else if (data.type === 'chat') {
     userPrompt = `${browserReadyPrefix}${data.text}`;
+  } else if (data.type === 'open-file') {
+    // 打开文件 - 使用系统默认程序
+    const filePath = data.path;
+    if (filePath && typeof filePath === 'string') {
+      const { exec } = await import('child_process');
+      const platform = process.platform;
+      const cmd = platform === 'darwin' ? `open "${filePath}"` :
+                  platform === 'win32' ? `start "" "${filePath}"` :
+                  `xdg-open "${filePath}"`;
+      exec(cmd, (err) => {
+        if (err) console.error('[open-file] 打开失败:', err.message);
+        else console.log('[open-file] 已打开:', filePath);
+      });
+    }
+    return;
   } else {
     return;
   }

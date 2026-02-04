@@ -6,9 +6,9 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
-import { PATHS, ensureDir, getReportDir } from '../../config/paths.js';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { join, basename } from 'path';
+import { PATHS, ensureDir, DEEPSPIDER_HOME } from '../../config/paths.js';
 
 const OUTPUT_DIR = PATHS.REPORTS_DIR;
 
@@ -23,6 +23,31 @@ function extractDomain(url) {
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * 从文件路径读取代码内容
+ * 支持相对路径和绝对路径
+ */
+function readCodeFromFile(filePath) {
+  if (!filePath) return null;
+
+  let fullPath = filePath;
+  if (!fullPath.startsWith('/')) {
+    fullPath = join(PATHS.OUTPUT_DIR, filePath);
+  }
+
+  if (!existsSync(fullPath)) {
+    console.warn('[report] 代码文件不存在:', fullPath);
+    return null;
+  }
+
+  try {
+    return readFileSync(fullPath, 'utf-8');
+  } catch (e) {
+    console.warn('[report] 读取代码文件失败:', e.message);
+    return null;
+  }
 }
 
 /**
@@ -72,34 +97,57 @@ function generateHtmlPage(title, markdown, pythonCode, jsCode) {
 
 /**
  * 保存分析报告
+ * 支持两种模式：
+ * 1. 传入代码文件路径（推荐）- pythonCodeFile/jsCodeFile
+ * 2. 传入代码内容（兼容）- pythonCode/jsCode
  */
 export const saveAnalysisReport = tool(
-  async ({ domain, title, markdown, pythonCode, jsCode }) => {
+  async ({ domain, title, markdown, pythonCode, pythonCodeFile, jsCode, jsCodeFile }) => {
     try {
       const domainDir = join(OUTPUT_DIR, extractDomain(domain));
       ensureDir(domainDir);
 
       const paths = {};
 
+      // 优先从文件读取代码
+      let finalPythonCode = pythonCode;
+      let finalJsCode = jsCode;
+
+      if (pythonCodeFile) {
+        const code = readCodeFromFile(pythonCodeFile);
+        if (code) {
+          finalPythonCode = code;
+          console.log('[report] 从文件读取 Python 代码:', pythonCodeFile);
+        }
+      }
+
+      if (jsCodeFile) {
+        const code = readCodeFromFile(jsCodeFile);
+        if (code) {
+          finalJsCode = code;
+          console.log('[report] 从文件读取 JS 代码:', jsCodeFile);
+        }
+      }
+
       // 保存 Markdown
       paths.markdown = join(domainDir, 'analysis.md');
       writeFileSync(paths.markdown, markdown, 'utf-8');
 
       // 保存 Python 代码
-      if (pythonCode) {
+      if (finalPythonCode) {
         paths.python = join(domainDir, 'decrypt.py');
-        writeFileSync(paths.python, pythonCode, 'utf-8');
+        writeFileSync(paths.python, finalPythonCode, 'utf-8');
       }
 
       // 保存 JS 代码
-      if (jsCode) {
+      if (finalJsCode) {
         paths.javascript = join(domainDir, 'decrypt.js');
-        writeFileSync(paths.javascript, jsCode, 'utf-8');
+        writeFileSync(paths.javascript, finalJsCode, 'utf-8');
       }
 
       // 生成 HTML
       paths.html = join(domainDir, 'report.html');
-      const html = generateHtmlPage(title || domain, markdown, pythonCode, jsCode);
+      const html = generateHtmlPage(title || domain, markdown, finalPythonCode, finalJsCode);
       writeFileSync(paths.html, html, 'utf-8');
 
       console.log('[report] 已保存:', domainDir);
@@ -110,13 +158,15 @@ export const saveAnalysisReport = tool(
   },
   {
     name: 'save_analysis_report',
-    description: '保存加密分析报告。分析完成后必须调用，保存 Markdown、HTML 和代码文件。',
+    description: `保存分析报告。推荐先用 artifact_save 保存代码文件，再传入文件路径。`,
     schema: z.object({
-      domain: z.string().describe('网站域名或 URL'),
+      domain: z.string().describe('网站域名'),
       title: z.string().optional().describe('报告标题'),
-      markdown: z.string().describe('Markdown 分析报告'),
-      pythonCode: z.string().describe('Python 解密代码（必须提供完整可运行代码）'),
-      jsCode: z.string().optional().describe('JavaScript 解密代码'),
+      markdown: z.string().describe('Markdown 摘要'),
+      pythonCodeFile: z.string().optional().describe('Python 代码文件路径（推荐）'),
+      pythonCode: z.string().optional().describe('Python 代码内容（不推荐）'),
+      jsCodeFile: z.string().optional().describe('JS 代码文件路径'),
+      jsCode: z.string().optional().describe('JS 代码内容'),
     }),
   }
 );

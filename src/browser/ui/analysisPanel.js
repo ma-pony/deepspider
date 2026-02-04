@@ -552,6 +552,13 @@ export function getAnalysisPanelScript() {
       .deepspider-msg p { margin: 6px 0; }
       .deepspider-msg strong { font-weight: 600; color: #e6edf3; }
       .deepspider-msg em { font-style: italic; }
+      .deepspider-file-link {
+        color: #79c0ff;
+        text-decoration: underline;
+        cursor: pointer;
+        word-break: break-all;
+      }
+      .deepspider-file-link:hover { color: #58a6ff; }
       @keyframes deepspider-msg-in {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: translateY(0); }
@@ -1517,15 +1524,43 @@ export function getAnalysisPanelScript() {
       } else {
         messagesEl.innerHTML = msgs.map(m => {
           // assistant 消息使用 Markdown 解析，其他消息转义
-          const content = m.role === 'assistant' ? parseMarkdown(m.content) : escapeHtml(m.content);
+          let content = m.role === 'assistant' ? parseMarkdown(m.content) : escapeHtml(m.content);
+          // 对所有消息应用文件路径链接化
+          content = linkifyFilePaths(content);
           return '<div class="deepspider-msg deepspider-msg-' + m.role + '">' + content + '</div>';
         }).join('');
+        // 绑定文件路径点击事件
+        bindFilePathClicks(messagesEl);
       }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
     function escapeHtml(str) {
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // 检测并链接化文件路径
+    function linkifyFilePaths(html) {
+      // 匹配文件路径: ~/.deepspider/..., /Users/..., /home/..., 或任意绝对路径
+      const pathRegex = /(~?\\/[\\w.\\-\\/]+(?:\\.\\w+)?)/g;
+      return html.replace(pathRegex, (match) => {
+        // 过滤掉太短或明显不是文件路径的
+        if (match.length < 5 || match === '/') return match;
+        // 展开 ~ 为实际路径（前端无法获取，保持原样传给后端）
+        return '<span class="deepspider-file-link" data-file-path="' + match + '">' + match + '</span>';
+      });
+    }
+
+    // 绑定文件路径点击事件
+    function bindFilePathClicks(container) {
+      container.querySelectorAll('.deepspider-file-link').forEach(el => {
+        el.onclick = () => {
+          const filePath = el.dataset.filePath;
+          if (filePath && typeof __deepspider_send__ === 'function') {
+            __deepspider_send__(JSON.stringify({ type: 'open-file', path: filePath }));
+          }
+        };
+      });
     }
 
     // 使用 marked.js 解析 Markdown
