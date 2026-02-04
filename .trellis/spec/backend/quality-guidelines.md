@@ -113,6 +113,42 @@ proc.on('close', () => {
 
 **原因**: `spawn` 的 options 不包含 `timeout`，这是 `execSync` 的选项。使用 spawn 时必须手动实现超时逻辑。
 
+### 6. 用正则替换 HTML 字符串
+
+```javascript
+// ❌ 禁止：正则替换 HTML 字符串会破坏结构
+function linkifyPaths(html) {
+  return html.replace(/(\/[\w.\-\/]+)/g, '<a href="$1">$1</a>');
+}
+// 会把 </strong> 中的 /strong 也匹配成路径！
+
+// ✅ 使用 DOM TreeWalker 遍历文本节点
+function linkifyPaths(container) {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+  textNodes.forEach(node => {
+    // 只处理纯文本，不会影响 HTML 标签
+  });
+}
+```
+
+**原因**: 正则无法区分 HTML 标签和文本内容，容易误匹配导致结构破坏。
+
+### 7. LLM 工具参数传递大段代码
+
+```javascript
+// ❌ 禁止：直接传递大段代码内容，可能被 LLM 截断
+await saveReport({ pythonCode: longCodeString });
+
+// ✅ 先保存到文件，再传递文件路径
+await artifactSave({ path: 'domain/decrypt.py', content: code });
+await saveReport({ pythonCodeFile: 'domain/decrypt.py' });
+```
+
+**原因**: LLM 输出有长度限制，大段代码作为参数传递时可能被截断。分步保存确保代码完整性。
+
 ---
 
 ## Required Patterns
