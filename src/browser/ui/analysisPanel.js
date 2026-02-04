@@ -211,12 +211,18 @@ export function getAnalysisPanelScript() {
     window.__deepspider_ui_init__ = true;
 
     // ========== 加载 marked.js ==========
+    let markedReady = !!window.marked;
     if (!window.marked) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
       script.onload = () => {
         window.marked.setOptions({ breaks: true, gfm: true });
+        markedReady = true;
         console.log('[DeepSpider] marked.js loaded');
+        // 重新渲染消息以应用 Markdown 格式
+        if (deepspider.renderMessages) {
+          deepspider.renderMessages();
+        }
       };
       document.head.appendChild(script);
     }
@@ -1586,7 +1592,7 @@ export function getAnalysisPanelScript() {
     // 使用 marked.js 解析 Markdown
     function parseMarkdown(text) {
       if (!text) return '';
-      // 如果 marked 已加载则使用，否则降级为纯文本
+      // 如果 marked 已加载则使用
       if (window.marked && window.marked.parse) {
         try {
           return window.marked.parse(text);
@@ -1594,8 +1600,24 @@ export function getAnalysisPanelScript() {
           console.warn('[DeepSpider] marked parse error:', e);
         }
       }
-      // 降级：简单转义
-      return '<p>' + escapeHtml(text).replace(/\\n/g, '<br>') + '</p>';
+      // 降级：简单 Markdown 解析
+      let html = escapeHtml(text);
+      // 代码块
+      html = html.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, '<pre><code>$2</code></pre>');
+      // 行内代码
+      html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+      // 标题
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+      // 粗体
+      html = html.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+      // 列表
+      html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+      html = html.replace(/^(\\d+)\\. (.+)$/gm, '<li>$2</li>');
+      // 换行
+      html = html.replace(/\\n/g, '<br>');
+      return html;
     }
 
     // ========== 对话输入 ==========
@@ -1798,6 +1820,7 @@ export function getAnalysisPanelScript() {
     deepspider.addMessage = addMessage;
     deepspider.appendToLastMessage = appendToLastMessage;
     deepspider.updateLastMessage = updateLastMessage;
+    deepspider.renderMessages = renderMessages;
     deepspider.clearMessages = () => { deepspider.chatMessages = []; saveMessages(); renderMessages(); };
     deepspider.startSelector = startSelectMode;
     deepspider.stopSelector = stopSelectMode;
