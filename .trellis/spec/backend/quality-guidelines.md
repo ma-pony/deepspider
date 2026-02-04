@@ -171,6 +171,47 @@ traverse.default(ast, {
 const cdp = await browser.getCDPSession();
 ```
 
+### 3. Hook 日志记录调用位置
+
+```javascript
+// ✅ 在日志中包含解析后的调用位置
+const entry = {
+  ...data,
+  timestamp: Date.now(),
+  stack: stack,
+  caller: caller,  // { func, file, line, col }
+};
+
+// 控制台输出显示文件名和行号
+const loc = caller ? ' @ ' + caller.file.split('/').pop() + ':' + caller.line : '';
+console.log('[DeepSpider:' + type + ']' + loc, data);
+```
+
+**原因**: Hook 日志需要记录 JS 文件调用位置，便于快速定位加密代码来源。
+
+---
+
+## Release Process
+
+### 版本发布流程
+
+升级版本时必须同步创建 git tag：
+
+```bash
+# 1. 升级 package.json 版本
+npm version patch --no-git-tag-version
+
+# 2. 提交版本变更
+git add package.json
+git commit -m "chore: bump version to x.x.x"
+
+# 3. 创建并推送 git tag
+git tag vx.x.x
+git push && git push origin vx.x.x
+```
+
+**原因**: npm 版本和 git tag 需要保持同步，便于版本追踪和回溯。
+
 ---
 
 ## Testing Requirements
