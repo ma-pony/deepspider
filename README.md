@@ -38,6 +38,11 @@ cp .env.example .env
 # 编辑 .env 填入配置（见下方环境变量说明）
 ```
 
+> **注意**: 项目依赖 `isolated-vm` 原生模块，需要 C++ 编译环境：
+> - macOS: `xcode-select --install`
+> - Ubuntu: `sudo apt install build-essential`
+> - Windows: 安装 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
 ### 环境变量配置
 
 DeepSpider 需要配置 LLM API 才能运行。支持任何兼容 OpenAI 格式的供应商。

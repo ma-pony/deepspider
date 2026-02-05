@@ -17,6 +17,7 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt",
+    "postinstall": "patchright install chromium && npm rebuild isolated-vm 2>/dev/null || true",
     "prepare": "husky"
   },
   "keywords": [
