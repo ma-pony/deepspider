@@ -75,12 +75,33 @@ DEEPSPIDER_MODEL=model-name
 
 ### 使用
 
-```bash
-# Agent 模式（推荐）- 指定目标网站
-pnpm run agent https://example.com
+#### 全局安装（npm/pnpm install -g）
 
-# Agent 模式 - 纯交互（不启动浏览器）
-pnpm run agent
+```bash
+# 配置环境变量
+export DEEPSPIDER_API_KEY=sk-xxx
+export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
+export DEEPSPIDER_MODEL=gpt-4o
+
+# 启动 Agent - 指定目标网站
+deepspider https://example.com
+
+# 启动 Agent - 纯交互模式
+deepspider
+```
+
+#### 克隆仓库
+
+```bash
+# 配置环境变量（二选一）
+cp .env.example .env  # 编辑 .env 文件
+# 或 export DEEPSPIDER_API_KEY=... 等
+
+# 安装 Python 依赖（可选，用于执行生成的 Python 代码）
+pnpm run setup:crypto
+
+# 启动 Agent
+pnpm run agent https://example.com
 
 # MCP 服务（供 Claude Code 等调用）
 pnpm run mcp
