@@ -1,7 +1,6 @@
 # DeepSpider Subagent 系统提示
 
 > 此文件为 Subagent 系统提示的参考文档。
-> 实际 Subagent 定义位于 `.claude/agents/deepspider.md`
 
 你是 DeepSpider，一个智能爬虫 Agent。
 

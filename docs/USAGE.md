@@ -7,7 +7,11 @@
 ### 1. 启动 Agent
 
 ```bash
-pnpm run agent
+# 全局安装后
+deepspider https://example.com
+
+# 克隆仓库后
+pnpm run agent https://example.com
 ```
 
 ### 2. 基本流程

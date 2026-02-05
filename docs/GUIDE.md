@@ -34,8 +34,8 @@ DeepSpider 是一个智能爬虫 Agent，基于 DeepAgents + Patchright 构建�
 deepspider/
 ├── src/
 │   ├── agent/               # DeepAgent 系统
-│   │   ├── tools/           # 39个工具
-│   │   ├── subagents/       # 3个子代理
+│   │   ├── tools/           # 工具集（90+）
+│   │   ├── subagents/       # 7个子代理
 │   │   └── prompts/         # 系统提示
 │   ├── browser/             # 浏览器运行时 (Patchright)
 │   │   ├── client.js        # 反检测浏览器客户端
@@ -53,48 +53,54 @@ deepspider/
 
 ## 安装配置
 
-### 依赖安装
+### 全局安装（推荐）
 
 ```bash
-cd /path/to/deepspider
+# npm
+npm install -g deepspider
+
+# pnpm（需要先批准构建脚本）
+pnpm approve-builds -g deepspider isolated-vm
+pnpm install -g deepspider
+```
+
+### 克隆仓库开发
+
+```bash
+git clone https://github.com/ma-pony/deepspider.git
+cd deepspider
 pnpm install
-```
-
-### 作为 Plugin 安装
-
-```bash
-claude /install /path/to/deepspider
-```
-
-### 本地开发测试 (不安装)
-
-```bash
-claude --plugin-dir /path/to/deepspider
-```
-
-### 独立 CLI 使用
-
-```bash
-pnpm run cli run target.js      # 执行代码
-pnpm run cli analyze target.js  # 分析代码
+cp .env.example .env  # 配置环境变量
+pnpm run setup:crypto  # 安装 Python 依赖（可选）
 ```
 
 ---
 
 ## 使用方式
 
-### 方式一: Commands (斜杠命令)
+### 全局安装后
 
+```bash
+# 配置环境变量
+export DEEPSPIDER_API_KEY=sk-xxx
+export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
+export DEEPSPIDER_MODEL=gpt-4o
+
+# 启动 Agent
+deepspider https://example.com
 ```
-/deepspider:run <file.js>      # 在沙箱中执行并自动补环境
-/deepspider:analyze <file.js>  # 分析代码结构和加密
-/deepspider:deob <file.js>     # 反混淆代码
-/deepspider:trace <param>      # 追踪参数生成逻辑
+
+### 克隆仓库后
+
+```bash
+# 启动 Agent
+pnpm run agent https://example.com
+
+# MCP 服务
+pnpm run mcp
 ```
 
-### 方式二: Agent 对话
-
-直接与 DeepSpider Agent 对话:
+### Agent 对话示例
 
 ```
 分析这段 JS 代码的加密逻辑
@@ -102,13 +108,6 @@ pnpm run cli analyze target.js  # 分析代码
 反混淆这个文件
 追踪 sign 参数的生成过程
 ```
-
-### 方式三: MCP 工具调用
-
-Claude 会自动调用 MCP 工具，工具命名格式:
-- `mcp__deepspider__sandbox_execute`
-- `mcp__deepspider__analyze_ast`
-- `mcp__deepspider__deobfuscate`
 
 ---
 
@@ -302,9 +301,14 @@ export const myTool = tool(
 
 | 子代理 | 职责 |
 |--------|------|
-| static-agent | 预处理、解包、反混淆、加密定位 |
-| dynamic-agent | 浏览器控制、断点、Hook、数据采集 |
-| sandbox-agent | 环境补全、代码执行、补丁生成 |
+| crawler | 爬虫编排：整合各模块、生成完整脚本 |
+| static | 静态分析：解包、反混淆、加密定位 |
+| dynamic | 动态分析：浏览器控制、Hook、数据采集 |
+| sandbox | 沙箱执行：环境补全、代码执行 |
+| js2python | JS转Python：加密代码转换、验证 |
+| env-agent | 环境补全：生成浏览器环境模拟代码 |
+| captcha | 验证码处理：OCR、滑块、点选 |
+| anti-detect | 反检测：指纹管理、代理池 |
 
 ### 知识库
 
