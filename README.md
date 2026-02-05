@@ -22,21 +22,22 @@
 ### 安装
 
 ```bash
-# 方式一：npm 全局安装
+# 方式一：npm 全局安装（推荐）
 npm install -g deepspider
 
-# 方式二：克隆仓库
+# 方式二：pnpm 全局安装
+pnpm approve-builds -g deepspider isolated-vm # 首次需要批准构建脚本
+pnpm install -g deepspider
+
+# 方式三：克隆仓库
 git clone https://github.com/ma-pony/deepspider.git
 cd deepspider
 pnpm install
-
-# 安装 Python 加密库（用于运行生成的 Python 代码）
-pnpm run setup:crypto
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 填入配置（见下方环境变量说明）
+cp .env.example .env  # 配置环境变量
+pnpm run setup:crypto  # 安装 Python 加密库（可选）
 ```
+
+安装完成后，首次运行会提示配置环境变量（LLM API）。
 
 > **注意**: 项目依赖 `isolated-vm` 原生模块，需要 C++ 编译环境：
 > - macOS: `xcode-select --install`
