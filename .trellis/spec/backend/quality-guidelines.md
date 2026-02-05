@@ -193,24 +193,48 @@ console.log('[DeepSpider:' + type + ']' + loc, data);
 
 ## Release Process
 
+### 原生模块依赖处理
+
+项目依赖 `isolated-vm` 等原生 C++ 模块，需要编译环境。
+
+**postinstall 自动处理**:
+```json
+{
+  "scripts": {
+    "postinstall": "patchright install chromium && npm rebuild isolated-vm 2>/dev/null || true"
+  }
+}
+```
+
+**编译环境要求**:
+- macOS: `xcode-select --install`
+- Ubuntu: `sudo apt install build-essential`
+- Windows: Visual Studio Build Tools
+
+> **注意**: `2>/dev/null || true` 确保编译失败不会阻塞安装，但沙箱功能可能不可用。
+
+---
+
 ### 版本发布流程
 
-升级版本时必须同步创建 git tag：
+升级版本并推送 tag，GitHub Actions 会自动发布到 npm：
 
 ```bash
 # 1. 升级 package.json 版本
-npm version patch --no-git-tag-version
+# 编辑 package.json 中的 version 字段
 
 # 2. 提交版本变更
 git add package.json
 git commit -m "chore: bump version to x.x.x"
 
 # 3. 创建并推送 git tag
-git tag vx.x.x
+git tag -a vx.x.x -m "vx.x.x"
 git push && git push origin vx.x.x
 ```
 
-**原因**: npm 版本和 git tag 需要保持同步，便于版本追踪和回溯。
+> **注意**: 推送 tag 后 GitHub Actions 会自动触发 npm 发布，无需手动 `npm publish`。
+
+**原因**: 自动化发布避免手动操作失误，确保版本一致性。
 
 ---
 
