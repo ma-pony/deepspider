@@ -242,6 +242,49 @@ tools: [...analyzerTools, ...deobfuscatorTools, ...traceTools]
 tools: [...analyzerTools, ...browserTools, ...sandboxTools]
 ```
 
+### systemPrompt 按任务类型动态组合
+
+当不同任务类型需要不同的约束时，应拆分提示词并动态组合：
+
+```javascript
+// src/agent/prompts/system.js
+
+// 基础提示 - 适用于所有对话
+export const systemPrompt = `你是 DeepSpider，智能爬虫 Agent。
+
+## 浏览器面板
+当消息以"[浏览器已就绪]"开头时，浏览器已打开，不要再调用 launch_browser。
+
+## 委托子代理
+简单任务自己做，复杂任务委托子代理。`;
+
+// 完整分析专用 - 仅在特定任务时添加
+export const fullAnalysisPrompt = `
+## 完整分析任务要求
+必须完成端到端验证，验证成功后才能保存报告...`;
+```
+
+在消息处理时动态组合：
+
+```javascript
+// src/agent/run.js
+import { fullAnalysisPrompt } from './prompts/system.js';
+
+if (data.type === 'analysis') {
+  // 完整分析：添加强制验证要求
+  userPrompt = `${browserReadyPrefix}用户选中数据要求分析...
+${fullAnalysisPrompt}`;
+} else if (data.type === 'chat') {
+  // 普通聊天：不添加额外约束
+  userPrompt = `${browserReadyPrefix}${data.text}`;
+}
+```
+
+**好处**：
+- 普通聊天不受端到端验证等强制要求约束
+- 减少不必要的 token 消耗
+- 任务类型明确，Agent 行为可预测
+
 ### Skills 只写经验
 
 ```markdown
