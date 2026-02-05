@@ -465,19 +465,19 @@ export const generatePythonCrypto = tool(
 );
 
 /**
- * 执行 Python 加密验证代码
+ * 执行 Python 代码
  */
 export const executePythonCode = tool(
   async ({ code, timeout }) => {
-    const result = await executePython(code, timeout || 10000);
+    const result = await executePython(code, timeout || 30000);
     return JSON.stringify(result);
   },
   {
-    name: 'run_python_crypto_test',
-    description: '运行 Python 加密/解密测试代码。仅用于验证标准加密算法（AES、DES、SM4、MD5、SHA等）的 Python 实现是否正确。不要用于执行 JS 代码或调用 subprocess。',
+    name: 'run_python_code',
+    description: '执行 Python 代码。可用于加密验证、HTTP 请求、数据处理等任务。环境已预装 pycryptodome、requests 等常用库。',
     schema: z.object({
-      code: z.string().describe('纯 Python 加密验证代码，不要包含 subprocess 或调用外部程序'),
-      timeout: z.number().optional().default(10000).describe('超时时间（毫秒）'),
+      code: z.string().describe('Python 代码'),
+      timeout: z.number().optional().default(30000).describe('超时时间（毫秒）'),
     }),
   }
 );

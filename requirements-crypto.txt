@@ -1,14 +1,20 @@
-# JSForge Python 加密库依赖
+# DeepSpider Python 依赖
 # 安装: uv pip install -r requirements-crypto.txt
 
-# 通用加密库
+# 加密库
 pycryptodome>=3.20.0    # AES/DES/RSA/MD5/SHA 等
-
-# 国密算法
-gmssl>=3.2.2            # SM2/SM3/SM4
-
-# RSA
-rsa>=4.9
-
-# 其他常用
+gmssl>=3.2.2            # SM2/SM3/SM4 国密算法
+rsa>=4.9                # RSA
 pyDes>=2.0.1            # DES/3DES
+
+# HTTP 请求
+requests>=2.31.0        # HTTP 客户端
+httpx>=0.27.0           # 异步 HTTP 客户端
+
+# JS 执行
+PyExecJS>=1.5.1         # 执行 JS 代码
+
+# 数据处理
+lxml>=5.0.0             # HTML/XML 解析
+beautifulsoup4>=4.12.0  # HTML 解析
+parsel>=1.8.0           # XPath/CSS 选择器

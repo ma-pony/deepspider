@@ -59,7 +59,7 @@ export const fullAnalysisPrompt = `
 
 #### 第一层：算法验证（必须）
 验证加密/解密函数本身是否正确：
-1. 使用 \`execute_python\` 执行加密/解密代码
+1. 使用 \`run_python_code\` 执行加密/解密代码
 2. 检查：encrypt(plaintext) → ciphertext → decrypt() → plaintext
 
 #### 第二层：端到端验证（必须）
@@ -88,7 +88,7 @@ export const fullAnalysisPrompt = `
 3. **必须在最终输出中告知用户文件保存路径**
 
 **调用 save_analysis_report 的前提条件**（必须全部满足）：
-1. 已使用 \`execute_python\` 或 \`verify_with_python\` 验证代码能正确运行
+1. 已使用 \`run_python_code\` 或 \`verify_with_python\` 验证代码能正确运行
 2. 验证结果与预期一致
 3. 已用 \`artifact_save\` 保存代码文件
 

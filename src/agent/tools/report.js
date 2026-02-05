@@ -129,9 +129,8 @@ export const saveAnalysisReport = tool(
         }
       }
 
-      // 保存 Markdown
+      // 保存 Markdown（先收集所有路径，最后追加文件列表）
       paths.markdown = join(domainDir, 'analysis.md');
-      writeFileSync(paths.markdown, markdown, 'utf-8');
 
       // 保存 Python 代码
       if (finalPythonCode) {
@@ -149,6 +148,13 @@ export const saveAnalysisReport = tool(
       paths.html = join(domainDir, 'report.html');
       const html = generateHtmlPage(title || domain, markdown, finalPythonCode, finalJsCode);
       writeFileSync(paths.html, html, 'utf-8');
+
+      // 在 markdown 末尾自动追加生成文件列表
+      const fileList = Object.entries(paths)
+        .map(([type, p]) => `- ${type}: \`${p}\``)
+        .join('\n');
+      const finalMarkdown = markdown + '\n\n## 生成文件\n\n' + fileList;
+      writeFileSync(paths.markdown, finalMarkdown, 'utf-8');
 
       console.log('[report] 已保存:', domainDir);
       return JSON.stringify({ success: true, paths, dir: domainDir });
