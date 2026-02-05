@@ -35,7 +35,7 @@ export function ensureConfig() {
 
 配置方式（任选其一）：
 
-1. 环境变量（推荐）：
+1. 配置环境变量（推荐）：
    export DEEPSPIDER_API_KEY=sk-xxx
    export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
    export DEEPSPIDER_MODEL=gpt-4o
@@ -43,9 +43,7 @@ export function ensureConfig() {
 2. 一行命令：
    DEEPSPIDER_API_KEY=sk-xxx DEEPSPIDER_BASE_URL=https://api.openai.com/v1 DEEPSPIDER_MODEL=gpt-4o deepspider <url>
 
-常用供应商配置：
-   OpenAI:   BASE_URL=https://api.openai.com/v1      MODEL=gpt-4o
-   DeepSeek: BASE_URL=https://api.deepseek.com/v1   MODEL=deepseek-chat
+请根据提示补全配置后重试。
 `);
 
   return false;
