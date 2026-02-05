@@ -7,7 +7,6 @@ import { join } from 'path';
 import { PATHS, ensureDir, generateFilename } from '../../config/paths.js';
 
 // 导出路径常量（兼容旧代码）
-export const OUTPUT_DIR = PATHS.OUTPUT_DIR;
 export const SCREENSHOTS_DIR = PATHS.SCREENSHOTS_DIR;
 export const REPORTS_DIR = PATHS.REPORTS_DIR;
 export const UNPACKED_DIR = PATHS.UNPACKED_DIR;
