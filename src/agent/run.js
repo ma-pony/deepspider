@@ -10,6 +10,7 @@ import readline from 'readline';
 import { readFileSync } from 'fs';
 import { marked } from 'marked';
 import { createDeepSpiderAgent } from './index.js';
+import { fullAnalysisPrompt } from './prompts/system.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
@@ -491,19 +492,19 @@ async function handleBrowserMessage(data, page) {
     const iframeInfo = data.iframeSrc ? `\niframe来源: ${data.iframeSrc}` : '';
     const analysisType = data.analysisType || 'full';
 
-    // 根据分析类型生成不同的提示
-    const typePrompts = {
-      source: '请使用 search_in_responses 搜索选中文本，定位数据来源请求。',
-      crypto: '请分析该数据涉及的加密逻辑，识别加密算法并生成 Python 代码。',
-      full: '请使用 search_in_responses 搜索选中文本定位来源，分析加密逻辑，生成完整的 Python 代码。'
-    };
+    // 处理多元素选择
+    const elements = data.elements || [{ text: data.text, xpath: data.xpath, iframeSrc: data.iframeSrc }];
+    const elementsDesc = elements.map((el, i) =>
+      `${i + 1}. "${el.text?.slice(0, 100) || ''}"\n   XPath: ${el.xpath}${el.iframeSrc ? `\n   iframe: ${el.iframeSrc}` : ''}`
+    ).join('\n');
 
-    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求分析：
-"${data.text}"
-XPath: ${data.xpath}${iframeInfo}
+    const supplementText = data.text ? `\n\n用户补充说明: ${data.text}` : '';
 
-分析类型: ${analysisType}
-${typePrompts[analysisType] || typePrompts.full}`;
+    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求完整分析：
+
+${elementsDesc}${supplementText}
+
+${fullAnalysisPrompt}`;
   } else if (data.type === 'generate-config') {
     // 生成爬虫配置 - 使用 crawler 子代理
     const config = data.config;

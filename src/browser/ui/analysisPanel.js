@@ -159,6 +159,7 @@ export function getAnalysisPanelScript() {
   const STORAGE_KEY = 'deepspider_chat_messages';
   const STAGES_STORAGE_KEY = 'deepspider_stages';
   const CURRENT_STAGE_KEY = 'deepspider_current_stage';
+  const SELECTED_ELEMENTS_KEY = 'deepspider_selected_elements';
   try {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     deepspider.chatMessages = saved ? JSON.parse(saved) : [];
@@ -181,6 +182,13 @@ export function getAnalysisPanelScript() {
   } catch (e) {
     deepspider.currentStageIndex = 0;
   }
+  // 已选元素列表 - 从 sessionStorage 恢复
+  try {
+    const savedElements = sessionStorage.getItem(SELECTED_ELEMENTS_KEY);
+    deepspider.selectedElements = savedElements ? JSON.parse(savedElements) : [];
+  } catch (e) {
+    deepspider.selectedElements = [];
+  }
   let isSelectMode = false;
   let currentElement = null;
 
@@ -200,6 +208,15 @@ export function getAnalysisPanelScript() {
       sessionStorage.setItem(CURRENT_STAGE_KEY, String(deepspider.currentStageIndex));
     } catch (e) {
       console.warn('[DeepSpider] 保存阶段配置失败:', e);
+    }
+  }
+
+  // 保存已选元素到 sessionStorage
+  function saveSelectedElements() {
+    try {
+      sessionStorage.setItem(SELECTED_ELEMENTS_KEY, JSON.stringify(deepspider.selectedElements));
+    } catch (e) {
+      console.warn('[DeepSpider] 保存已选元素失败:', e);
     }
   }
 
@@ -629,6 +646,122 @@ export function getAnalysisPanelScript() {
       .deepspider-input button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 179, 237, 0.4); }
       .deepspider-input button:active:not(:disabled) { transform: translateY(0); }
       .deepspider-input button:disabled { background: rgba(255,255,255,0.1); color: #6e7681; cursor: not-allowed; box-shadow: none; }
+      /* 已选元素标签区域 */
+      .deepspider-selected-tags {
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(99, 179, 237, 0.15);
+        background: rgba(0,0,0,0.15);
+        display: none;
+      }
+      .deepspider-selected-tags.visible { display: block; }
+      .deepspider-selected-tags-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .deepspider-selected-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(99, 179, 237, 0.15);
+        border: 1px solid rgba(99, 179, 237, 0.25);
+        border-radius: 8px;
+        font-size: 12px;
+        color: #63b3ed;
+        max-width: 200px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .deepspider-selected-tag:hover {
+        background: rgba(99, 179, 237, 0.25);
+        border-color: rgba(99, 179, 237, 0.4);
+      }
+      .deepspider-selected-tag-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+      .deepspider-selected-tag-remove {
+        color: #8b949e;
+        font-size: 14px;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .deepspider-selected-tag-remove:hover { color: #f85149; }
+      .deepspider-add-more-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        background: rgba(255,255,255,0.05);
+        border: 1px dashed rgba(255,255,255,0.2);
+        border-radius: 8px;
+        font-size: 12px;
+        color: #8b949e;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .deepspider-add-more-btn:hover {
+        background: rgba(99, 179, 237, 0.1);
+        border-color: rgba(99, 179, 237, 0.3);
+        color: #63b3ed;
+      }
+      /* 功能按钮行 */
+      .deepspider-action-buttons {
+        display: flex;
+        gap: 8px;
+        padding: 10px 14px;
+        border-top: 1px solid rgba(99, 179, 237, 0.1);
+        background: rgba(0,0,0,0.1);
+      }
+      .deepspider-action-buttons button {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .deepspider-btn-analyze {
+        background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+        border: none;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
+      }
+      .deepspider-btn-analyze:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(128, 90, 213, 0.4);
+      }
+      .deepspider-btn-analyze:disabled {
+        background: rgba(128, 90, 213, 0.3);
+        color: rgba(255,255,255,0.5);
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .deepspider-btn-send-msg {
+        background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
+        border: none;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(99, 179, 237, 0.3);
+      }
+      .deepspider-btn-send-msg:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(99, 179, 237, 0.4);
+      }
+      .deepspider-btn-send-msg:disabled {
+        background: rgba(99, 179, 237, 0.3);
+        color: rgba(255,255,255,0.5);
+        cursor: not-allowed;
+        box-shadow: none;
+      }
       #deepspider-overlay {
         position: fixed;
         pointer-events: none;
@@ -654,154 +787,7 @@ export function getAnalysisPanelScript() {
         box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         border: 1px solid rgba(99, 179, 237, 0.2);
       }
-      /* 元素选择后的操作菜单 */
-      #deepspider-action-modal {
-        display: none;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(13, 17, 23, 0.85);
-        backdrop-filter: blur(4px);
-        z-index: 2147483648;
-        justify-content: center;
-        align-items: center;
-        padding: 24px;
-      }
-      #deepspider-action-modal.visible { display: flex; }
       #deepspider-config-modal.visible { display: flex !important; }
-      .deepspider-action-container {
-        width: 420px;
-        max-height: 80vh;
-        background: linear-gradient(180deg, #1e2530 0%, #161b22 100%);
-        border: 1px solid rgba(99, 179, 237, 0.2);
-        border-radius: 16px;
-        box-shadow: 0 24px 80px rgba(0,0,0,0.5);
-        overflow: hidden;
-        animation: deepspider-modal-in 0.2s ease-out;
-      }
-      .deepspider-action-header {
-        padding: 16px 20px;
-        background: linear-gradient(180deg, rgba(99, 179, 237, 0.08) 0%, transparent 100%);
-        border-bottom: 1px solid rgba(99, 179, 237, 0.15);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .deepspider-action-header h4 {
-        margin: 0;
-        color: #63b3ed;
-        font-size: 15px;
-        font-weight: 600;
-      }
-      .deepspider-action-close {
-        background: transparent;
-        border: none;
-        color: #8b949e;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 4px 8px;
-      }
-      .deepspider-action-close:hover { color: #f85149; }
-      .deepspider-action-content {
-        padding: 16px 20px;
-        max-height: 60vh;
-        overflow-y: auto;
-      }
-      .deepspider-action-preview {
-        background: rgba(0,0,0,0.3);
-        border: 1px solid rgba(99, 179, 237, 0.1);
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 16px;
-        font-size: 12px;
-        color: #8b949e;
-        max-height: 80px;
-        overflow: hidden;
-      }
-      .deepspider-action-preview .xpath {
-        color: #79c0ff;
-        font-family: monospace;
-        font-size: 11px;
-        margin-top: 6px;
-        word-break: break-all;
-      }
-      .deepspider-action-section {
-        margin-bottom: 16px;
-      }
-      .deepspider-action-section label {
-        display: block;
-        color: #8b949e;
-        font-size: 12px;
-        margin-bottom: 8px;
-      }
-      .deepspider-action-input {
-        width: 100%;
-        padding: 10px 12px;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px;
-        color: #c9d1d9;
-        font-size: 13px;
-        outline: none;
-        box-sizing: border-box;
-      }
-      .deepspider-action-input:focus {
-        border-color: rgba(99, 179, 237, 0.5);
-      }
-      .deepspider-action-select {
-        width: 100%;
-        padding: 10px 12px;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px;
-        color: #c9d1d9;
-        font-size: 13px;
-        outline: none;
-        cursor: pointer;
-      }
-      .deepspider-action-btns {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 16px;
-      }
-      .deepspider-action-btn {
-        padding: 12px 16px;
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px;
-        background: rgba(255,255,255,0.05);
-        color: #c9d1d9;
-        font-size: 13px;
-        cursor: pointer;
-        text-align: left;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .deepspider-action-btn:hover {
-        background: rgba(99, 179, 237, 0.15);
-        border-color: rgba(99, 179, 237, 0.3);
-      }
-      .deepspider-action-btn.primary {
-        background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
-        border-color: transparent;
-        color: #fff;
-      }
-      .deepspider-action-btn.primary:hover {
-        box-shadow: 0 4px 12px rgba(99, 179, 237, 0.4);
-      }
-      .deepspider-action-btn.success {
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-        border-color: transparent;
-        color: #fff;
-      }
-      .deepspider-action-btn-icon { font-size: 16px; }
-      .deepspider-action-btn-text { flex: 1; }
-      .deepspider-action-btn-desc {
-        font-size: 11px;
-        color: rgba(255,255,255,0.6);
-        margin-top: 2px;
-      }
     \`;
     document.head.appendChild(style);
 
@@ -827,9 +813,15 @@ export function getAnalysisPanelScript() {
           点击上方 ⦿ 按钮选择页面元素<br>或在下方输入问题开始分析
         </div>
       </div>
+      <div class="deepspider-selected-tags" id="deepspider-selected-tags">
+        <div class="deepspider-selected-tags-list" id="deepspider-selected-tags-list"></div>
+      </div>
       <div class="deepspider-input">
         <textarea id="deepspider-chat-input" placeholder="输入问题，按 Enter 发送..." rows="2"></textarea>
-        <button id="deepspider-btn-send">发送</button>
+      </div>
+      <div class="deepspider-action-buttons" id="deepspider-action-buttons">
+        <button class="deepspider-btn-analyze" id="deepspider-btn-analyze" disabled>📊 完整分析</button>
+        <button class="deepspider-btn-send-msg" id="deepspider-btn-send-msg" disabled>发送</button>
       </div>
     \`;
     document.body.appendChild(panel);
@@ -847,26 +839,6 @@ export function getAnalysisPanelScript() {
       </div>
     \`;
     document.body.appendChild(reportModal);
-
-    // ========== 创建元素操作菜单 ==========
-    const actionModal = document.createElement('div');
-    actionModal.id = 'deepspider-action-modal';
-    actionModal.innerHTML = \`
-      <div class="deepspider-action-container">
-        <div class="deepspider-action-header">
-          <h4>🎯 元素已选中</h4>
-          <button class="deepspider-action-close" id="deepspider-action-close">&times;</button>
-        </div>
-        <div class="deepspider-action-content">
-          <div class="deepspider-action-preview" id="deepspider-action-preview">
-            <div class="text"></div>
-            <div class="xpath"></div>
-          </div>
-          <div class="deepspider-action-btns" id="deepspider-action-btns"></div>
-        </div>
-      </div>
-    \`;
-    document.body.appendChild(actionModal);
 
     // ========== 创建配置弹窗 ==========
     const configModal = document.createElement('div');
@@ -910,85 +882,9 @@ export function getAnalysisPanelScript() {
     });
     document.getElementById('deepspider-config-submit').onclick = submitConfig;
 
-    // 操作菜单状态
-    let pendingSelection = null;
-
-    // 关闭操作菜单
-    document.getElementById('deepspider-action-close').onclick = () => {
-      actionModal.classList.remove('visible');
-      pendingSelection = null;
-    };
-    actionModal.addEventListener('click', (e) => {
-      if (e.target === actionModal) {
-        actionModal.classList.remove('visible');
-        pendingSelection = null;
-      }
-    });
-
-    // 显示操作菜单
-    function showActionMenu(selection) {
-      pendingSelection = selection;
-      const preview = document.getElementById('deepspider-action-preview');
-      preview.querySelector('.text').textContent = selection.text.slice(0, 100) + (selection.text.length > 100 ? '...' : '');
-      preview.querySelector('.xpath').textContent = selection.xpath;
-
-      const btnsContainer = document.getElementById('deepspider-action-btns');
-      btnsContainer.innerHTML = \`
-        <button class="deepspider-action-btn primary" data-action="full-analysis">
-          <span class="deepspider-action-btn-icon">📊</span>
-          <div class="deepspider-action-btn-text">
-            分析数据来源
-            <div class="deepspider-action-btn-desc">定位接口 + 分析加密 + 生成代码</div>
-          </div>
-        </button>
-      \`;
-
-      // 绑定按钮事件
-      btnsContainer.querySelectorAll('button').forEach(btn => {
-        btn.onclick = () => handleAction(btn.dataset.action);
-      });
-
-      actionModal.classList.add('visible');
-    }
-
-    // 处理操作菜单的动作
-    function handleAction(action) {
-      if (!pendingSelection) return;
-
-      switch (action) {
-        case 'full-analysis':
-          sendAnalysis('full', pendingSelection);
-          break;
-      }
-      actionModal.classList.remove('visible');
-    }
-
     // 创建空阶段对象
     function createStage(name) {
       return { name: name, fields: [], entry: null, pagination: null };
-    }
-
-    // 发送分析请求
-    function sendAnalysis(analysisType, selection) {
-      panel.classList.add('visible');
-      const typeLabels = {
-        source: '追踪数据来源',
-        crypto: '分析加密逻辑',
-        full: '完整流程分析'
-      };
-      addMessage('user', typeLabels[analysisType] + ': ' + selection.text.slice(0, 80));
-      addMessage('system', '分析中...');
-
-      if (typeof __deepspider_send__ === 'function') {
-        __deepspider_send__(JSON.stringify({
-          type: 'analysis',
-          analysisType: analysisType,
-          text: selection.text,
-          xpath: selection.xpath,
-          url: location.href,
-          iframeSrc: selection.iframeSrc
-        }));
-      }
     }
 
     // 更新阶段面板显示
@@ -1368,10 +1264,12 @@ export function getAnalysisPanelScript() {
       e.stopPropagation();
       const text = currentElement.innerText?.trim().slice(0, 500) || '';
       const xpath = getXPath(currentElement);
-      stopSelectMode();
 
-      // 显示操作菜单而不是直接发送分析
-      showActionMenu({ text, xpath, url: location.href });
+      // 添加到已选元素列表而非弹出菜单
+      addSelectedElement({ text, xpath, url: location.href });
+
+      // 保持选择模式，允许继续选择
+      // 不调用 stopSelectMode()
     }
 
     function onSelectKey(e) {
@@ -1497,29 +1395,149 @@ export function getAnalysisPanelScript() {
 
     // ========== 对话输入 ==========
     const chatInput = document.getElementById('deepspider-chat-input');
-    document.getElementById('deepspider-btn-send').onclick = sendChat;
+    const analyzeBtn = document.getElementById('deepspider-btn-analyze');
+    const sendMsgBtn = document.getElementById('deepspider-btn-send-msg');
+
+    // ========== 已选元素管理 ==========
+    function addSelectedElement(element) {
+      // 检查是否已存在相同 xpath 的元素
+      const exists = deepspider.selectedElements.some(el => el.xpath === element.xpath);
+      if (exists) return;
+
+      deepspider.selectedElements.push(element);
+      saveSelectedElements();
+      renderSelectedTags();
+      updateActionButtons();
+    }
+
+    function removeSelectedElement(index) {
+      if (index < 0 || index >= deepspider.selectedElements.length) return;
+      deepspider.selectedElements.splice(index, 1);
+      saveSelectedElements();
+      renderSelectedTags();
+      updateActionButtons();
+    }
+
+    function clearSelectedElements() {
+      deepspider.selectedElements = [];
+      saveSelectedElements();
+      renderSelectedTags();
+      updateActionButtons();
+    }
+
+    function renderSelectedTags() {
+      const container = document.getElementById('deepspider-selected-tags');
+      const list = document.getElementById('deepspider-selected-tags-list');
+      const elements = deepspider.selectedElements;
+
+      if (elements.length === 0) {
+        container.classList.remove('visible');
+        return;
+      }
+
+      container.classList.add('visible');
+
+      const tagsHtml = elements.map((el, i) => {
+        const displayText = el.text.slice(0, 20) + (el.text.length > 20 ? '...' : '');
+        return '<span class="deepspider-selected-tag" data-index="' + i + '" title="' + escapeHtml(el.text.slice(0, 100)) + '">' +
+          '<span class="deepspider-selected-tag-text">' + escapeHtml(displayText) + '</span>' +
+          '<span class="deepspider-selected-tag-remove" data-remove="' + i + '">&times;</span>' +
+        '</span>';
+      }).join('');
+
+      const addMoreBtn = '<span class="deepspider-add-more-btn" id="deepspider-add-more">+ 继续选择</span>';
+
+      list.innerHTML = tagsHtml + addMoreBtn;
+
+      // 绑定删除事件
+      list.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          removeSelectedElement(parseInt(btn.dataset.remove));
+        };
+      });
+
+      // 绑定继续选择按钮
+      document.getElementById('deepspider-add-more').onclick = () => {
+        startSelectMode();
+      };
+    }
+
+    function updateActionButtons() {
+      const hasElements = deepspider.selectedElements.length > 0;
+      const hasText = chatInput.value.trim().length > 0;
+
+      analyzeBtn.disabled = !hasElements;
+      sendMsgBtn.disabled = !hasText && !hasElements;
+    }
+
+    // 监听输入框变化
+    chatInput.oninput = updateActionButtons;
+
+    // 绑定按钮事件
+    analyzeBtn.onclick = sendAnalysisWithElements;
+    sendMsgBtn.onclick = sendChat;
     chatInput.onkeydown = (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
     };
 
     function sendChat() {
       const text = chatInput.value.trim();
+      const elements = deepspider.selectedElements;
+
+      // 如果有已选元素，发送分析请求
+      if (elements.length > 0) {
+        sendAnalysisWithElements();
+        return;
+      }
+
+      // 纯文字对话
       if (!text) return;
       chatInput.value = '';
       addMessage('user', text);
       if (typeof __deepspider_send__ === 'function') {
         __deepspider_send__(JSON.stringify({ type: 'chat', text }));
       }
+      updateActionButtons();
+    }
+
+    // 发送完整分析（带已选元素）
+    function sendAnalysisWithElements() {
+      const elements = deepspider.selectedElements;
+      if (elements.length === 0) return;
+
+      const text = chatInput.value.trim();
+      const elementsText = elements.map(el => el.text.slice(0, 50)).join(', ');
+      const displayMsg = (text ? text + ' - ' : '完整分析: ') + elementsText.slice(0, 80);
+
+      panel.classList.add('visible');
+      addMessage('user', displayMsg);
+      addMessage('system', '分析中...');
+
+      if (typeof __deepspider_send__ === 'function') {
+        __deepspider_send__(JSON.stringify({
+          type: 'analysis',
+          analysisType: 'full',
+          elements: elements,
+          text: text,
+          url: location.href
+        }));
+      }
+
+      // 清空已选元素和输入框
+      chatInput.value = '';
+      clearSelectedElements();
     }
 
     // ========== 监听 iframe 选中结果 ==========
     window.addEventListener('message', (e) => {
       if (e.data?.type === 'deepspider-iframe-selection') {
         const { text, xpath, iframeSrc } = e.data;
-        stopSelectMode();
 
-        // 显示操作菜单而不是直接发送分析
-        showActionMenu({ text, xpath, url: location.href, iframeSrc });
+        // 添加到已选元素列表而非弹出菜单
+        addSelectedElement({ text, xpath, url: location.href, iframeSrc });
+
+        // 保持选择模式，允许继续选择
       }
     });
 
@@ -1708,6 +1726,8 @@ export function getAnalysisPanelScript() {
     deepspider.maximize = maximize;
     deepspider.getStages = () => deepspider.stages;
     deepspider.clearStages = clearAll;
+    deepspider.getSelectedElements = () => deepspider.selectedElements;
+    deepspider.clearSelectedElements = clearSelectedElements;
 
     // 自动显示面板
     panel.classList.add('visible');
@@ -1715,6 +1735,9 @@ export function getAnalysisPanelScript() {
     renderMessages();
     // 恢复阶段面板
     updateStagesPanel();
+    // 恢复已选元素标签
+    renderSelectedTags();
+    updateActionButtons();
     console.log('[DeepSpider UI] 分析面板已加载');
   }
 
