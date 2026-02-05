@@ -248,6 +248,103 @@ export const getPageInfo = tool(
 );
 
 /**
+ * 获取页面源代码 - CDP（支持分片）
+ */
+export const getPageSource = tool(
+  async ({ type, chunk, chunkSize }) => {
+    const browser = await getBrowser();
+    let html;
+    if (type === 'outer') {
+      html = await cdpEvaluate(browser, 'document.documentElement.outerHTML');
+    } else {
+      html = await cdpEvaluate(browser, 'document.body.innerHTML');
+    }
+    const totalLength = html?.length || 0;
+    const totalChunks = Math.ceil(totalLength / chunkSize);
+
+    // 分片返回
+    const start = chunk * chunkSize;
+    const end = Math.min(start + chunkSize, totalLength);
+    const content = html.substring(start, end);
+
+    return JSON.stringify({
+      success: true,
+      totalLength,
+      totalChunks,
+      chunk,
+      chunkSize,
+      start,
+      end,
+      content,
+    });
+  },
+  {
+    name: 'get_page_source',
+    description: '获取当前页面的 HTML 源代码（支持分片获取大页面）',
+    schema: z.object({
+      type: z.enum(['body', 'outer']).default('body').describe('body: body 内容；outer: 完整 HTML'),
+      chunk: z.number().default(0).describe('分片索引，从 0 开始'),
+      chunkSize: z.number().default(50000).describe('每片大小（字符数），默认 50000'),
+    }),
+  }
+);
+
+/**
+ * 获取元素 HTML - CDP（支持分片）
+ */
+export const getElementHtml = tool(
+  async ({ selector, type, selectorType, chunk, chunkSize }) => {
+    const browser = await getBrowser();
+    const prop = type === 'outer' ? 'outerHTML' : 'innerHTML';
+
+    let expression;
+    if (selectorType === 'xpath') {
+      expression = `
+        (function() {
+          const result = document.evaluate('${selector.replace(/'/g, "\\'")}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          const el = result.singleNodeValue;
+          return el ? el.${prop} : null;
+        })()
+      `;
+    } else {
+      expression = `document.querySelector('${selector.replace(/'/g, "\\'")}')?.${prop}`;
+    }
+
+    const html = await cdpEvaluate(browser, expression);
+    if (!html) {
+      return JSON.stringify({ success: false, error: '元素未找到', selector });
+    }
+
+    const totalLength = html.length;
+    const totalChunks = Math.ceil(totalLength / chunkSize);
+    const start = chunk * chunkSize;
+    const end = Math.min(start + chunkSize, totalLength);
+    const content = html.substring(start, end);
+
+    return JSON.stringify({
+      success: true,
+      totalLength,
+      totalChunks,
+      chunk,
+      start,
+      end,
+      content,
+    });
+  },
+  {
+    name: 'get_element_html',
+    description: '根据选择器获取元素的 HTML 内容（支持分片）',
+    schema: z.object({
+      selector: z.string().describe('CSS 选择器或 XPath'),
+      selectorType: z.enum(['css', 'xpath']).default('css').describe('选择器类型'),
+      type: z.enum(['inner', 'outer']).default('outer').describe('inner/outer'),
+      chunk: z.number().default(0).describe('分片索引，从 0 开始'),
+      chunkSize: z.number().default(50000).describe('每片大小，默认 50000'),
+    }),
+  }
+);
+
+/**
  * 获取浏览器 Cookie - CDP
  */
 export const getCookies = tool(
@@ -320,5 +417,7 @@ export const browserTools = [
   pressKey,
   hoverElement,
   getPageInfo,
+  getPageSource,
+  getElementHtml,
   getCookies,
 ];

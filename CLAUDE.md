@@ -2,6 +2,11 @@
 
 > 基于 DeepAgents + Patchright 的智能爬虫 Agent，覆盖爬虫全生命周期
 
+## 分析方法论
+
+** 每次都分别从资深爬虫工程师和资深技术架构师的两个角度进行理性的辩论性的分析。**
+从最佳实践出发，结合当前项目的实际架构。
+
 ## 功能
 
 ### 逆向分析
@@ -155,6 +160,24 @@ pnpm run agent https://example.com
 ```
 
 ## 代码规范
+
+### Hook 内部数据过滤
+
+系统内部操作（消息存储、前后端通信）不应触发 Hook 记录。使用统一标记过滤：
+
+```javascript
+// Storage: 使用 deepspider_ 前缀
+sessionStorage.setItem('deepspider_messages', data);  // 不触发 Hook
+
+// JSON: 使用 __ds__ 标记
+const msg = { __ds__: true, type: 'chat', text: '...' };  // 不触发 Hook
+```
+
+| 场景 | 过滤方式 | 示例 |
+|------|----------|------|
+| sessionStorage | `deepspider_` 前缀 | `deepspider_chat_messages` |
+| 发送到后端的消息 | `__ds__: true` | `{ __ds__: true, type: 'chat' }` |
+| 面板消息对象 | `__ds__: true` | `{ __ds__: true, role, content }` |
 
 ### 浏览器交互
 

@@ -104,6 +104,46 @@ for (const trap in handler) {
 }
 ```
 
+### 4. 内部操作触发 Hook
+
+**问题**: 系统内部的消息发送、状态存储等操作也会触发 Hook，产生噪音日志。
+
+```javascript
+// ❌ 错误：内部操作被记录
+sessionStorage.setItem('deepspider_messages', JSON.stringify(messages));
+// 触发 Storage Hook 和 JSON Hook，污染日志
+```
+
+**解决方案**: 使用统一标记过滤内部数据。
+
+1. **Storage Hook**: 使用 `deepspider_` 前缀过滤 key
+```javascript
+const INTERNAL_PREFIX = 'deepspider_';
+storage.setItem = function(key, value) {
+  if (!key.startsWith(INTERNAL_PREFIX)) {
+    deepspider.log('storage', { ... });
+  }
+  return origSet(key, value);
+};
+```
+
+2. **JSON Hook**: 使用 `__ds__` 标记过滤内部数据
+```javascript
+// 内部消息添加标记
+const msg = { __ds__: true, type: 'chat', text: '...' };
+
+// Hook 中检查标记
+const INTERNAL_MARKER = '"__ds__":true';
+if (!result.includes(INTERNAL_MARKER)) {
+  deepspider.log('json', { ... });
+}
+```
+
+**规范**:
+- sessionStorage/localStorage key 必须以 `deepspider_` 开头
+- 发送到后端的 JSON 消息必须包含 `__ds__: true`
+- 面板消息对象必须包含 `__ds__: true`
+
 ---
 
 ## Anti-Detection Patterns

@@ -185,11 +185,14 @@ function getJSONHooks() {
 
   const OriginalParse = JSON.parse;
   const OriginalStringify = JSON.stringify;
-  const MIN_LOG_LENGTH = 50; // 只记录长度超过 50 的数据
+  const MIN_LOG_LENGTH = 50;
+
+  // 内部数据标记 - 跳过 DeepSpider 内部操作
+  const INTERNAL_MARKER = '"__ds__":true';
 
   JSON.parse = deepspider.native(function(text, reviver) {
     const textStr = String(text);
-    if (textStr.length >= MIN_LOG_LENGTH) {
+    if (textStr.length >= MIN_LOG_LENGTH && !textStr.includes(INTERNAL_MARKER)) {
       deepspider.log('json', {
         action: 'parse',
         input: textStr.slice(0, 200),
@@ -201,7 +204,7 @@ function getJSONHooks() {
 
   JSON.stringify = deepspider.native(function(value, replacer, space) {
     const result = OriginalStringify.call(JSON, value, replacer, space);
-    if (result && result.length >= MIN_LOG_LENGTH) {
+    if (result && result.length >= MIN_LOG_LENGTH && !result.includes(INTERNAL_MARKER)) {
       deepspider.log('json', {
         action: 'stringify',
         output: result.slice(0, 200),
@@ -297,18 +300,27 @@ function getStorageHooks() {
   const deepspider = window.__deepspider__;
   if (!deepspider) return;
 
+  // 内部使用的 key 前缀，不记录日志
+  const INTERNAL_PREFIX = 'deepspider_';
+
   function hookStorage(storage, name) {
     const origGet = storage.getItem.bind(storage);
     const origSet = storage.setItem.bind(storage);
 
     storage.getItem = deepspider.native(function(key) {
       const value = origGet(key);
-      deepspider.log('storage', { action: 'get', storage: name, key: key, value: value?.slice(0, 100) });
+      // 跳过内部 key
+      if (!key.startsWith(INTERNAL_PREFIX)) {
+        deepspider.log('storage', { action: 'get', storage: name, key: key, value: value?.slice(0, 100) });
+      }
       return value;
     }, origGet);
 
     storage.setItem = deepspider.native(function(key, value) {
-      deepspider.log('storage', { action: 'set', storage: name, key: key, value: String(value).slice(0, 100) });
+      // 跳过内部 key
+      if (!key.startsWith(INTERNAL_PREFIX)) {
+        deepspider.log('storage', { action: 'set', storage: name, key: key, value: String(value).slice(0, 100) });
+      }
       return origSet(key, value);
     }, origSet);
   }

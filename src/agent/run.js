@@ -288,6 +288,9 @@ async function chatStream(input, page = null, retryCount = 0) {
     debug('chatStream: 刷新剩余内容');
     await flushPanelText();
 
+    // 流式输出完成，触发 Markdown 渲染
+    await evaluateInPage('window.__deepspider__?.finalizeMessage?.("assistant")');
+
     // 清除忙碌状态
     await evaluateInPage('window.__deepspider__?.setBusy?.(false)');
 
@@ -489,9 +492,6 @@ async function handleBrowserMessage(data, page) {
 
   let userPrompt;
   if (data.type === 'analysis') {
-    const iframeInfo = data.iframeSrc ? `\niframe来源: ${data.iframeSrc}` : '';
-    const analysisType = data.analysisType || 'full';
-
     // 处理多元素选择
     const elements = data.elements || [{ text: data.text, xpath: data.xpath, iframeSrc: data.iframeSrc }];
     const elementsDesc = elements.map((el, i) =>
@@ -517,7 +517,18 @@ ${JSON.stringify(config.fields, null, 2)}
 
 请先用 query_store 查询已有的加密代码，然后整合生成配置和脚本。`;
   } else if (data.type === 'chat') {
-    userPrompt = `${browserReadyPrefix}${data.text}`;
+    // 普通对话，可能带有已选元素作为上下文
+    if (data.elements && data.elements.length > 0) {
+      const elementsDesc = data.elements.map((el, i) =>
+        `${i + 1}. "${el.text?.slice(0, 100) || ''}"\n   XPath: ${el.xpath}`
+      ).join('\n');
+      userPrompt = `${browserReadyPrefix}${data.text}
+
+用户选中的元素：
+${elementsDesc}`;
+    } else {
+      userPrompt = `${browserReadyPrefix}${data.text}`;
+    }
   } else if (data.type === 'open-file') {
     // 打开文件 - 使用系统默认程序
     let filePath = data.path;

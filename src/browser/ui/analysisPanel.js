@@ -597,6 +597,12 @@ export function getAnalysisPanelScript() {
         margin-right: 40px;
         border: 1px solid rgba(99, 179, 237, 0.15);
       }
+      .deepspider-msg-assistant.streaming {
+        white-space: pre-wrap;
+        font-family: 'SF Mono', 'Monaco', monospace;
+        font-size: 12px;
+        opacity: 0.9;
+      }
       .deepspider-msg-system {
         background: transparent;
         text-align: center;
@@ -1128,6 +1134,7 @@ export function getAnalysisPanelScript() {
 
       if (typeof __deepspider_send__ === 'function') {
         __deepspider_send__(JSON.stringify({
+          __ds__: true,
           type: 'generate-config',
           config: config,
           url: location.href
@@ -1259,6 +1266,12 @@ export function getAnalysisPanelScript() {
     }
 
     function onSelectClick(e) {
+      // 检查点击目标是否是面板元素，如果是则不阻止事件
+      const clickTarget = e.target;
+      if (clickTarget.id?.startsWith('deepspider-') || clickTarget.closest('#deepspider-panel')) {
+        return;
+      }
+
       if (!currentElement) return;
       e.preventDefault();
       e.stopPropagation();
@@ -1281,12 +1294,20 @@ export function getAnalysisPanelScript() {
       else startSelectMode();
     };
 
+    // ESC 键全局监听（备用）
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isSelectMode) {
+        stopSelectMode();
+      }
+    });
+
     // ========== 消息渲染 ==========
     const messagesEl = document.getElementById('deepspider-messages');
 
-    function addMessage(role, content) {
-      console.log('[DeepSpider UI] addMessage:', role, content?.slice(0, 50));
-      deepspider.chatMessages.push({ role, content, time: Date.now() });
+    function addMessage(role, content, complete = true) {
+      // assistant 消息默认未完成（等待流式输出结束）
+      const isComplete = role === 'assistant' ? complete : true;
+      deepspider.chatMessages.push({ __ds__: true, role, content, time: Date.now(), complete: isComplete });
       saveMessages();
       renderMessages();
     }
@@ -1302,9 +1323,16 @@ export function getAnalysisPanelScript() {
         \`;
       } else {
         messagesEl.innerHTML = msgs.map(m => {
-          // assistant 消息使用 Markdown 解析，其他消息转义
-          const content = m.role === 'assistant' ? parseMarkdown(m.content) : escapeHtml(m.content);
-          return '<div class="deepspider-msg deepspider-msg-' + m.role + '">' + content + '</div>';
+          let content;
+          // 兼容旧消息：没有 complete 字段视为已完成
+          const isComplete = m.complete !== false;
+          if (m.role === 'assistant') {
+            content = isComplete ? parseMarkdown(m.content) : escapeHtml(m.content);
+          } else {
+            content = escapeHtml(m.content);
+          }
+          const streamingClass = (m.role === 'assistant' && !isComplete) ? ' streaming' : '';
+          return '<div class="deepspider-msg deepspider-msg-' + m.role + streamingClass + '">' + content + '</div>';
         }).join('');
         // 在 DOM 上处理文件路径链接化
         linkifyFilePaths(messagesEl);
@@ -1356,7 +1384,7 @@ export function getAnalysisPanelScript() {
         el.onclick = () => {
           const filePath = el.dataset.filePath;
           if (filePath && typeof __deepspider_send__ === 'function') {
-            __deepspider_send__(JSON.stringify({ type: 'open-file', path: filePath }));
+            __deepspider_send__(JSON.stringify({ __ds__: true, type: 'open-file', path: filePath }));
           }
         };
       });
@@ -1365,6 +1393,13 @@ export function getAnalysisPanelScript() {
     // 使用 marked.js 解析 Markdown
     function parseMarkdown(text) {
       if (!text) return '';
+
+      // 检测是否已经是 HTML（避免重复解析）
+      const trimmed = text.trim();
+      if (trimmed.startsWith('<') && /<[a-z][^>]*>/i.test(trimmed)) {
+        return text;
+      }
+
       // 如果 marked 已加载则使用
       if (window.marked && window.marked.parse) {
         try {
@@ -1373,10 +1408,21 @@ export function getAnalysisPanelScript() {
           console.warn('[DeepSpider] marked parse error:', e);
         }
       }
+
       // 降级：简单 Markdown 解析
-      let html = escapeHtml(text);
-      // 代码块
-      html = html.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, '<pre><code>$2</code></pre>');
+      // 先提取代码块保护起来
+      const codeBlocks = [];
+      let html = text.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, (_, lang, code) => {
+        codeBlocks.push('<pre><code>' + escapeHtml(code) + '</code></pre>');
+        return '___CODE_BLOCK_' + (codeBlocks.length - 1) + '___';
+      });
+
+      // 转义 HTML
+      html = escapeHtml(html);
+
+      // 还原代码块
+      html = html.replace(/___CODE_BLOCK_(\\d+)___/g, (_, i) => codeBlocks[parseInt(i)]);
+
       // 行内代码
       html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
       // 标题
@@ -1388,6 +1434,8 @@ export function getAnalysisPanelScript() {
       // 列表
       html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
       html = html.replace(/^(\\d+)\\. (.+)$/gm, '<li>$2</li>');
+      // 链接
+      html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
       // 换行
       html = html.replace(/\\n/g, '<br>');
       return html;
@@ -1485,9 +1533,9 @@ export function getAnalysisPanelScript() {
       const text = chatInput.value.trim();
       const elements = deepspider.selectedElements;
 
-      // 如果有已选元素，发送分析请求
+      // 如果有已选元素，发送带元素的对话（不是完整分析）
       if (elements.length > 0) {
-        sendAnalysisWithElements();
+        sendChatWithElements();
         return;
       }
 
@@ -1496,9 +1544,35 @@ export function getAnalysisPanelScript() {
       chatInput.value = '';
       addMessage('user', text);
       if (typeof __deepspider_send__ === 'function') {
-        __deepspider_send__(JSON.stringify({ type: 'chat', text }));
+        __deepspider_send__(JSON.stringify({ __ds__: true, type: 'chat', text }));
       }
       updateActionButtons();
+    }
+
+    // 发送带元素的对话（用户输入文字 + 已选元素，不触发完整分析流程）
+    function sendChatWithElements() {
+      const elements = deepspider.selectedElements;
+      const text = chatInput.value.trim();
+      if (elements.length === 0 && !text) return;
+
+      const elementsText = elements.map(el => el.text.slice(0, 50)).join(', ');
+      const displayMsg = text + (elements.length > 0 ? ' [' + elementsText.slice(0, 60) + ']' : '');
+
+      panel.classList.add('visible');
+      addMessage('user', displayMsg);
+
+      if (typeof __deepspider_send__ === 'function') {
+        __deepspider_send__(JSON.stringify({
+          __ds__: true,
+          type: 'chat',
+          text: text,
+          elements: elements,
+          url: location.href
+        }));
+      }
+
+      chatInput.value = '';
+      clearSelectedElements();
     }
 
     // 发送完整分析（带已选元素）
@@ -1516,6 +1590,7 @@ export function getAnalysisPanelScript() {
 
       if (typeof __deepspider_send__ === 'function') {
         __deepspider_send__(JSON.stringify({
+          __ds__: true,
           type: 'analysis',
           analysisType: 'full',
           elements: elements,
@@ -1541,22 +1616,40 @@ export function getAnalysisPanelScript() {
       }
     });
 
-    // ========== 追加到最后一条消息 ==========
+    // ========== 追加到最后一条消息（流式输出优化） ==========
     function appendToLastMessage(role, text) {
-      console.log('[DeepSpider UI] appendToLastMessage:', role, text?.slice(0, 50));
       const msgs = deepspider.chatMessages;
-      // 查找最后一条同角色消息
+      // 查找最后一条同角色的未完成消息
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === role) {
+        if (msgs[i].role === role && !msgs[i].complete) {
           msgs[i].content += text;
-          saveMessages();
-          renderMessages();
+          // 流式输出时直接操作 DOM，不重新渲染
+          const msgElements = messagesEl.querySelectorAll('.deepspider-msg-' + role);
+          const lastMsgEl = msgElements[msgElements.length - 1];
+          if (lastMsgEl) {
+            lastMsgEl.textContent = msgs[i].content;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
           return true;
         }
       }
-      // 没找到则创建新消息
-      addMessage(role, text);
+      // 没找到则创建新的未完成消息
+      addMessage(role, text, false);
       return true;
+    }
+
+    // 完成流式输出后调用，标记完成并渲染 Markdown
+    function finalizeMessage(role) {
+      const msgs = deepspider.chatMessages;
+      // 找到最后一条未完成的消息，标记为完成
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === role && !msgs[i].complete) {
+          msgs[i].complete = true;
+          break;
+        }
+      }
+      saveMessages();
+      renderMessages();
     }
 
     // ========== 更新最后一条消息（替换内容） ==========
@@ -1715,6 +1808,7 @@ export function getAnalysisPanelScript() {
     deepspider.hidePanel = () => panel.classList.remove('visible');
     deepspider.addMessage = addMessage;
     deepspider.appendToLastMessage = appendToLastMessage;
+    deepspider.finalizeMessage = finalizeMessage;
     deepspider.updateLastMessage = updateLastMessage;
     deepspider.renderMessages = renderMessages;
     deepspider.clearMessages = () => { deepspider.chatMessages = []; saveMessages(); renderMessages(); };
