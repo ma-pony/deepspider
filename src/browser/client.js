@@ -4,13 +4,15 @@
  */
 
 import { chromium } from 'patchright';
+import { EventEmitter } from 'events';
 import { getDefaultHookScript } from './defaultHooks.js';
 import { NetworkInterceptor } from './interceptors/NetworkInterceptor.js';
 import { ScriptInterceptor } from './interceptors/ScriptInterceptor.js';
 import { getDataStore } from '../store/DataStore.js';
 
-export class BrowserClient {
+export class BrowserClient extends EventEmitter {
   constructor() {
+    super();
     this.browser = null;
     this.context = null;
     this.page = null;
@@ -20,6 +22,7 @@ export class BrowserClient {
     this.scriptInterceptor = null;
     this.hookScript = null;
     this.onMessage = null;
+    this._isCleaningUp = false;
   }
 
   /**
@@ -51,6 +54,8 @@ export class BrowserClient {
     }
 
     this.browser = await chromium.launch(launchOptions);
+    this.emit('launched', { headless });
+
     this.context = await this.browser.newContext({
       ignoreHTTPSErrors: true,
     });
@@ -183,15 +188,47 @@ export class BrowserClient {
    * 关闭浏览器
    */
   async close() {
-    if (this.cdpSession) {
-      await this.cdpSession.detach().catch(() => {});
-      this.cdpSession = null;
-    }
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.context = null;
-      this.page = null;
+    await this.cleanup();
+  }
+
+  /**
+   * 清理所有资源
+   */
+  async cleanup() {
+    if (this._isCleaningUp) return;
+    this._isCleaningUp = true;
+
+    try {
+      // 停止拦截器
+      if (this.networkInterceptor) {
+        await this.networkInterceptor.stop?.().catch(() => {});
+        this.networkInterceptor = null;
+      }
+      if (this.scriptInterceptor) {
+        await this.scriptInterceptor.stop?.().catch(() => {});
+        this.scriptInterceptor = null;
+      }
+
+      // 分离 CDP session
+      if (this.cdpSession) {
+        await this.cdpSession.detach().catch(() => {});
+        this.cdpSession = null;
+      }
+
+      // 关闭浏览器
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
+        this.context = null;
+        this.page = null;
+        this.pages = [];
+      }
+
+      this.emit('closed');
+    } catch (e) {
+      this.emit('error', e);
+    } finally {
+      this._isCleaningUp = false;
     }
   }
 }

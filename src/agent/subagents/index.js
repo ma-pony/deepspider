@@ -2,6 +2,9 @@
  * DeepSpider - 子代理索引
  */
 
+// 工厂函数
+export { createSubagent, SKILLS } from './factory.js';
+
 // 编排层
 export { crawlerSubagent } from './crawler.js';
 

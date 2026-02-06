@@ -17,7 +17,16 @@ DeepSpider 是一个 Node.js 后端项目，基于 DeepAgents + Patchright 构�
 src/
 ├── agent/                 # DeepAgent 系统（核心）
 │   ├── index.js           # Agent 主入口，createDeepSpiderAgent()
-│   ├── run.js             # Agent 运行入口
+│   ├── run.js             # Agent 运行入口（精简协调器）
+│   ├── core/              # 核心运行时模块
+│   │   ├── index.js       # 模块导出
+│   │   ├── StreamHandler.js  # 流式输出处理
+│   │   ├── RetryManager.js   # 重试策略
+│   │   └── PanelBridge.js    # 面板通信桥接
+│   ├── errors/            # 错误处理模块
+│   │   ├── index.js       # 模块导出
+│   │   ├── ErrorClassifier.js # 错误分类器
+│   │   └── SpiderError.js    # 结构化错误类型
 │   ├── tools/             # LangChain 工具集（90+）
 │   │   ├── index.js       # 工具导出汇总
 │   │   ├── analyzer.js    # AST 分析工具
@@ -25,6 +34,7 @@ src/
 │   │   └── ...
 │   ├── subagents/         # 子代理定义
 │   │   ├── index.js       # 子代理导出
+│   │   ├── factory.js     # 子代理工厂函数
 │   │   ├── static.js      # 静态分析子代理
 │   │   ├── dynamic.js     # 动态分析子代理
 │   │   └── sandbox.js     # 沙箱执行子代理
@@ -76,16 +86,20 @@ src/
 ### 新功能开发指南
 
 1. **新增工具**: 在 `src/agent/tools/` 下创建文件，导出工具数组，在 `index.js` 中汇总
-2. **新增子代理**: 在 `src/agent/subagents/` 下创建文件，定义 subagent 对象
+2. **新增子代理**: 在 `src/agent/subagents/` 下创建文件，使用 `createSubagent()` 工厂函数
 3. **新增 Skill**: 在 `src/agent/skills/` 下创建目录，包含 `SKILL.md` 文件
 4. **新增分析器**: 在 `src/analyzer/` 下创建类文件
 5. **新增 Hook**: 在 `src/browser/hooks/` 或 `src/env/` 下创建
 6. **新增环境模拟**: 在 `src/env/modules/` 对应子目录下创建
+7. **新增核心模块**: 在 `src/agent/core/` 下创建，用于运行时逻辑
+8. **新增错误类型**: 在 `src/agent/errors/` 下扩展 `SpiderError` 类
 
 ### 模块依赖关系
 
 ```
 agent/ ──────> tools/, subagents/, skills/, prompts/
+   │
+   ├──────────> core/, errors/
    │
    └──────────> browser/, analyzer/, store/, core/
                    │
@@ -113,6 +127,8 @@ browser/ ─────> interceptors/, collectors/, hooks/, ui/
 | 单个工具 | camelCase 动词 | `analyzeAst`, `deobfuscate` |
 | 子代理 | *Subagent | `staticSubagent`, `dynamicSubagent` |
 | 类 | PascalCase | `ASTAnalyzer`, `DataStore` |
+| 错误类 | *Error | `ApiServiceError`, `BrowserError` |
+| 核心模块类 | PascalCase | `StreamHandler`, `PanelBridge` |
 
 ---
 
@@ -122,5 +138,8 @@ browser/ ─────> interceptors/, collectors/, hooks/, ui/
 
 - **工具模块**: `src/agent/tools/analyzer.js` - 清晰的工具定义和导出
 - **子代理模块**: `src/agent/subagents/static.js` - 完整的子代理配置
+- **子代理工厂**: `src/agent/subagents/factory.js` - 统一创建子代理
+- **核心模块**: `src/agent/core/StreamHandler.js` - 流式处理逻辑
+- **错误模块**: `src/agent/errors/SpiderError.js` - 结构化错误类型
 - **分析器模块**: `src/analyzer/ASTAnalyzer.js` - 类的组织和方法划分
 - **存储模块**: `src/store/DataStore.js` - 单例模式和完整的 CRUD 操作

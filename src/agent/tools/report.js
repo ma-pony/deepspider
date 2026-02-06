@@ -102,8 +102,24 @@ function generateHtmlPage(title, markdown, pythonCode, jsCode) {
  * 2. 传入代码内容（兼容）- pythonCode/jsCode
  */
 export const saveAnalysisReport = tool(
-  async ({ domain, title, markdown, pythonCode, pythonCodeFile, jsCode, jsCodeFile }) => {
+  async ({ domain, title, markdown, pythonCode, pythonCodeFile, jsCode, jsCodeFile, validationResult }) => {
     try {
+      // 验证状态检查
+      let validationWarning = '';
+      let validationStatus = 'unknown';
+
+      if (!validationResult) {
+        validationWarning = '⚠️ 警告：未提供端到端验证结果，建议先使用 verify_encryption 或 run_python 验证代码正确性';
+        validationStatus = 'not_verified';
+        console.warn('[report]', validationWarning);
+      } else if (validationResult.success === false) {
+        validationWarning = `⚠️ 警告：验证失败 - ${validationResult.error || '未知错误'}`;
+        validationStatus = 'failed';
+        console.warn('[report]', validationWarning);
+      } else {
+        validationStatus = 'passed';
+      }
+
       const domainDir = join(OUTPUT_DIR, extractDomain(domain));
       ensureDir(domainDir);
 
@@ -153,18 +169,30 @@ export const saveAnalysisReport = tool(
       const fileList = Object.entries(paths)
         .map(([type, p]) => `- ${type}: \`${p}\``)
         .join('\n');
-      const finalMarkdown = markdown + '\n\n## 生成文件\n\n' + fileList;
+
+      // 添加验证状态标记
+      const validationSection = validationWarning
+        ? `\n\n## 验证状态\n\n${validationWarning}\n`
+        : '\n\n## 验证状态\n\n✅ 端到端验证通过\n';
+
+      const finalMarkdown = markdown + validationSection + '\n## 生成文件\n\n' + fileList;
       writeFileSync(paths.markdown, finalMarkdown, 'utf-8');
 
       console.log('[report] 已保存:', domainDir);
-      return JSON.stringify({ success: true, paths, dir: domainDir });
+      return JSON.stringify({
+        success: true,
+        paths,
+        dir: domainDir,
+        validationStatus,
+        validationWarning: validationWarning || null,
+      });
     } catch (e) {
       return JSON.stringify({ success: false, error: e.message });
     }
   },
   {
     name: 'save_analysis_report',
-    description: `保存分析报告。推荐先用 artifact_save 保存代码文件，再传入文件路径。`,
+    description: `保存分析报告。推荐先用 artifact_save 保存代码文件，再传入文件路径。建议先验证代码正确性再保存报告。`,
     schema: z.object({
       domain: z.string().describe('网站域名'),
       title: z.string().optional().describe('报告标题'),
@@ -173,6 +201,10 @@ export const saveAnalysisReport = tool(
       pythonCode: z.string().optional().describe('Python 代码内容（不推荐）'),
       jsCodeFile: z.string().optional().describe('JS 代码文件路径'),
       jsCode: z.string().optional().describe('JS 代码内容'),
+      validationResult: z.object({
+        success: z.boolean().describe('验证是否成功'),
+        error: z.string().optional().describe('错误信息'),
+      }).optional().describe('端到端验证结果（推荐提供）'),
     }),
   }
 );

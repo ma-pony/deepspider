@@ -300,3 +300,78 @@ if (!currentStage) return;
 if (index < 0 || index >= currentStage.fields.length) return;
 currentStage.fields.splice(index, 1);
 ```
+
+---
+
+## Modularization Patterns
+
+### 1. 大文件拆分原则
+
+当文件超过 300 行时，考虑按职责拆分：
+
+```javascript
+// ❌ 禁止：单文件包含多种职责
+// run.js (600+ 行)
+// - 流式处理逻辑
+// - 重试策略
+// - 面板通信
+// - 错误分类
+
+// ✅ 按职责拆分到 core/ 目录
+// src/agent/core/
+// ├── StreamHandler.js   # 流式输出处理
+// ├── RetryManager.js    # 重试策略
+// ├── PanelBridge.js     # 面板通信
+// └── index.js           # 模块导出
+```
+
+**原因**: 单一职责原则，便于测试和维护。
+
+### 2. 使用子代理工厂函数
+
+```javascript
+// ❌ 禁止：每个子代理重复配置中间件
+export const staticSubagent = {
+  name: 'static-agent',
+  tools: [...staticTools, ...evolveTools],
+  middleware: [
+    createFilterToolsMiddleware(),
+    createSkillsMiddleware({ backend, sources: [SKILLS.static] }),
+  ],
+};
+
+// ✅ 使用工厂函数统一配置
+import { createSubagent, SKILLS } from './factory.js';
+
+export const staticSubagent = createSubagent({
+  name: 'static-agent',
+  description: '静态分析专家',
+  systemPrompt: '...',
+  tools: staticTools,
+  skills: [SKILLS.static],
+});
+```
+
+**原因**: 工厂函数自动注入公共中间件和 evolveTools，避免遗漏。
+
+### 3. 结构化错误类型
+
+```javascript
+// ❌ 禁止：字符串匹配判断错误类型
+if (/503|502|429/.test(error.message)) {
+  // 重试
+}
+
+// ✅ 使用结构化错误类型
+import { ApiServiceError, isApiServiceError } from './errors/index.js';
+
+// 抛出时
+throw new ApiServiceError('服务不可用', { statusCode: 503 });
+
+// 捕获时
+if (isApiServiceError(error.message)) {
+  // 重试
+}
+```
+
+**原因**: 结构化错误便于分类处理，支持携带额外上下文。
