@@ -106,7 +106,7 @@ export const captchaSlideDetect = tool(
 
       // 获取背景图和滑块图
       const bgElement = await page.$(bg_selector);
-      const slideElement = slide_selector ? await page.$(slide_selector) : null;
+      const _slideElement = slide_selector ? await page.$(slide_selector) : null;
 
       if (!bgElement) {
         return JSON.stringify({ success: false, error: '未找到背景图' });

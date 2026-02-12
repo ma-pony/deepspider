@@ -100,7 +100,7 @@ export const evolveSkill = tool(
     let content = '';
     try {
       content = fs.readFileSync(evolvedPath, 'utf-8');
-    } catch (e) {
+    } catch {
       // 文件不存在，使用空内容
     }
 

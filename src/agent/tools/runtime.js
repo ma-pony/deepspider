@@ -110,7 +110,7 @@ export const addInitScript = tool(
  * 清除 Cookie
  */
 export const clearCookies = tool(
-  async ({ domain }) => {
+  async ({ domain: _domain }) => {
     const browser = await getBrowser();
     const context = browser.getContext();
     await context.clearCookies();

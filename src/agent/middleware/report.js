@@ -44,7 +44,7 @@ export function createReportMiddleware(options = {}) {
               console.log('[reportMiddleware] 检测到 .md 文件:', content.path);
               return { lastWrittenMdFile: content.path };
             }
-          } catch (e) {
+          } catch {
             // 解析失败，忽略
           }
         }

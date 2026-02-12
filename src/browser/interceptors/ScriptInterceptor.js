@@ -38,7 +38,7 @@ export class ScriptInterceptor {
   }
 
   async onScriptParsed(params) {
-    const { scriptId, url, length } = params;
+    const { scriptId, url, length: _length } = params;
 
     // 跳过扩展和空脚本
     if (!url || url.startsWith('chrome-extension://')) return;
@@ -67,7 +67,7 @@ export class ScriptInterceptor {
         timestamp: Date.now(),
         pageUrl: this.getPageUrl()  // 传递页面 URL
       });
-    } catch (e) {
+    } catch {
       // 获取失败，跳过
     }
   }

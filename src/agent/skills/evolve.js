@@ -3,9 +3,6 @@
  * 合并静态 SKILL.md + 动态 evolved.md
  */
 
-import fs from 'fs';
-import path from 'path';
-
 // 配置
 const MAX_RECENT_ITEMS = 10;
 const MERGE_THRESHOLD = 20;

@@ -4,8 +4,8 @@
  * 支持会话隔离、内容去重、自动清理
  */
 
-import { mkdirSync, existsSync, readFileSync, statSync } from 'fs';
-import { writeFile, readFile, readdir, rm, stat } from 'fs/promises';
+import { existsSync, readFileSync } from 'fs';
+import { writeFile, readFile, rm } from 'fs/promises';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { PATHS, ensureDir } from '../config/paths.js';
@@ -201,7 +201,7 @@ export class DataStore {
       if (existsSync(indexFile)) {
         index = JSON.parse(readFileSync(indexFile, 'utf-8'));
       }
-    } catch (e) {
+    } catch {
       // 使用默认索引
     }
 
@@ -446,7 +446,7 @@ export class DataStore {
               timestamp: meta.timestamp
             });
           }
-        } catch (e) { /* skip */ }
+        } catch { /* skip */ }
       }
     }
     return results;
@@ -477,7 +477,7 @@ export class DataStore {
               timestamp: meta.timestamp
             });
           }
-        } catch (e) { /* skip */ }
+        } catch { /* skip */ }
       }
     }
     return results;

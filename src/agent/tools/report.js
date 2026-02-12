@@ -7,8 +7,8 @@
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join, basename } from 'path';
-import { PATHS, ensureDir, DEEPSPIDER_HOME } from '../../config/paths.js';
+import { join } from 'path';
+import { PATHS, ensureDir } from '../../config/paths.js';
 
 const OUTPUT_DIR = PATHS.REPORTS_DIR;
 

@@ -105,7 +105,7 @@ export class NetworkInterceptor {
         console.error('[NetworkInterceptor] 保存失败:', e.message);
       });
 
-    } catch (e) {
+    } catch {
       // 某些响应无法获取 body
     }
 

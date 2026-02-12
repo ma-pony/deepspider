@@ -169,7 +169,7 @@ export class PatchGenerator {
     return defaults[type] || 'undefined';
   }
 
-  _generateSmartTemplate(property, context = {}) {
+  _generateSmartTemplate(property, _context = {}) {
     const parts = property.split('.');
     const propName = parts[parts.length - 1];
     const type = this._inferType(property);
@@ -232,7 +232,7 @@ export class PatchGenerator {
     }
 
     // 检测同一对象的重复定义
-    for (const [root, props] of roots) {
+    for (const [_root, props] of roots) {
       if (props.length > 1) {
         const seen = new Set();
         for (const p of props) {

@@ -21,7 +21,7 @@ export class EnvCollector {
       return this.cache.get(path);
     }
 
-    const result = await this.page.evaluate(({ path, depth, includeProto }) => {
+    const result = await this.page.evaluate(({ path, depth, includeProto: _includeProto }) => {
       function getByPath(obj, path) {
         return path.split('.').reduce((o, k) => o && o[k], obj);
       }

@@ -4,7 +4,7 @@
  * 根据 Hook 收集的数据生成可在 Node.js 运行的浏览器环境代码
  */
 
-import { GETSET_LIST, FUNC_LIST, HTML_TAG_MAP } from './BrowserAPIList.js';
+import { GETSET_LIST, FUNC_LIST, HTML_TAG_MAP } from './BrowserAPIList.js'; // eslint-disable-line no-unused-vars
 
 export class EnvCodeGenerator {
   constructor() {

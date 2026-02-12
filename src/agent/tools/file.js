@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
-import { writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, readdirSync } from 'fs';
 import { dirname, join, isAbsolute, relative } from 'path';
 import { PATHS, ensureDir, DEEPSPIDER_HOME } from '../../config/paths.js';
 
@@ -186,7 +186,7 @@ function searchInFile(filePath, pattern, isRegex) {
       if (isRegex) regex.lastIndex = 0; // 重置正则
     }
     return matches;
-  } catch (e) {
+  } catch {
     return [];
   }
 }

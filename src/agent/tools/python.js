@@ -53,7 +53,7 @@ async function executePython(code, timeout = 10000) {
  * 生成 Python 验证代码
  */
 function generateVerifyCode(algorithm, params) {
-  const { plaintext, ciphertext, key, iv, mode, format, hmacKey, digestmod } = params;
+  const { plaintext, ciphertext, key, iv, _mode, format, hmacKey, digestmod } = params;
 
   const templates = {
     // AES
@@ -223,7 +223,7 @@ print('MATCH' if result == expected else f'MISMATCH: got {result}')
  * 生成可复用的 Python 代码片段
  */
 function generatePythonSnippet(algorithm, params) {
-  const { key, iv, mode, format, hmacKey, digestmod } = params;
+  const { key, iv, _mode, _format, hmacKey, digestmod } = params;
 
   const snippets = {
     'AES-CBC': `
@@ -488,7 +488,7 @@ export const executePythonCode = tool(
 export const generateExecjsCode = tool(
   async ({ jsCode, functionName, description }) => {
     // 转义 JS 代码中的特殊字符
-    const escapedJs = jsCode
+    const _escapedJs = jsCode
       .replace(/\\/g, '\\\\')
       .replace(/"""/g, '\\"\\"\\"')
       .replace(/\n/g, '\\n');
@@ -539,7 +539,7 @@ def ${functionName || 'execute_js'}(*args):
  * 分析 JS 代码，判断转换策略
  */
 export const analyzeJsForPython = tool(
-  async ({ jsCode, cryptoPatterns }) => {
+  async ({ jsCode, cryptoPatterns: _cryptoPatterns }) => {
     const analysis = {
       canPureRewrite: true,
       reasons: [],

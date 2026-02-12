@@ -51,7 +51,7 @@ export class EncryptionAnalyzer {
   }
 
   traceParam(code, paramName) {
-    const ast = this.astAnalyzer.parse(code);
+    const _ast = this.astAnalyzer.parse(code);
     const traces = [];
 
     // 简化实现：查找参数使用位置
@@ -80,7 +80,7 @@ export class EncryptionAnalyzer {
   // 使用模式库进行深度检测
   detectWithPatterns(code) {
     const detected = [];
-    for (const [key, pattern] of Object.entries(cryptoPatterns)) {
+    for (const [_key, pattern] of Object.entries(cryptoPatterns)) {
       for (const sig of pattern.signatures) {
         if (sig.test(code)) {
           detected.push({

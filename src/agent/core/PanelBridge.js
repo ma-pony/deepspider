@@ -53,7 +53,7 @@ export class PanelBridge {
       const escaped = JSON.stringify(content.trim());
       const code = `window.__deepspider__?.addMessage?.('${role}', ${escaped})`;
       await this.evaluateInPage(code);
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -110,7 +110,7 @@ export class PanelBridge {
         })()`;
         await this.evaluateInPage(code);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
 

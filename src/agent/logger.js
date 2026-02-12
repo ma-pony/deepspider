@@ -5,7 +5,7 @@
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { appendFileSync, mkdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { DEEPSPIDER_HOME } from '../config/paths.js';
 
 const LOG_DIR = join(DEEPSPIDER_HOME, 'logs');
