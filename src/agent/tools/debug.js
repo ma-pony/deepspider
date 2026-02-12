@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 import { getBrowser } from '../../browser/index.js';
 import { CDPSession } from '../../browser/cdp.js';
+import { logStore } from '../logger.js';
 
 let cdpSession = null;
 let isPaused = false;
@@ -235,6 +236,33 @@ export const stepOver = tool(
   }
 );
 
+/**
+ * 查询 Agent 执行日志
+ */
+export const getAgentLogs = tool(
+  async ({ category, level, limit, toolName }) => {
+    if (category === 'stats') {
+      return JSON.stringify(logStore.getStats(), null, 2);
+    }
+    const logs = logStore.query({ category, level, limit, toolName });
+    return JSON.stringify(logs, null, 2);
+  },
+  {
+    name: 'get_agent_logs',
+    description: '获取当前 Agent 会话的执行日志，包括 LLM 调用、工具调用、错误等。用于调试和分析 Agent 执行过程。category=stats 可获取统计概览。',
+    schema: z.object({
+      category: z.enum(['LLM', 'TOOL', 'CHAIN', 'AGENT', 'stats']).optional()
+        .describe('日志类别：LLM/TOOL/CHAIN/AGENT，或 stats 获取统计'),
+      level: z.enum(['INFO', 'DEBUG', 'ERROR']).optional()
+        .describe('日志级别'),
+      limit: z.number().optional().default(50)
+        .describe('返回条数（默认50，最近的N条）'),
+      toolName: z.string().optional()
+        .describe('按工具名过滤（仅 TOOL 类别有效）'),
+    }),
+  }
+);
+
 export const debugTools = [
   setBreakpoint,
   setXHRBreakpoint,
@@ -243,4 +271,5 @@ export const debugTools = [
   evaluateAtBreakpoint,
   resumeExecution,
   stepOver,
+  getAgentLogs,
 ];

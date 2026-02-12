@@ -169,7 +169,7 @@ async function init() {
     output: process.stdout,
   });
 
-  const logger = createLogger({ enabled: DEBUG, verbose: false });
+  const loggerCallbacks = createLogger({ enabled: DEBUG, verbose: false });
 
   async function onReportReady(mdFilePath) {
     console.log('[report] 中间件触发报告显示:', mdFilePath);
@@ -181,7 +181,7 @@ async function init() {
   agentConfig = {
     configurable: { thread_id: `deepspider-${Date.now()}` },
     recursionLimit: 5000,
-    callbacks: logger ? [logger] : [],
+    callbacks: loggerCallbacks,
   };
 
   // 初始化流处理器

@@ -11,7 +11,7 @@ export { patchTools, generatePatch, matchModule } from './patch.js';
 export { envTools, listEnvModules, loadEnvModule, loadAllEnvModules } from './env.js';
 export { profileTools, listProfiles, loadProfile, generateProfileCode } from './profile.js';
 export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, clearCookies } from './runtime.js';
-export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver } from './debug.js';
+export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver, getAgentLogs } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
 export { browserTools, clickElement, fillInput, waitForSelector } from './browser.js';
 export { reportTools, saveAnalysisReport } from './report.js';
