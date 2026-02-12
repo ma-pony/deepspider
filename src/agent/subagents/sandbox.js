@@ -2,9 +2,8 @@
  * DeepSpider - 沙箱验证子代理
  */
 
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
-import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
+import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
+import { SKILLS } from '../skills/config.js';
 
 import { sandboxTools } from '../tools/sandbox.js';
 import { nodejsTools } from '../tools/nodejs.js';
@@ -16,7 +15,7 @@ import { evolveTools } from '../tools/evolve.js';
 
 export const sandboxSubagent = {
   name: 'sandbox-agent',
-  description: '沙箱验证专家。当需要验证提取的代码能否正确执行时使用，适用于：验证加密算法、补全缺失环境、生成可独立运行的脚本。',
+  description: '沙箱验证专家。适用于：验证已提取的加密算法能否正确执行、补全缺失环境、生成可独立运行的 JS 脚本。不能做代码分析、不能控制浏览器、不能生成 Python 代码。输入必须是已提取的代码片段。',
   systemPrompt: `你是 DeepSpider 的验证执行专家。
 
 ## 职责
@@ -35,7 +34,7 @@ export const sandboxSubagent = {
 
 ## 经验记录
 完成验证后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "sandbox"`,
+- skill: "sandbox"` + SUBAGENT_DISCIPLINE_PROMPT,
   tools: [
     ...sandboxTools,
     ...nodejsTools,
@@ -45,11 +44,5 @@ export const sandboxSubagent = {
     ...fileTools,
     ...evolveTools,
   ],
-  middleware: [
-    createFilterToolsMiddleware(),
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.sandbox],
-    }),
-  ],
+  middleware: createBaseMiddleware([SKILLS.sandbox]),
 };

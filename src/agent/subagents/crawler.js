@@ -3,9 +3,8 @@
  * 智能调度、流程规划、脚本生成
  */
 
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
-import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
+import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
+import { SKILLS } from '../skills/config.js';
 
 import { crawlerTools } from '../tools/crawler.js';
 import { fileTools } from '../tools/file.js';
@@ -14,7 +13,7 @@ import { storeTools } from '../tools/store.js';
 
 export const crawlerSubagent = {
   name: 'crawler',
-  description: '爬虫编排专家。当需要规划完整爬虫流程、生成爬虫脚本、进行端到端测试时使用。负责分析目标网站复杂度，按需调度其他子代理，输出完整可运行的爬虫代码。',
+  description: '爬虫编排专家。适用于：规划完整爬虫流程、整合各模块生成完整 Python 爬虫脚本、E2E 测试。不能做加密分析、不能反混淆、不能控制浏览器。依赖其他子代理提供加密/验证码等模块。',
   systemPrompt: `你是 DeepSpider 的爬虫编排专家，负责生成完整可运行的 Python 爬虫脚本。
 
 ## 核心职责
@@ -121,18 +120,12 @@ if __name__ == "__main__":
 
 ## 经验记录
 完成爬虫编排后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "crawler"`,
+- skill: "crawler"` + SUBAGENT_DISCIPLINE_PROMPT,
   tools: [
     ...crawlerTools,
     ...fileTools,
     ...evolveTools,
     ...storeTools,
   ],
-  middleware: [
-    createFilterToolsMiddleware(),
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.crawler, SKILLS.xpath],
-    }),
-  ],
+  middleware: createBaseMiddleware([SKILLS.crawler, SKILLS.xpath]),
 };

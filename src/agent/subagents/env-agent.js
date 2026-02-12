@@ -3,9 +3,8 @@
  * 方向：通过补全浏览器环境让代码直接运行
  */
 
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
-import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
+import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
+import { SKILLS } from '../skills/config.js';
 
 import { sandboxTools } from '../tools/sandbox.js';
 import { nodejsTools } from '../tools/nodejs.js';
@@ -22,7 +21,7 @@ import { evolveTools } from '../tools/evolve.js';
 
 export const envAgentSubagent = {
   name: 'env-agent',
-  description: '补环境专家。当需要让混淆代码在沙箱中直接运行时使用，适用于：环境检测多、算法复杂难还原、需要快速获取结果的场景。',
+  description: '补环境专家。适用于：环境检测多、算法复杂难还原、需要补全浏览器环境后在沙箱中直接运行的场景。不能做 AST 反混淆、不能设浏览器断点、不能生成 Python 代码。',
   systemPrompt: `你是 DeepSpider 的补环境专家。
 
 ## 分析方向
@@ -57,7 +56,7 @@ export const envAgentSubagent = {
 
 ## 经验记录
 完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "env"`,
+- skill: "env"` + SUBAGENT_DISCIPLINE_PROMPT,
   tools: [
     ...sandboxTools,
     ...nodejsTools,
@@ -72,11 +71,5 @@ export const envAgentSubagent = {
     ...storeTools,
     ...evolveTools,
   ],
-  middleware: [
-    createFilterToolsMiddleware(),
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.env],
-    }),
-  ],
+  middleware: createBaseMiddleware([SKILLS.env]),
 };

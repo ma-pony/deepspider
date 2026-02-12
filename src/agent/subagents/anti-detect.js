@@ -3,9 +3,8 @@
  * 浏览器指纹管理、代理池、风控规避
  */
 
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
-import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
+import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
+import { SKILLS } from '../skills/config.js';
 
 import { antiDetectTools } from '../tools/index.js';
 import { browserTools } from '../tools/browser.js';
@@ -14,7 +13,7 @@ import { evolveTools } from '../tools/evolve.js';
 
 export const antiDetectSubagent = {
   name: 'anti-detect',
-  description: '反检测专家。当目标网站有风控检测、IP封禁、指纹识别时使用，适用于：代理IP配置、浏览器指纹伪装、请求特征修改、风控规避。',
+  description: '反检测专家。适用于：代理 IP 配置与轮换、浏览器指纹伪装、请求特征修改、风控规避策略。不能做加密分析、不能反混淆、不能处理验证码。',
   systemPrompt: `你是 DeepSpider 的反检测专家，负责绑过网站的反爬虫检测。
 
 ## 核心职责
@@ -28,18 +27,12 @@ export const antiDetectSubagent = {
 
 ## 经验记录
 完成反检测配置后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "anti-detect"`,
+- skill: "anti-detect"` + SUBAGENT_DISCIPLINE_PROMPT,
   tools: [
     ...antiDetectTools,
     ...browserTools,
     ...fileTools,
     ...evolveTools,
   ],
-  middleware: [
-    createFilterToolsMiddleware(),
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.antiDetect],
-    }),
-  ],
+  middleware: createBaseMiddleware([SKILLS.antiDetect]),
 };

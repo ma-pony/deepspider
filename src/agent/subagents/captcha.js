@@ -3,9 +3,8 @@
  * 识别和绕过各类验证码
  */
 
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
-import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
+import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
+import { SKILLS } from '../skills/config.js';
 
 import { captchaTools } from '../tools/captcha.js';
 import { browserTools } from '../tools/browser.js';
@@ -14,7 +13,7 @@ import { evolveTools } from '../tools/evolve.js';
 
 export const captchaSubagent = {
   name: 'captcha',
-  description: '验证码处理专家。当遇到验证码需要识别或绕过时使用，适用于：图片验证码OCR、滑块验证码、点选验证码、短信验证码处理。',
+  description: '验证码处理专家。适用于：图片验证码 OCR、滑块验证码缺口检测与轨迹模拟、点选验证码目标检测。不能做加密分析、不能反混淆、不能生成爬虫脚本。',
   systemPrompt: `你是 DeepSpider 的验证码处理专家，负责识别和绕过各类验证码。
 
 ## 核心职责
@@ -34,18 +33,12 @@ export const captchaSubagent = {
 
 ## 经验记录
 完成验证码处理后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "captcha"`,
+- skill: "captcha"` + SUBAGENT_DISCIPLINE_PROMPT,
   tools: [
     ...captchaTools,
     ...browserTools,
     ...fileTools,
     ...evolveTools,
   ],
-  middleware: [
-    createFilterToolsMiddleware(),
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.captcha],
-    }),
-  ],
+  middleware: createBaseMiddleware([SKILLS.captcha]),
 };
