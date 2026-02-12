@@ -4,6 +4,7 @@
  */
 
 import { Store } from '../store/Store.js';
+import { coveredAPIs } from '../env/modules/index.js';
 
 // 属性类型推断规则
 const TYPE_RULES = {
@@ -46,9 +47,26 @@ export class PatchGenerator {
   }
 
   async generate(property, context = {}) {
-    // 检查缓存
+    // 检查缓存（skipCoveredCheck 时忽略 skipped 缓存）
     if (this.generated.has(property)) {
-      return { ...this.generated.get(property), cached: true };
+      const cached = this.generated.get(property);
+      if (!(context.skipCoveredCheck && cached.skipped)) {
+        return { ...cached, cached: true };
+      }
+    }
+
+    // 0. 预置模块已覆盖，跳过（模块已加载到沙箱，无需重复补丁）
+    //    当模块未加载时（skipCoveredCheck=true），不跳过
+    if (!context.skipCoveredCheck && coveredAPIs.has(property)) {
+      const result = {
+        source: 'module-covered',
+        code: '',
+        property,
+        confidence: 1.0,
+        skipped: true,
+      };
+      this.generated.set(property, result);
+      return result;
     }
 
     // 1. 知识库精确匹配
@@ -194,12 +212,12 @@ export class PatchGenerator {
   }
 
   // 批量生成补丁
-  async generateBatch(properties) {
+  async generateBatch(properties, context = {}) {
     const results = [];
     const conflicts = this._detectConflicts(properties);
 
     for (const prop of properties) {
-      const result = await this.generate(prop);
+      const result = await this.generate(prop, context);
       result.hasConflict = conflicts.has(prop);
       results.push(result);
     }
@@ -252,6 +270,8 @@ export class PatchGenerator {
     const grouped = new Map();
 
     for (const patch of patches) {
+      // 跳过已被模块覆盖或无代码的补丁
+      if (patch.skipped || !patch.code) continue;
       const root = patch.property.split('.')[0];
       if (!grouped.has(root)) {
         grouped.set(root, []);

@@ -23,4 +23,10 @@ export const locationCode = `
 })();
 `;
 
+export const locationCovers = [
+  'location.href', 'location.protocol', 'location.host', 'location.hostname',
+  'location.port', 'location.pathname', 'location.search', 'location.hash',
+  'location.origin', 'location.assign', 'location.replace', 'location.reload',
+];
+
 export default locationCode;

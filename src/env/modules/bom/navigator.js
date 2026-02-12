@@ -67,4 +67,17 @@ export const navigatorCode = `
 })();
 `;
 
+export const navigatorCovers = [
+  'navigator.userAgent', 'navigator.appCodeName', 'navigator.appName',
+  'navigator.appVersion', 'navigator.platform', 'navigator.product',
+  'navigator.vendor', 'navigator.language', 'navigator.languages',
+  'navigator.onLine', 'navigator.cookieEnabled', 'navigator.hardwareConcurrency',
+  'navigator.maxTouchPoints', 'navigator.deviceMemory', 'navigator.webdriver',
+  'navigator.doNotTrack', 'navigator.plugins', 'navigator.mimeTypes',
+  'navigator.connection', 'navigator.geolocation', 'navigator.permissions',
+  'navigator.clipboard', 'navigator.userAgentData',
+  'navigator.javaEnabled', 'navigator.vibrate', 'navigator.sendBeacon',
+  'navigator.getBattery',
+];
+
 export default navigatorCode;

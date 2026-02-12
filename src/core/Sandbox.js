@@ -5,6 +5,8 @@
 
 import ivm from 'isolated-vm';
 import { EnvMonitor } from './EnvMonitor.js';
+import { PatchGenerator } from './PatchGenerator.js';
+import { modules, loadOrder } from '../env/modules/index.js';
 
 export class Sandbox {
   constructor() {
@@ -12,6 +14,7 @@ export class Sandbox {
     this.context = null;
     this.missingEnv = [];
     this.monitor = new EnvMonitor();
+    this.patchGenerator = new PatchGenerator();
     this.envLoaded = false;
   }
 
@@ -74,17 +77,26 @@ export class Sandbox {
       global.window = window;
       global.self = window;
 
+      const __proxyCache__ = new WeakMap();
       global.__createProxy__ = function(obj, path) {
-        return new Proxy(obj, {
+        if (__proxyCache__.has(obj)) return __proxyCache__.get(obj);
+        const proxy = new Proxy(obj, {
           get(t, p) {
             if (typeof p === 'symbol') return t[p];
             const fullPath = path ? path + '.' + p : String(p);
-            if (t[p] === undefined && !(p in t)) {
+            const val = t[p];
+            if (val === undefined && !(p in t)) {
               __recordMissing__(fullPath);
             }
-            return t[p];
+            // 递归代理子对象
+            if (val !== null && typeof val === 'object' && !__proxyCache__.has(val)) {
+              return __createProxy__(val, fullPath);
+            }
+            return val;
           }
         });
+        __proxyCache__.set(obj, proxy);
+        return proxy;
       };
     `;
 
@@ -136,6 +148,131 @@ export class Sandbox {
         stats: this.monitor.getStats()
       };
     }
+  }
+
+  /**
+   * 自动补环境闭环执行
+   * 加载预置模块 → Proxy 监控 → 迭代补丁 → 返回结果
+   */
+  async executeWithAutoFix(code, options = {}) {
+    const {
+      timeout = 5000,
+      maxIterations = 10,
+      loadModules = true,
+    } = options;
+
+    // 1. 加载预置环境模块
+    if (loadModules && !this.envLoaded) {
+      const envCode = loadOrder.map(n => modules[n]).filter(Boolean).join('\n\n');
+      await this.loadEnv(envCode);
+    }
+
+    // 2. 用 __createProxy__ 包裹全局对象，启用 missing 监控
+    await this._wrapGlobalsWithProxy();
+
+    const appliedPatches = [];
+    let lastMissingKey = '';
+
+    for (let i = 0; i < maxIterations; i++) {
+      const result = await this.execute(code, { timeout });
+
+      // 成功且无缺失，直接返回
+      if (result.success && result.missingEnv.length === 0) {
+        return { ...result, iterations: i + 1, appliedPatches };
+      }
+
+      // 没有新的缺失可补，退出
+      const currentKey = result.missingEnv.sort().join('|');
+      if (result.missingEnv.length === 0 || currentKey === lastMissingKey) {
+        return {
+          ...result,
+          iterations: i + 1,
+          appliedPatches,
+          remainingMissing: result.missingEnv,
+          stalled: currentKey === lastMissingKey,
+        };
+      }
+      lastMissingKey = currentKey;
+
+      // 非环境类错误（timeout / runtime-error），不继续补
+      if (!result.success) {
+        const envErrors = ['undefined-reference', 'not-a-function', 'null-access'];
+        if (!envErrors.includes(result.errorType)) {
+          return {
+            ...result,
+            iterations: i + 1,
+            appliedPatches,
+            remainingMissing: result.missingEnv,
+          };
+        }
+      }
+
+      // 批量生成补丁并注入（过滤掉 skipped 和低置信度的）
+      // 未加载模块时，不跳过 coveredAPIs 中的属性
+      const genContext = this.envLoaded ? {} : { skipCoveredCheck: true };
+      const batch = await this.patchGenerator.generateBatch(result.missingEnv, genContext);
+      const effective = batch.patches.filter(p => p.confidence >= 0.5 && !p.skipped);
+      const patchCode = this.patchGenerator.mergePatchCode(effective);
+
+      if (!patchCode.trim()) {
+        return {
+          ...result,
+          iterations: i + 1,
+          appliedPatches,
+          remainingMissing: result.missingEnv,
+        };
+      }
+
+      const injectResult = await this.inject(patchCode);
+      if (!injectResult.success) {
+        return {
+          ...result,
+          iterations: i + 1,
+          appliedPatches,
+          remainingMissing: result.missingEnv,
+          patchError: injectResult.error,
+        };
+      }
+
+      appliedPatches.push(...effective);
+
+      // 补丁注入后重新包裹全局对象，恢复 Proxy 监控
+      await this._wrapGlobalsWithProxy();
+    }
+
+    // 达到最大迭代次数
+    const finalResult = await this.execute(code, { timeout });
+    return {
+      ...finalResult,
+      iterations: maxIterations,
+      appliedPatches,
+      remainingMissing: finalResult.missingEnv,
+      maxIterationsReached: true,
+    };
+  }
+
+  /**
+   * 将全局环境对象用 __createProxy__ 包裹，启用缺失属性监控
+   */
+  async _wrapGlobalsWithProxy() {
+    const wrapCode = `
+      (function() {
+        var targets = ['navigator', 'document', 'screen', 'location', 'history'];
+        for (var i = 0; i < targets.length; i++) {
+          var name = targets[i];
+          // 全局对象不存在时先创建空壳，确保 Proxy 可监控
+          if (typeof global[name] === 'undefined') {
+            global[name] = {};
+          }
+          if (typeof global[name] === 'object' && global[name] !== null) {
+            try {
+              global[name] = __createProxy__(global[name], name);
+            } catch(e) {}
+          }
+        }
+      })();
+    `;
+    await this.context.eval(wrapCode);
   }
 
   // 错误分类（帮助判断是环境缺失还是代码错误）

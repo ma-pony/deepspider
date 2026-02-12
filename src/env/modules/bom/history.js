@@ -26,4 +26,10 @@ export const historyCode = `
 })();
 `;
 
+export const historyCovers = [
+  'history.length', 'history.state', 'history.scrollRestoration',
+  'history.back', 'history.forward', 'history.go',
+  'history.pushState', 'history.replaceState',
+];
+
 export default historyCode;

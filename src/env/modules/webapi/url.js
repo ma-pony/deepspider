@@ -44,4 +44,8 @@ export const urlCode = `
 })();
 `;
 
+export const urlCovers = [
+  'URL', 'URLSearchParams',
+];
+
 export default urlCode;

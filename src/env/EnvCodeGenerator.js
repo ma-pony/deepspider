@@ -1,10 +1,9 @@
 /**
  * DeepSpider - 环境代码生成器
- * 借鉴 v_jstools 的 make_env_1_v3.js
- * 根据 Hook 收集的数据生成可在 Node.js 运行的浏览器环境代码
+ * 基于预置模块 + Hook 日志数据生成可在 Node.js 运行的浏览器环境代码
  */
 
-import { GETSET_LIST, FUNC_LIST, HTML_TAG_MAP } from './BrowserAPIList.js'; // eslint-disable-line no-unused-vars
+import { modules, loadOrder } from './modules/index.js';
 
 export class EnvCodeGenerator {
   constructor() {
@@ -20,21 +19,26 @@ export class EnvCodeGenerator {
   }
 
   /**
-   * 解析环境日志
+   * 解析环境日志（支持任意深度路径）
    */
   parseEnvLogs(logs) {
     for (const log of logs) {
       if (log._type === 'env' && log.path) {
         const parts = log.path.split('.');
-        const className = parts[0];
-        const propName = parts[1];
-        if (!this.envData[className]) {
-          this.envData[className] = { props: {}, methods: {} };
+        const rootObj = parts[0];
+
+        if (!this.envData[rootObj]) {
+          this.envData[rootObj] = { props: {}, methods: {} };
         }
+
+        // 完整路径作为 key，保留深层访问信息
+        const fullPath = parts.slice(1).join('.');
+        if (!fullPath) continue;
+
         if (log.type === 'get' || log.type === 'set') {
-          this.envData[className].props[propName] = log.value;
+          this.envData[rootObj].props[fullPath] = log.value;
         } else if (log.type === 'call') {
-          this.envData[className].methods[propName] = log.result;
+          this.envData[rootObj].methods[fullPath] = log.result;
         }
       }
     }
@@ -49,8 +53,8 @@ export class EnvCodeGenerator {
     lines.push('// 生成时间: ' + new Date().toISOString());
     lines.push('');
     lines.push(this.generateSafeWrapper());
-    lines.push(this.generateBaseClasses());
-    lines.push(this.generateGlobalObjects());
+    lines.push(this.generateModules());
+    lines.push(this.generateOverrides());
     return lines.join('\n');
   }
 
@@ -69,88 +73,56 @@ function v_saf(fn) {
   }
 
   /**
-   * 生成基础类
+   * 加载预置模块代码
    */
-  generateBaseClasses() {
-    return `
-// EventTarget 基类
-class EventTarget {
-  constructor() { this._listeners = {}; }
-  addEventListener(type, fn) {
-    if (!this._listeners[type]) this._listeners[type] = [];
-    this._listeners[type].push(fn);
-  }
-  removeEventListener(type, fn) {
-    if (!this._listeners[type]) return;
-    this._listeners[type] = this._listeners[type].filter(f => f !== fn);
-  }
-  dispatchEvent(event) {
-    const fns = this._listeners[event.type] || [];
-    fns.forEach(fn => fn.call(this, event));
-    return true;
-  }
-}
-
-// Node 基类
-class Node extends EventTarget {
-  constructor() {
-    super();
-    this.childNodes = [];
-    this.parentNode = null;
-  }
-  appendChild(node) { node.parentNode = this; this.childNodes.push(node); return node; }
-  removeChild(node) {
-    const idx = this.childNodes.indexOf(node);
-    if (idx > -1) this.childNodes.splice(idx, 1);
-    node.parentNode = null;
-    return node;
-  }
-}`;
+  generateModules() {
+    return loadOrder
+      .map(name => modules[name])
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   /**
-   * 生成全局对象
+   * 根据 Hook 日志数据生成覆盖补丁
+   * 用真实采集值覆盖预置模块的默认值
    */
-  generateGlobalObjects() {
-    const nav = this.envData.navigator?.props || {};
-    const scr = this.envData.screen?.props || {};
+  generateOverrides() {
+    const lines = ['\n// Hook 数据覆盖（真实环境值）'];
+    let hasOverrides = false;
 
-    return `
-// Navigator
-var navigator = {
-  userAgent: ${JSON.stringify(nav.userAgent || 'Mozilla/5.0')},
-  platform: ${JSON.stringify(nav.platform || 'Win32')},
-  language: ${JSON.stringify(nav.language || 'zh-CN')},
-  cookieEnabled: true,
-  onLine: true,
-  webdriver: false,
-};
+    for (const [rootObj, data] of Object.entries(this.envData)) {
+      // 属性覆盖
+      for (const [path, value] of Object.entries(data.props)) {
+        if (value === undefined || value === '[Object]') continue;
+        const fullPath = `${rootObj}.${path}`;
+        const parts = fullPath.split('.');
 
-// Screen
-var screen = {
-  width: ${scr.width || 1920},
-  height: ${scr.height || 1080},
-  colorDepth: 24,
-};
+        // 深层路径需要确保中间对象存在
+        if (parts.length > 2) {
+          for (let i = 2; i < parts.length; i++) {
+            const parentPath = parts.slice(0, i).join('.');
+            lines.push(`try { if (typeof ${parentPath} === 'undefined') ${parentPath} = {}; } catch(e) {}`);
+          }
+        }
 
-// Location
-var location = { href: '', protocol: 'https:', host: '', pathname: '/' };
+        lines.push(`try { ${fullPath} = ${this._serializeValue(value)}; } catch(e) {}`);
+        hasOverrides = true;
+      }
+    }
 
-// Document
-var document = {
-  cookie: '',
-  createElement: function(tag) { return {}; },
-  getElementById: function(id) { return null; },
-  querySelector: function(sel) { return null; },
-};
+    return hasOverrides ? lines.join('\n') : '';
+  }
 
-// Window
-var window = this;
-window.navigator = navigator;
-window.screen = screen;
-window.location = location;
-window.document = document;
-`;
+  _serializeValue(value) {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'string') return JSON.stringify(value);
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return 'undefined';
+    }
   }
 }
 

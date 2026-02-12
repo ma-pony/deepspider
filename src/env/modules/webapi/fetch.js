@@ -43,4 +43,8 @@ export const fetchCode = `
 })();
 `;
 
+export const fetchCovers = [
+  'fetch', 'Headers', 'Request', 'Response',
+];
+
 export default fetchCode;

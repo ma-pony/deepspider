@@ -20,4 +20,11 @@ export const storageCode = `
 })();
 `;
 
+export const storageCovers = [
+  'localStorage.length', 'localStorage.key', 'localStorage.getItem',
+  'localStorage.setItem', 'localStorage.removeItem', 'localStorage.clear',
+  'sessionStorage.length', 'sessionStorage.key', 'sessionStorage.getItem',
+  'sessionStorage.setItem', 'sessionStorage.removeItem', 'sessionStorage.clear',
+];
+
 export default storageCode;

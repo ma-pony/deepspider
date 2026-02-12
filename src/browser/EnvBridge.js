@@ -26,24 +26,38 @@ export class EnvBridge {
 
     for (const path of missingPaths) {
       try {
-        // 1. 从真实浏览器采集
+        // 1. 尝试从真实浏览器采集
         const collected = await this.collector.collect(path, { depth: 2 });
 
-        if (!collected.success) {
-          results.failed.push({ path, reason: 'collect_failed', error: collected.error });
-          continue;
+        if (collected.success) {
+          results.collected.push(path);
+          this.collectedData.set(path, collected);
+
+          // 2. 生成补丁代码
+          const patch = this._generatePatch(path, collected);
+          if (patch) {
+            results.patched.push({ path, code: patch });
+            continue;
+          }
         }
 
-        results.collected.push(path);
-        this.collectedData.set(path, collected);
-
-        // 2. 生成补丁代码
-        const patch = this._generatePatch(path, collected);
-        if (patch) {
-          results.patched.push({ path, code: patch });
+        // 3. 采集失败时 fallback 到 PatchGenerator
+        const fallback = await this.patchGenerator.generate(path);
+        if (fallback.code) {
+          results.patched.push({ path, code: fallback.code, source: fallback.source });
+        } else {
+          results.failed.push({ path, reason: 'no_patch' });
         }
 
       } catch (e) {
+        // 浏览器不可用时也 fallback
+        try {
+          const fallback = await this.patchGenerator.generate(path);
+          if (fallback.code) {
+            results.patched.push({ path, code: fallback.code, source: fallback.source });
+            continue;
+          }
+        } catch { /* ignore */ }
         results.failed.push({ path, reason: 'error', error: e.message });
       }
     }
@@ -66,7 +80,7 @@ export class EnvBridge {
     // 根据数据类型生成不同的补丁
     switch (data.type) {
       case 'string':
-        return `${parentPath}.${propName} = "${data.value}";`;
+        return `${parentPath}.${propName} = ${JSON.stringify(data.value)};`;
 
       case 'number':
         return `${parentPath}.${propName} = ${data.value};`;
@@ -123,7 +137,7 @@ export class EnvBridge {
 
   _serializeValue(data) {
     switch (data.type) {
-      case 'string': return `"${data.value}"`;
+      case 'string': return JSON.stringify(data.value);
       case 'number': return data.value;
       case 'boolean': return data.value;
       case 'null': return 'null';

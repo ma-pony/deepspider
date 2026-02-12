@@ -107,4 +107,18 @@ export const documentCode = `
 })();
 `;
 
+export const documentCovers = [
+  'document.nodeType', 'document.nodeName', 'document.documentElement',
+  'document.head', 'document.body', 'document.title', 'document.cookie',
+  'document.domain', 'document.URL', 'document.referrer', 'document.readyState',
+  'document.hidden', 'document.visibilityState',
+  'document.createElement', 'document.createTextNode',
+  'document.createDocumentFragment', 'document.createComment',
+  'document.getElementById', 'document.getElementsByTagName',
+  'document.getElementsByClassName', 'document.getElementsByName',
+  'document.querySelector', 'document.querySelectorAll',
+  'document.addEventListener', 'document.removeEventListener',
+  'document.dispatchEvent', 'document.write', 'document.writeln',
+];
+
 export default documentCode;

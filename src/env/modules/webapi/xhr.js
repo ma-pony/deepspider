@@ -45,4 +45,12 @@ export const xhrCode = `
 })();
 `;
 
+export const xhrCovers = [
+  'XMLHttpRequest', 'XMLHttpRequest.prototype.open',
+  'XMLHttpRequest.prototype.send', 'XMLHttpRequest.prototype.abort',
+  'XMLHttpRequest.prototype.setRequestHeader',
+  'XMLHttpRequest.prototype.getResponseHeader',
+  'XMLHttpRequest.prototype.getAllResponseHeaders',
+];
+
 export default xhrCode;

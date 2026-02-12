@@ -48,4 +48,8 @@ export const eventCode = `
 })();
 `;
 
+export const eventCovers = [
+  'Event', 'CustomEvent', 'MouseEvent', 'KeyboardEvent',
+];
+
 export default eventCode;

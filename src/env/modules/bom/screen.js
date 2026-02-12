@@ -23,4 +23,10 @@ export const screenCode = `
 })();
 `;
 
+export const screenCovers = [
+  'screen.width', 'screen.height', 'screen.availWidth', 'screen.availHeight',
+  'screen.colorDepth', 'screen.pixelDepth', 'screen.availLeft', 'screen.availTop',
+  'screen.orientation',
+];
+
 export default screenCode;

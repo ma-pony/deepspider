@@ -76,4 +76,24 @@ export const sandboxReset = tool(
   }
 );
 
-export const sandboxTools = [sandboxExecute, sandboxInject, sandboxReset];
+/**
+ * 自动补环境执行工具
+ */
+export const sandboxAutoFix = tool(
+  async ({ code, timeout, maxIterations }) => {
+    const sb = await getSandbox();
+    const result = await sb.executeWithAutoFix(code, { timeout, maxIterations });
+    return JSON.stringify(result, null, 2);
+  },
+  {
+    name: 'sandbox_auto_fix',
+    description: '自动补环境闭环执行：加载预置模块 → 执行代码 → 发现缺失环境 → 自动生成补丁 → 重试，直到成功或无法继续。适合快速验证混淆代码能否在沙箱中运行。',
+    schema: z.object({
+      code: z.string().describe('要执行的目标JS代码'),
+      timeout: z.number().optional().default(5000).describe('单次执行超时时间(ms)'),
+      maxIterations: z.number().optional().default(10).describe('最大迭代次数'),
+    }),
+  }
+);
+
+export const sandboxTools = [sandboxExecute, sandboxInject, sandboxReset, sandboxAutoFix];
