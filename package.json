@@ -5,14 +5,14 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "deepspider": "./src/agent/run.js"
+    "deepspider": "./bin/cli.js"
   },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "cli": "node src/agent/run.js",
+    "cli": "node bin/cli.js",
     "mcp": "node src/mcp/server.js",
-    "agent": "node src/agent/run.js",
+    "agent": "node bin/cli.js",
     "test": "node --test test/",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",

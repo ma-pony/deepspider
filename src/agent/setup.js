@@ -1,17 +1,15 @@
 /**
  * DeepSpider 配置检测
- * 简单检测 + 清晰提示，不做交互式向导
+ * 环境变量 > 配置文件 > 默认值
  */
 
+import { getConfigValues } from '../config/settings.js';
+
 /**
- * 检查环境变量是否已配置
+ * 检查配置（合并环境变量和配置文件）
  */
 export function checkEnvConfig() {
-  return {
-    apiKey: process.env.DEEPSPIDER_API_KEY,
-    baseUrl: process.env.DEEPSPIDER_BASE_URL,
-    model: process.env.DEEPSPIDER_MODEL,
-  };
+  return getConfigValues();
 }
 
 /**
@@ -22,9 +20,9 @@ export function ensureConfig() {
   const { apiKey, baseUrl, model } = checkEnvConfig();
   const missing = [];
 
-  if (!apiKey) missing.push('DEEPSPIDER_API_KEY');
-  if (!baseUrl) missing.push('DEEPSPIDER_BASE_URL');
-  if (!model) missing.push('DEEPSPIDER_MODEL');
+  if (!apiKey) missing.push('apiKey (DEEPSPIDER_API_KEY)');
+  if (!baseUrl) missing.push('baseUrl (DEEPSPIDER_BASE_URL)');
+  if (!model) missing.push('model (DEEPSPIDER_MODEL)');
 
   if (missing.length === 0) {
     return true;
@@ -35,13 +33,15 @@ export function ensureConfig() {
 
 配置方式（任选其一）：
 
-1. 配置环境变量（推荐）：
+1. 使用 deepspider config 命令：
+   deepspider config set apiKey sk-xxx
+   deepspider config set baseUrl https://api.openai.com/v1
+   deepspider config set model gpt-4o
+
+2. 配置环境变量：
    export DEEPSPIDER_API_KEY=sk-xxx
    export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
    export DEEPSPIDER_MODEL=gpt-4o
-
-2. 一行命令：
-   DEEPSPIDER_API_KEY=sk-xxx DEEPSPIDER_BASE_URL=https://api.openai.com/v1 DEEPSPIDER_MODEL=gpt-4o deepspider <url>
 
 请根据提示补全配置后重试。
 `);

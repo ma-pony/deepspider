@@ -1,11 +1,11 @@
-#!/usr/bin/env node
 /**
- * DeepSpider Agent 独立运行入口
+ * DeepSpider Agent 运行模块
  * 使用 CDP binding 接收浏览器消息
  * 支持流式输出显示思考过程
+ *
+ * 所有状态初始化延迟到 init() 中执行，避免 import 时产生副作用
  */
 
-import 'dotenv/config';
 import readline from 'readline';
 import { readFileSync } from 'fs';
 import { marked } from 'marked';
@@ -18,60 +18,14 @@ import { browserTools } from './tools/browser.js';
 import { ensureConfig } from './setup.js';
 import { StreamHandler, PanelBridge } from './core/index.js';
 
-const args = process.argv.slice(2);
-const targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
+let rl = null;
 let browser = null;
 let streamHandler = null;
-
-console.log('=== DeepSpider Agent ===');
-console.log('智能爬虫 Agent，输入 exit 退出\n');
-
-const DEBUG = process.env.DEBUG === 'true' || process.argv.includes('--debug');
-
-function debug(...args) {
-  if (DEBUG) {
-    console.log('[DEBUG]', ...args);
-  }
-}
-
-const logger = createLogger({ enabled: DEBUG, verbose: false });
-
-/**
- * 报告就绪回调 - 由中间件在 afterAgent 时调用
- */
-async function onReportReady(mdFilePath) {
-  console.log('[report] 中间件触发报告显示:', mdFilePath);
-  await showReportFromFile(mdFilePath);
-}
-
-// 创建 Agent
-const agent = createDeepSpiderAgent({ onReportReady });
-
-const config = {
-  configurable: { thread_id: `deepspider-${Date.now()}` },
-  recursionLimit: 5000,
-  callbacks: logger ? [logger] : [],
-};
-
-/**
- * 初始化流处理器
- */
-function initStreamHandler() {
-  const panelBridge = new PanelBridge(() => browser, debug);
-  streamHandler = new StreamHandler({
-    agent,
-    config,
-    panelBridge,
-    riskTools: browserTools.map(t => t.name),
-    debug,
-  });
-}
+let targetUrl = null;
+let DEBUG = false;
+let debugFn = () => {};
+let agent = null;
+let agentConfig = null;
 
 /**
  * 从文件显示报告（由中间件回调触发）
@@ -106,7 +60,7 @@ async function showReportFromFile(mdFilePath) {
  * 处理浏览器消息（通过 CDP binding 接收）
  */
 async function handleBrowserMessage(data, page) {
-  debug(`handleBrowserMessage: 收到消息, type=${data.type}, page=${!!page}`);
+  debugFn(`handleBrowserMessage: 收到消息, type=${data.type}, page=${!!page}`);
 
   const browserReadyPrefix = '[浏览器已就绪] ';
 
@@ -193,7 +147,13 @@ function prompt() {
 }
 
 async function init() {
-  debug('init: 启动');
+  // 解析参数（在 init 时才读取，避免与 CLI 路由层的 argv 冲突）
+  const args = process.argv.slice(2);
+  targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
+  DEBUG = process.env.DEBUG === 'true' || args.includes('--debug');
+  debugFn = (...a) => { if (DEBUG) console.log('[DEBUG]', ...a); };
+
+  debugFn('init: 启动');
 
   if (!ensureConfig()) {
     process.exit(1);
@@ -203,27 +163,58 @@ async function init() {
     console.log('[DEBUG] 调试模式已启用');
   }
 
+  // 创建 readline、logger、agent（全部延迟到 init）
+  rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const logger = createLogger({ enabled: DEBUG, verbose: false });
+
+  async function onReportReady(mdFilePath) {
+    console.log('[report] 中间件触发报告显示:', mdFilePath);
+    await showReportFromFile(mdFilePath);
+  }
+
+  agent = createDeepSpiderAgent({ onReportReady });
+
+  agentConfig = {
+    configurable: { thread_id: `deepspider-${Date.now()}` },
+    recursionLimit: 5000,
+    callbacks: logger ? [logger] : [],
+  };
+
   // 初始化流处理器
-  initStreamHandler();
+  const panelBridge = new PanelBridge(() => browser, debugFn);
+  streamHandler = new StreamHandler({
+    agent,
+    config: agentConfig,
+    panelBridge,
+    riskTools: browserTools.map(t => t.name),
+    debug: debugFn,
+  });
+
+  console.log('=== DeepSpider Agent ===');
+  console.log('智能爬虫 Agent，输入 exit 退出\n');
 
   if (targetUrl) {
     console.log(`正在打开: ${targetUrl}\n`);
     try {
-      debug('init: 获取浏览器实例');
+      debugFn('init: 获取浏览器实例');
       browser = await getBrowser();
       browser.onMessage = handleBrowserMessage;
-      debug('init: 导航到目标URL');
+      debugFn('init: 导航到目标URL');
       await browser.navigate(targetUrl);
       markHookInjected();
-      debug('init: 浏览器就绪');
+      debugFn('init: 浏览器就绪');
       console.log('浏览器已就绪，数据自动记录中');
       console.log('点击面板选择按钮(⦿)选择数据进行分析\n');
     } catch (error) {
       console.error('启动浏览器失败:', error.message);
-      debug('init: 浏览器启动失败 -', error.stack);
+      debugFn('init: 浏览器启动失败 -', error.stack);
     }
   }
   prompt();
 }
 
-init();
+export { init };
