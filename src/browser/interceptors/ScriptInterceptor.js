@@ -41,14 +41,31 @@ export class ScriptInterceptor {
   async onScriptParsed(params) {
     const { scriptId, url, length: _length } = params;
 
-    // 跳过扩展和空脚本
-    if (!url || url.startsWith('chrome-extension://')) return;
+    // 跳过扩展脚本
+    if (url?.startsWith('chrome-extension://')) return;
     if (this.scriptIds.has(scriptId)) return;
 
     this.scriptIds.add(scriptId);
 
-    // 异步获取并存储源码
-    this.fetchAndSave(scriptId, url).catch(() => {});
+    if (url) {
+      // 有 URL 的脚本：获取源码、通知订阅者、存储
+      this.fetchAndSave(scriptId, url).catch(() => {});
+    } else if (this.onSource) {
+      // 无 URL 脚本（eval/new Function 生成）：仅通知订阅者用于 debugger 检测，不存储
+      this.fetchAndNotify(scriptId).catch(() => {});
+    }
+  }
+
+  async fetchAndNotify(scriptId) {
+    try {
+      const { scriptSource } = await this.client.send(
+        'Debugger.getScriptSource',
+        { scriptId }
+      );
+      try { this.onSource(scriptId, scriptSource); } catch { /* 订阅者异常不影响主流程 */ }
+    } catch {
+      // 获取失败（脚本已卸载等），忽略
+    }
   }
 
   async fetchAndSave(scriptId, url) {
@@ -59,9 +76,7 @@ export class ScriptInterceptor {
       );
 
       // 通知订阅者（AntiDebugInterceptor 等）
-      if (this.onSource) {
-        this.onSource(scriptId, scriptSource);
-      }
+      try { this.onSource?.(scriptId, scriptSource); } catch { /* 订阅者异常不影响主流程 */ }
 
       // 限制大小，超大脚本只保存部分
       const source = scriptSource.slice(0, 500000);
