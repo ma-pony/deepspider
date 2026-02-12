@@ -37,40 +37,51 @@ cp .env.example .env  # 配置环境变量
 pnpm run setup:crypto  # 安装 Python 加密库（可选）
 ```
 
-安装完成后，首次运行会提示配置环境变量（LLM API）。
+安装完成后，首次运行会提示配置 LLM API。
 
 > **注意**: 项目依赖 `isolated-vm` 原生模块，需要 C++ 编译环境：
 > - macOS: `xcode-select --install`
 > - Ubuntu: `sudo apt install build-essential`
 > - Windows: 安装 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 
-### 环境变量配置
+### 配置
 
 DeepSpider 需要配置 LLM API 才能运行。支持任何兼容 OpenAI 格式的供应商。
 
-| 变量名 | 必填 | 说明 |
-|--------|------|------|
-| `DEEPSPIDER_API_KEY` | 是 | API 密钥 |
-| `DEEPSPIDER_BASE_URL` | 是 | API 地址 |
-| `DEEPSPIDER_MODEL` | 是 | 模型名称 |
+| 配置键 | 环境变量 | 说明 |
+|--------|----------|------|
+| `apiKey` | `DEEPSPIDER_API_KEY` | API 密钥 |
+| `baseUrl` | `DEEPSPIDER_BASE_URL` | API 地址 |
+| `model` | `DEEPSPIDER_MODEL` | 模型名称 |
 
-**常用供应商配置示例**：
+优先级：环境变量 > 配置文件 (`~/.deepspider/config/settings.json`) > 默认值
+
+**方式一：使用 CLI 命令（推荐）**
+
+```bash
+deepspider config set apiKey sk-xxx
+deepspider config set baseUrl https://api.openai.com/v1
+deepspider config set model gpt-4o
+```
+
+**方式二：环境变量**
+
+```bash
+export DEEPSPIDER_API_KEY=sk-xxx
+export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
+export DEEPSPIDER_MODEL=gpt-4o
+```
+
+**常用供应商示例**：
 
 ```bash
 # OpenAI
-DEEPSPIDER_API_KEY=sk-xxx
-DEEPSPIDER_BASE_URL=https://api.openai.com/v1
-DEEPSPIDER_MODEL=gpt-4o
+deepspider config set baseUrl https://api.openai.com/v1
+deepspider config set model gpt-4o
 
 # DeepSeek
-DEEPSPIDER_API_KEY=sk-xxx
-DEEPSPIDER_BASE_URL=https://api.deepseek.com/v1
-DEEPSPIDER_MODEL=deepseek-chat
-
-# 其他 OpenAI 兼容供应商
-DEEPSPIDER_API_KEY=your-key
-DEEPSPIDER_BASE_URL=https://your-provider.com/v1
-DEEPSPIDER_MODEL=model-name
+deepspider config set baseUrl https://api.deepseek.com/v1
+deepspider config set model deepseek-chat
 ```
 
 ### 使用
@@ -78,24 +89,33 @@ DEEPSPIDER_MODEL=model-name
 #### 全局安装（npm/pnpm install -g）
 
 ```bash
-# 配置环境变量
-export DEEPSPIDER_API_KEY=sk-xxx
-export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
-export DEEPSPIDER_MODEL=gpt-4o
-
 # 启动 Agent - 指定目标网站
 deepspider https://example.com
 
 # 启动 Agent - 纯交互模式
 deepspider
+
+# 查看帮助
+deepspider --help
+
+# 管理配置
+deepspider config list            # 查看所有配置
+deepspider config set apiKey sk-xxx
+deepspider config set model gpt-4o
+
+# 检查更新
+deepspider update
 ```
 
 #### 克隆仓库
 
 ```bash
-# 配置环境变量（二选一）
+# 配置（二选一）
 cp .env.example .env  # 编辑 .env 文件
-# 或 export DEEPSPIDER_API_KEY=... 等
+# 或使用 CLI 命令
+node bin/cli.js config set apiKey sk-xxx
+node bin/cli.js config set baseUrl https://api.openai.com/v1
+node bin/cli.js config set model gpt-4o
 
 # 安装 Python 依赖（可选，用于执行生成的 Python 代码）
 pnpm run setup:crypto
@@ -161,12 +181,19 @@ pnpm test
 
 ```
 deepspider/
+├── bin/cli.js               # CLI 入口（命令路由）
 ├── src/
 │   ├── agent/               # DeepAgent 系统
 │   │   ├── tools/           # 工具集（90+）
 │   │   ├── subagents/       # 子代理
 │   │   ├── skills/          # 领域技能
 │   │   └── prompts/         # 系统提示
+│   ├── cli/                 # CLI 命令
+│   │   ├── config.js        # 配置 re-export
+│   │   └── commands/        # 子命令（version/help/config/update）
+│   ├── config/              # 核心配置
+│   │   ├── paths.js         # 路径常量
+│   │   └── settings.js      # 配置读写（环境变量/文件/默认值）
 │   ├── browser/             # 浏览器运行时
 │   │   ├── client.js        # Patchright 客户端
 │   │   ├── cdp.js           # CDP 会话管理
@@ -177,7 +204,6 @@ deepspider/
 │   ├── env/                 # 环境补丁模块
 │   ├── store/               # 数据存储
 │   └── mcp/                 # MCP 服务
-├── bin/cli.js               # CLI 入口
 └── test/                    # 测试
 ```
 

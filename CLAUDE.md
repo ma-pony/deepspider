@@ -39,13 +39,25 @@
 
 ```
 deepspider/
+├── bin/cli.js               # CLI 入口（命令路由）
 ├── src/
 │   ├── agent/               # DeepAgent 系统
 │   │   ├── index.js         # 主入口
-│   │   ├── run.js           # Agent 运行入口
+│   │   ├── run.js           # Agent 运行模块（延迟初始化）
+│   │   ├── setup.js         # 配置检测
 │   │   ├── tools/           # 工具集（90+）
 │   │   ├── subagents/       # 子代理
 │   │   └── prompts/         # 系统提示
+│   ├── cli/                 # CLI 命令层
+│   │   ├── config.js        # 配置 re-export
+│   │   └── commands/        # 子命令
+│   │       ├── version.js   # --version
+│   │       ├── help.js      # --help
+│   │       ├── config.js    # config 子命令
+│   │       └── update.js    # update 命令
+│   ├── config/              # 核心配置层
+│   │   ├── paths.js         # 路径常量
+│   │   └── settings.js      # 配置读写（环境变量 > 文件 > 默认值）
 │   ├── browser/             # 浏览器运行时
 │   │   ├── client.js        # Patchright 客户端
 │   │   ├── cdp.js           # CDP 会话管理
@@ -62,7 +74,6 @@ deepspider/
 │   ├── core/                # 核心模块
 │   ├── env/                 # 环境补丁模块
 │   └── mcp/                 # MCP 服务
-├── bin/cli.js               # CLI 入口
 └── test/                    # 测试
 ```
 
@@ -133,7 +144,7 @@ pnpm run agent https://example.com
 ┌─────────────────────────────────────┐
 │  浏览器启动，自动注入 Hook          │
 │  CDP 拦截器记录请求/脚本            │
-│  数据存储到 .deepspider-data/          │
+│  数据存储到 ~/.deepspider/          │
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
@@ -285,12 +296,28 @@ pnpm install
 # 安装 Python 加密库（用于运行生成的 Python 代码）
 pnpm run setup:crypto
 
-# 配置环境变量
+# 配置（任选其一）
+# 方式一：CLI 命令（推荐）
+deepspider config set apiKey your-api-key
+deepspider config set baseUrl https://api.openai.com/v1
+deepspider config set model gpt-4o
+
+# 方式二：环境变量 / .env 文件
 cp .env.example .env
 # 编辑 .env 填入:
 #   DEEPSPIDER_API_KEY=your-api-key
 #   DEEPSPIDER_BASE_URL=https://api.openai.com/v1
 #   DEEPSPIDER_MODEL=gpt-4o
+
+# CLI 命令
+deepspider --version              # 显示版本
+deepspider --help                 # 显示帮助
+deepspider config list            # 查看配置及来源
+deepspider config get <key>       # 获取配置项
+deepspider config set <key> <val> # 设置配置项
+deepspider config reset           # 重置配置文件
+deepspider config path            # 显示配置文件路径
+deepspider update                 # 检查更新
 
 # Agent 模式（推荐）- 指定目标网站
 pnpm run agent https://example.com
