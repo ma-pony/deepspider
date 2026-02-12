@@ -8,6 +8,7 @@ import { EventEmitter } from 'events';
 import { getDefaultHookScript } from './defaultHooks.js';
 import { NetworkInterceptor } from './interceptors/NetworkInterceptor.js';
 import { ScriptInterceptor } from './interceptors/ScriptInterceptor.js';
+import { AntiDebugInterceptor } from './interceptors/AntiDebugInterceptor.js';
 import { getDataStore } from '../store/DataStore.js';
 
 export class BrowserClient extends EventEmitter {
@@ -20,6 +21,7 @@ export class BrowserClient extends EventEmitter {
     this.cdpSession = null;
     this.networkInterceptor = null;
     this.scriptInterceptor = null;
+    this.antiDebugInterceptor = null;
     this.hookScript = null;
     this.onMessage = null;
     this._isCleaningUp = false;
@@ -125,11 +127,16 @@ export class BrowserClient extends EventEmitter {
       await networkInterceptor.start();
       await scriptInterceptor.start();
 
+      // 反无限 debugger：必须在 ScriptInterceptor 之后（Debugger 域已启用）
+      const antiDebugInterceptor = new AntiDebugInterceptor(cdp);
+      await antiDebugInterceptor.start();
+
       // 保存引用
       if (page === this.page) {
         this.cdpSession = cdp;
         this.networkInterceptor = networkInterceptor;
         this.scriptInterceptor = scriptInterceptor;
+        this.antiDebugInterceptor = antiDebugInterceptor;
       }
 
       // 监听页面导航
@@ -207,6 +214,9 @@ export class BrowserClient extends EventEmitter {
       if (this.scriptInterceptor) {
         await this.scriptInterceptor.stop?.().catch(() => {});
         this.scriptInterceptor = null;
+      }
+      if (this.antiDebugInterceptor) {
+        this.antiDebugInterceptor = null;
       }
 
       // 分离 CDP session
