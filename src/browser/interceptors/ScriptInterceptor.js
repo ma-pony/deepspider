@@ -11,6 +11,7 @@ export class ScriptInterceptor {
     this.page = page;  // Playwright page 对象
     this.store = getDataStore();
     this.scriptIds = new Set();
+    this.onSource = null;  // 回调: (scriptId, scriptSource) => void
   }
 
   /**
@@ -56,6 +57,11 @@ export class ScriptInterceptor {
         'Debugger.getScriptSource',
         { scriptId }
       );
+
+      // 通知订阅者（AntiDebugInterceptor 等）
+      if (this.onSource) {
+        this.onSource(scriptId, scriptSource);
+      }
 
       // 限制大小，超大脚本只保存部分
       const source = scriptSource.slice(0, 500000);

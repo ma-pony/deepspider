@@ -131,6 +131,11 @@ export class BrowserClient extends EventEmitter {
       const antiDebugInterceptor = new AntiDebugInterceptor(cdp);
       await antiDebugInterceptor.start();
 
+      // ScriptInterceptor 拉取源码后通知 AntiDebugInterceptor，避免重复 CDP 调用
+      scriptInterceptor.onSource = (scriptId, source) => {
+        antiDebugInterceptor.checkScript(scriptId, source);
+      };
+
       // 保存引用
       if (page === this.page) {
         this.cdpSession = cdp;
