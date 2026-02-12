@@ -4,6 +4,12 @@
   "description": "智能爬虫工程平台 - 基于 DeepAgents + Patchright 的 AI 爬虫 Agent",
   "type": "module",
   "main": "src/index.js",
+  "files": [
+    "bin/",
+    "src/",
+    "requirements-crypto.txt",
+    ".env.example"
+  ],
   "bin": {
     "deepspider": "./bin/cli.js"
   },
