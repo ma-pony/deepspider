@@ -34,16 +34,20 @@ export const listFunctions = tool(
  */
 export const getFunctionCode = tool(
   async ({ code, funcName }) => {
+    // buildDependencyGraph 先调用，extractSlice 内部会复用 this.ast 缓存
+    const graph = astAnalyzer.buildDependencyGraph(code);
+    const deps = graph.get(funcName) || [];
     const slice = astAnalyzer.extractSlice(code, funcName);
     return JSON.stringify({
       funcName,
       found: !!slice,
       code: slice || '未找到该函数',
+      dependencies: deps,
     }, null, 2);
   },
   {
     name: 'get_function_code',
-    description: '获取指定函数的代码片段',
+    description: '提取指定函数的完整代码（含递归依赖函数和全局变量）。返回可独立运行的代码片段 + 依赖函数列表',
     schema: z.object({
       code: z.string().describe('源代码'),
       funcName: z.string().describe('函数名'),

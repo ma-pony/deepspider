@@ -35,6 +35,8 @@ import { nodejsTools } from '../tools/nodejs.js';
 // 输出
 import { fileTools } from '../tools/file.js';
 import { storeTools } from '../tools/store.js';
+// 工作记忆
+import { scratchpadTools } from '../tools/scratchpad.js';
 
 export const reverseSubagent = createSubagent({
   name: 'reverse-agent',
@@ -73,6 +75,13 @@ export const reverseSubagent = createSubagent({
 - 浏览器生命周期由主 agent 管理，你没有 launch_browser / navigate_to 工具
 - 如果任务描述中包含"浏览器已就绪"，你可以直接使用断点、Hook、采集工具
 - 如果浏览器未启动，返回结果告知主 agent 需要先启动浏览器
+
+## 工作记忆
+多步分析时，用 save_memo 记录关键发现，防止上下文丢失：
+- 定位到加密函数后 → save_memo("crypto-func", "函数名 + 位置 + 算法类型")
+- 找到 key/iv 来源后 → save_memo("key-source", "来源 + 值")
+- 验证成功后 → save_memo("verified-code", "可运行的完整代码")
+分析开始时用 list_memo 检查是否有之前的记录可以复用。
 
 ## 输出要求
 - 返回加密算法的完整分析（入口函数、参数来源、算法类型）
@@ -114,6 +123,8 @@ export const reverseSubagent = createSubagent({
     // 输出
     ...fileTools,
     ...storeTools,
+    // 工作记忆
+    ...scratchpadTools,
   ],
   skills: ['static', 'dynamic', 'sandbox', 'env'],
   evolveSkill: ['static-analysis', 'dynamic-analysis', 'sandbox', 'env'],

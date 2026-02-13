@@ -3,7 +3,7 @@
  * 统一子代理创建，自动注入公共配置
  */
 
-import { createMiddleware, toolRetryMiddleware } from 'langchain';
+import { createMiddleware, toolRetryMiddleware, contextEditingMiddleware, ClearToolUsesEdit } from 'langchain';
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
 import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
@@ -75,6 +75,13 @@ export function createBaseMiddleware(skillsSources = []) {
     }),
     createFilterToolsMiddleware(),
     createToolCallLimitMiddleware(),
+    contextEditingMiddleware({                    // 清理旧工具结果，防止上下文膨胀
+      edits: [new ClearToolUsesEdit({
+        trigger: { tokens: 80000 },               // 80k token 触发（子代理上下文较短）
+        keep: { messages: 5 },                     // 保留最近 5 条工具结果
+        excludeTools: ['save_memo'],               // scratchpad 内容不清理
+      })],
+    }),
     createSkillsMiddleware({
       backend: skillsBackend,
       sources: skillsSources,

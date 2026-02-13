@@ -35,6 +35,7 @@ export { antiDetectTools } from './anti-detect.js';
 export { crawlerTools } from './crawler.js';
 export { nodejsTools, runNodeCode } from './nodejs.js';
 export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig } from './hookManager.js';
+export { scratchpadTools, saveMemo, loadMemo, listMemo } from './scratchpad.js';
 // pythonTools 只在 js2python 子代理中使用，不导出到主工具集
 
 // 所有工具
@@ -71,6 +72,7 @@ import { antiDetectTools } from './anti-detect.js';
 import { crawlerTools } from './crawler.js';
 import { nodejsTools } from './nodejs.js';
 import { hookManagerTools } from './hookManager.js';
+import { scratchpadTools } from './scratchpad.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -106,6 +108,7 @@ export const allTools = [
   ...crawlerTools,
   ...nodejsTools,
   ...hookManagerTools,
+  ...scratchpadTools,
 ];
 
 /**
@@ -136,4 +139,6 @@ export const coreTools = [
   ...evolveTools,
   // Node.js 执行（委托前快速验证假设）
   ...nodejsTools,
+  // 工作记忆
+  ...scratchpadTools,
 ];
