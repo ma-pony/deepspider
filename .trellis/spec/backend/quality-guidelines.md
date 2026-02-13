@@ -331,8 +331,8 @@ currentStage.fields.splice(index, 1);
 
 ```javascript
 // ❌ 禁止：每个子代理重复配置中间件
-export const staticSubagent = {
-  name: 'static-agent',
+export const reverseSubagent = {
+  name: 'reverse-agent',
   tools: [...staticTools, ...evolveTools],
   middleware: [
     createFilterToolsMiddleware(),
@@ -343,12 +343,12 @@ export const staticSubagent = {
 // ✅ 使用工厂函数统一配置
 import { createSubagent, SKILLS } from './factory.js';
 
-export const staticSubagent = createSubagent({
-  name: 'static-agent',
-  description: '静态分析专家',
+export const reverseSubagent = createSubagent({
+  name: 'reverse-agent',
+  description: '逆向分析专家',
   systemPrompt: '...',
   tools: staticTools,
-  skills: [SKILLS.static],
+  skills: ['static', 'dynamic', 'sandbox', 'env'],
 });
 ```
 

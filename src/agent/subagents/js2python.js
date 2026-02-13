@@ -3,16 +3,14 @@
  * 将 JS 加密逻辑转换为 Python 代码
  */
 
-import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
-import { SKILLS } from '../skills/config.js';
+import { createSubagent } from './factory.js';
 
 import { pythonTools } from '../tools/python.js';
 import { nodejsTools } from '../tools/nodejs.js';
 import { analyzerTools } from '../tools/analyzer.js';
 import { fileTools } from '../tools/file.js';
-import { evolveTools } from '../tools/evolve.js';
 
-export const js2pythonSubagent = {
+export const js2pythonSubagent = createSubagent({
   name: 'js2python',
   description: 'JS转Python专家。适用于：将已还原的 JS 加密代码转换为 Python 实现、标准加密算法转换、复杂算法 execjs 方案。输入必须是已分析清楚的 JS 代码。不能做代码分析、不能反混淆、不能控制浏览器。',
   systemPrompt: `你是 DeepSpider 的 JS 转 Python 专家，负责将 JS 加密逻辑转换为 Python 代码。
@@ -50,16 +48,13 @@ export const js2pythonSubagent = {
 纯 Python 转换失败 3 次 → 改用 execjs 方案
 
 目标是保证最终输出可用的代码。
-
-## 经验记录
-完成转换后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "js2python"` + SUBAGENT_DISCIPLINE_PROMPT,
+`,
   tools: [
     ...pythonTools,
     ...nodejsTools,
     ...analyzerTools,
     ...fileTools,
-    ...evolveTools,
   ],
-  middleware: createBaseMiddleware([SKILLS.js2python]),
-};
+  skills: ['js2python'],
+  evolveSkill: 'js2python',
+});

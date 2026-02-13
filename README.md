@@ -150,19 +150,14 @@ pnpm test
        ┌───────────────┼───────────────┐
        ▼               ▼               ▼
 ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│static-agent │ │captcha-agent│ │anti-detect  │
-│ 静态分析    │ │ 验证码处理  │ │ 反检测      │
+│reverse-agent│ │captcha-agent│ │anti-detect  │
+│ 逆向分析    │ │ 验证码处理  │ │ 反检测      │
 └──────┬──────┘ └─────────────┘ └─────────────┘
        ▼
 ┌─────────────┐
-│dynamic-agent│
-│ 动态调试    │
-└──────┬──────┘
-       ▼
-┌─────────────┐     ┌─────────────┐
-│sandbox-agent│ ──▶ │js2python    │
-│ 沙箱验证    │     │ 代码转换    │
-└─────────────┘     └─────────────┘
+│js2python    │
+│ 代码转换    │
+└─────────────┘
 ```
 
 ### 子代理体系
@@ -170,9 +165,7 @@ pnpm test
 | 子代理 | 职责 | 核心工具 |
 |--------|------|----------|
 | crawler | 爬虫编排：整合各模块、生成完整脚本 | file, store, crawler |
-| static | 静态分析：解包、反混淆、加密定位 | webcrack, deobfuscate, analyze |
-| dynamic | 动态分析：浏览器控制、Hook、数据采集 | browser, debug, capture |
-| sandbox | 沙箱执行：环境补全、代码执行 | sandbox, env, patch |
+| reverse | 逆向分析全流程：反混淆、断点调试、Hook、沙箱验证、补环境 | tracing, deobfuscate, debug, capture, sandbox, env |
 | js2python | JS转Python：加密代码转换、验证 | python, analyzer |
 | captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
 | anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |

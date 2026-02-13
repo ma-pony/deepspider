@@ -3,15 +3,13 @@
  * 智能调度、流程规划、脚本生成
  */
 
-import { createBaseMiddleware, SUBAGENT_DISCIPLINE_PROMPT } from './factory.js';
-import { SKILLS } from '../skills/config.js';
+import { createSubagent } from './factory.js';
 
 import { crawlerTools } from '../tools/crawler.js';
 import { fileTools } from '../tools/file.js';
-import { evolveTools } from '../tools/evolve.js';
 import { storeTools } from '../tools/store.js';
 
-export const crawlerSubagent = {
+export const crawlerSubagent = createSubagent({
   name: 'crawler',
   description: '爬虫编排专家。适用于：规划完整爬虫流程、整合各模块生成完整 Python 爬虫脚本、E2E 测试。不能做加密分析、不能反混淆、不能控制浏览器。依赖其他子代理提供加密/验证码等模块。',
   systemPrompt: `你是 DeepSpider 的爬虫编排专家，负责生成完整可运行的 Python 爬虫脚本。
@@ -51,10 +49,10 @@ export const crawlerSubagent = {
 
 | 网站特征 | 调用子代理 | 获取模块 |
 |----------|-----------|----------|
-| 有加密参数 | static → js2python | crypto.py |
+| 有加密参数 | reverse-agent → js2python | crypto.py |
 | 有验证码 | captcha 分析 | 生成验证码处理代码 |
 | 有风控 | anti-detect 分析 | 生成反检测配置代码 |
-| 需要登录 | dynamic 分析 | 生成登录流程代码 |
+| 需要登录 | reverse-agent 分析 | 生成登录流程代码 |
 
 ## 输出规范
 
@@ -117,15 +115,12 @@ if __name__ == "__main__":
 3. 整合为完整脚本
 4. E2E 验证
 5. 输出文件
-
-## 经验记录
-完成爬虫编排后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "crawler"` + SUBAGENT_DISCIPLINE_PROMPT,
+`,
   tools: [
     ...crawlerTools,
     ...fileTools,
-    ...evolveTools,
     ...storeTools,
   ],
-  middleware: createBaseMiddleware([SKILLS.crawler, SKILLS.xpath]),
-};
+  skills: ['crawler', 'xpath'],
+  evolveSkill: 'crawler',
+});

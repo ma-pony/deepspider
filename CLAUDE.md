@@ -101,11 +101,8 @@ deepspider/
 | 子代理 | 职责 | 核心工具 |
 |--------|------|----------|
 | crawler | 爬虫编排：整合各模块、生成完整脚本 | file, store, crawler |
-| static | 静态分析：解包、反混淆、加密定位 | webcrack, deobfuscate, analyze |
-| dynamic | 动态分析：浏览器控制、Hook、数据采集 | browser, debug, capture |
-| sandbox | 沙箱执行：环境补全、代码执行 | sandbox, env, patch |
+| reverse | 逆向分析全流程：反混淆、断点调试、Hook、沙箱验证、补环境 | tracing, deobfuscate, debug, capture, sandbox, env |
 | js2python | JS转Python：加密代码转换、验证 | python, analyzer |
-| env-agent | 环境补全：生成浏览器环境模拟代码 | env, sandbox |
 | captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
 | anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |
 
@@ -124,8 +121,8 @@ deepspider/
 ┌─────────────────────────────────────┐
 │  按需调用子代理                     │
 │                                     │
-│  Level 1 简单: static → js2python   │
-│  Level 2 中等: + captcha + dynamic  │
+│  Level 1 简单: reverse → js2python  │
+│  Level 2 中等: + captcha            │
 │  Level 3 复杂: + anti-detect + e2e  │
 └─────────────────────────────────────┘
          ↓

@@ -13,7 +13,7 @@ export { profileTools, listProfiles, loadProfile, generateProfileCode } from './
 export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, clearCookies } from './runtime.js';
 export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver, getAgentLogs } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
-export { browserTools, clickElement, fillInput, waitForSelector } from './browser.js';
+export { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, getInteractiveElements } from './browser.js';
 export { reportTools, saveAnalysisReport } from './report.js';
 export { webcrackTools, unpackBundle, analyzeBundle } from './webcrack.js';
 export { preprocessTools, preprocessCode } from './preprocess.js';
@@ -110,28 +110,30 @@ export const allTools = [
 
 /**
  * 主 Agent 核心工具
- * 只包含必要的运行时、交互和数据查询工具
- * pythonTools 只在 js2python 子代理中使用
+ * 职责：浏览器生命周期、简单页面交互、数据查询、委托调度
+ *
+ * 以下工具有意不包含在主 agent 中，由专属子代理持有：
+ * - hookManagerTools (inject_hook 等) → reverse-agent
+ * - captureTools (collect_env, get_hook_logs 等) → reverse-agent
+ * - sandboxTools → reverse-agent
+ * - debugTools → reverse-agent
+ * - 静态分析工具 → reverse-agent
  */
 export const coreTools = [
-  // 浏览器运行时
+  // 浏览器运行时（生命周期管理）
   ...runtimeTools,
-  // 页面交互
+  // 页面交互（简单点击、填写、等待）
   ...browserTools,
-  // 浏览器分析交互
+  // 浏览器分析面板交互
   ...analysisTools,
-  // 数据溯源查询
+  // 数据溯源查询（判断委托方向的依据）
   ...tracingTools,
-  // 沙箱执行（验证代码）
-  ...sandboxTools,
-  // Hook 日志
-  ...captureTools,
+  // 报告生成
+  ...reportTools,
   // 文件操作
   ...fileTools,
   // 经验进化
   ...evolveTools,
-  // Node.js 执行（支持 require）
+  // Node.js 执行（委托前快速验证假设）
   ...nodejsTools,
-  // Hook 动态管理
-  ...hookManagerTools,
 ];

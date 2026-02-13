@@ -406,10 +406,169 @@ export const getCookies = tool(
   }
 );
 
+/**
+ * CSS 选择器转义（Node.js 没有 CSS.escape）
+ */
+function cssEscape(str) {
+  return str.replace(/([^\w-])/g, '\\$1');
+}
+
+/**
+ * 转义属性选择器中的值（双引号）
+ */
+function escapeAttrValue(str) {
+  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/**
+ * 可交互角色白名单
+ */
+const INTERACTIVE_ROLES = new Set([
+  'button', 'link', 'menuitem', 'tab',
+  'checkbox', 'radio', 'combobox', 'textbox',
+  'switch', 'option', 'menuitemcheckbox', 'menuitemradio',
+  'searchbox', 'spinbutton', 'slider',
+]);
+
+/**
+ * 从 DOM.describeNode 结果生成 CSS 选择器
+ */
+function buildSelector(nodeInfo) {
+  const { localName, attributes } = nodeInfo;
+  if (!localName) return '';
+
+  // attributes 是 [key, value, key, value, ...] 扁平数组
+  const attrs = {};
+  for (let i = 0; i < (attributes || []).length; i += 2) {
+    attrs[attributes[i]] = attributes[i + 1];
+  }
+
+  // 优先用 id
+  if (attrs.id) return `#${cssEscape(attrs.id)}`;
+
+  // 其次用 data-* 属性
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('data-') && v) return `${localName}[${k}="${escapeAttrValue(v)}"]`;
+  }
+
+  // 用 aria-label
+  if (attrs['aria-label']) {
+    return `${localName}[aria-label="${escapeAttrValue(attrs['aria-label'])}"]`;
+  }
+
+  // 用 name 属性（input/select 等）
+  if (attrs.name) {
+    return `${localName}[name="${escapeAttrValue(attrs.name)}"]`;
+  }
+
+  // 用 class（拼接所有类名提高唯一性）
+  if (attrs.class) {
+    const classes = attrs.class.split(/\s+/).filter(Boolean);
+    if (classes.length) return `${localName}.${classes.map(c => cssEscape(c)).join('.')}`;
+  }
+
+  // 兜底用 tagName
+  return localName;
+}
+
+/**
+ * 获取页面可交互元素列表 - CDP Accessibility Tree
+ */
+export const getInteractiveElements = tool(
+  async ({ roles, limit }) => {
+    const browser = await getBrowser();
+    const cdp = await browser.getCDPSession();
+    if (!cdp) throw new Error('CDP session not available');
+
+    // 启用所需 CDP 域
+    await cdp.send('Accessibility.enable');
+    await cdp.send('DOM.enable');
+
+    // 获取完整无障碍树
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+
+    // 确定过滤角色集
+    const filterRoles = roles?.length
+      ? new Set(roles)
+      : INTERACTIVE_ROLES;
+
+    // 过滤可交互节点
+    const candidates = [];
+    for (const node of nodes) {
+      if (node.ignored) continue;
+      const role = node.role?.value;
+      if (!role || !filterRoles.has(role)) continue;
+      candidates.push(node);
+    }
+
+    const totalBeforeTruncate = candidates.length;
+    const truncated = candidates.length > limit;
+    const selected = candidates.slice(0, limit);
+
+    // 并发获取选择器（分批，每批 20）
+    const BATCH = 20;
+    const elements = [];
+    for (let i = 0; i < selected.length; i += BATCH) {
+      const batch = selected.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(async (node) => {
+        // 提取属性
+        const props = {};
+        for (const p of (node.properties || [])) {
+          props[p.name] = p.value?.value;
+        }
+
+        // 通过 backendDOMNodeId 获取选择器
+        let selector = '';
+        if (node.backendDOMNodeId) {
+          try {
+            const desc = await cdp.send('DOM.describeNode', {
+              backendNodeId: node.backendDOMNodeId,
+            });
+            selector = buildSelector(desc.node);
+          } catch {
+            // 节点可能已从 DOM 移除
+          }
+        }
+
+        return {
+          role: node.role?.value,
+          name: node.name?.value || '',
+          selector,
+          clickable: !props.disabled,
+          disabled: !!props.disabled,
+          focused: !!props.focused,
+          description: node.description?.value || '',
+        };
+      }));
+      elements.push(...results);
+    }
+
+    return JSON.stringify({
+      elements,
+      total: totalBeforeTruncate,
+      truncated,
+    });
+  },
+  {
+    name: 'get_interactive_elements',
+    description: `获取页面上所有可交互元素（按钮、链接、输入框等），基于 Accessibility Tree。
+
+用途：在点击/操作元素前，先调用此工具了解页面上有哪些可交互元素，避免盲目猜测选择器。
+返回的 selector 可直接传给 click_element / fill_input 使用。
+
+支持的角色：button, link, menuitem, tab, checkbox, radio, combobox, textbox, switch, option, searchbox, spinbutton, slider 等。`,
+    schema: z.object({
+      roles: z.array(z.string()).optional().describe('过滤角色列表，如 ["button", "link"]，不传则返回所有可交互角色'),
+      limit: z.number().default(100).describe('最大返回数量，默认 100，避免结果过大'),
+    }),
+  }
+);
+
 export const browserTools = [
   clickElement,
   fillInput,
   waitForSelector,
+  takeScreenshot,
   reloadPage,
   goBack,
   goForward,
@@ -420,4 +579,5 @@ export const browserTools = [
   getPageSource,
   getElementHtml,
   getCookies,
+  getInteractiveElements,
 ];

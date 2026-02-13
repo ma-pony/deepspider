@@ -28,8 +28,11 @@ export const SUBAGENT_DISCIPLINE_PROMPT = `
 /**
  * 创建工具调用次数限制中间件
  * - wrapToolCall 计数
- * - wrapModelCall 达到上限后移除工具并注入提示
+ * - wrapModelCall 达到上限后注入提示引导模型总结返回
  * - beforeAgent 每次子代理被调用时重置计数器，避免跨任务累积
+ *
+ * 注意：callCount 通过闭包持有，假设同一子代理不会被并行调用。
+ * deepagents 当前是串行调度子代理，如果未来支持并行需改为 per-invocation 计数。
  */
 function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
   let callCount = 0;
@@ -52,7 +55,6 @@ function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
         return handler({
           ...request,
           systemPrompt: (request.systemPrompt || '') + limitNotice,
-          tools: [],
         });
       }
       return handler(request);
@@ -78,12 +80,14 @@ export function createBaseMiddleware(skillsSources = []) {
 
 /**
  * 创建子代理配置
+ * 自动注入 evolveTools + createBaseMiddleware，减少子代理定义中的重复代码
  * @param {Object} config - 子代理配置
  * @param {string} config.name - 子代理名称
  * @param {string} config.description - 子代理描述
  * @param {string} config.systemPrompt - 系统提示
  * @param {Array} config.tools - 工具列表
- * @param {Array} [config.skills] - 技能源列表（SKILLS 枚举值）
+ * @param {Array<string>} [config.skills] - SKILLS 的 key 列表（如 ['static', 'xpath']），自动映射为路径
+ * @param {string|string[]} [config.evolveSkill='general'] - evolve_skill 的目标 skill（对应 evolve.js skillMap key），支持数组表示多领域
  * @param {Array} [config.middleware] - 额外的中间件
  * @param {boolean} [config.includeEvolve=true] - 是否包含 evolve 工具
  */
@@ -94,25 +98,41 @@ export function createSubagent(config) {
     systemPrompt,
     tools,
     skills = [],
+    evolveSkill = 'general',
     middleware = [],
     includeEvolve = true,
   } = config;
 
-  // 合并工具列表
   const finalTools = includeEvolve
     ? [...tools, ...evolveTools]
     : tools;
 
-  // 构建中间件列表：复用 createBaseMiddleware + 额外中间件
+  // skills key → SKILLS 路径值
+  const skillsSources = skills.map((key) => {
+    const source = SKILLS[key];
+    if (!source) throw new Error(`Unknown skill key: "${key}". Valid keys: ${Object.keys(SKILLS).join(', ')}`);
+    return source;
+  });
+
   const finalMiddleware = [
-    ...createBaseMiddleware(skills),
+    ...createBaseMiddleware(skillsSources),
     ...middleware,
   ];
+
+  // 自动拼接通用 prompt 段落：经验记录 + 执行纪律
+  let evolvePrompt;
+  if (Array.isArray(evolveSkill)) {
+    const list = evolveSkill.map(s => `  - "${s}"`).join('\n');
+    evolvePrompt = `\n\n## 经验记录\n完成任务后，如发现有价值的经验，使用 evolve_skill 记录。根据经验所属领域选择对应 skill：\n${list}`;
+  } else {
+    evolvePrompt = `\n\n## 经验记录\n完成任务后，如发现有价值的经验，使用 evolve_skill 记录：\n- skill: "${evolveSkill}"`;
+  }
+  const fullPrompt = systemPrompt + evolvePrompt + SUBAGENT_DISCIPLINE_PROMPT;
 
   return {
     name,
     description,
-    systemPrompt,
+    systemPrompt: fullPrompt,
     tools: finalTools,
     middleware: finalMiddleware,
   };

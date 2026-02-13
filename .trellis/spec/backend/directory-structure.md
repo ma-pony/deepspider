@@ -125,7 +125,7 @@ browser/ ─────> interceptors/, collectors/, hooks/, ui/
 |------|----------|------|
 | 工具数组 | *Tools | `analyzerTools`, `deobfuscatorTools` |
 | 单个工具 | camelCase 动词 | `analyzeAst`, `deobfuscate` |
-| 子代理 | *Subagent | `staticSubagent`, `dynamicSubagent` |
+| 子代理 | *Subagent | `reverseSubagent`, `crawlerSubagent` |
 | 类 | PascalCase | `ASTAnalyzer`, `DataStore` |
 | 错误类 | *Error | `ApiServiceError`, `BrowserError` |
 | 核心模块类 | PascalCase | `StreamHandler`, `PanelBridge` |

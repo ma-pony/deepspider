@@ -23,6 +23,9 @@ function getSkillPath(skillName) {
     'sandbox': SKILLS.sandbox,
     'env': SKILLS.env,
     'js2python': SKILLS.js2python,
+    'crawler': SKILLS.crawler,
+    'captcha': SKILLS.captcha,
+    'anti-detect': SKILLS.antiDetect,
     'report': SKILLS.report,
     'general': SKILLS.general,
   };
@@ -83,7 +86,7 @@ export const evolveSkill = tool(
     if (!skillInfo) {
       return JSON.stringify({
         success: false,
-        error: `未知的 skill: ${skill}。可用: static-analysis, dynamic-analysis, sandbox, env, js2python, report, general。或使用 new:<name> 创建新 skill。`
+        error: `未知的 skill: ${skill}。可用: static-analysis, dynamic-analysis, sandbox, env, js2python, crawler, captcha, anti-detect, report, general。或使用 new:<name> 创建新 skill。`
       });
     }
 
@@ -152,7 +155,7 @@ export const evolveSkill = tool(
     name: 'evolve_skill',
     description: '记录分析过程中学到的经验。支持现有 skill 或 new:<name> 创建新 skill',
     schema: z.object({
-      skill: z.string().describe('目标 skill: static-analysis, dynamic-analysis, sandbox, env, js2python, report, general，或 new:<name> 创建新 skill'),
+      skill: z.string().describe('目标 skill: static-analysis, dynamic-analysis, sandbox, env, js2python, crawler, captcha, anti-detect, report, general，或 new:<name> 创建新 skill'),
       title: z.string().describe('经验标题，简短描述'),
       scenario: z.string().describe('具体场景/案例'),
       insight: z.string().describe('一句话总结经验'),

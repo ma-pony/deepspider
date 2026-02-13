@@ -41,38 +41,104 @@ const agent = createDeepAgent({
 
 ## 子代理定义
 
-### 字典式子代理
+### 使用 createSubagent 工厂函数（必须）
+
+所有子代理必须通过 `createSubagent` 创建，工厂函数自动注入：
+- `createBaseMiddleware`：工具过滤 + 调用次数限制 + Skills
+- `evolveTools`：经验记录工具
+- `SUBAGENT_DISCIPLINE_PROMPT`：防循环执行纪律
+- 经验记录 prompt：引导子代理调用 `evolve_skill`
 
 ```javascript
-export const staticSubagent = {
-  name: 'static-agent',
-  description: '静态代码分析专家。当需要分析混淆代码时使用。',
-  systemPrompt: `你是静态分析专家...`,
-  tools: [...analyzerTools, ...deobfuscatorTools],
-  middleware: [
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.static],
-    }),
-  ],
-};
+import { createSubagent } from './factory.js';
+import { analyzerTools } from '../tools/analyzer.js';
+
+export const reverseSubagent = createSubagent({
+  name: 'reverse-agent',
+  description: '逆向分析专家。覆盖逆向全流程：反混淆、断点调试、Hook、沙箱验证、补环境。不能生成 Python 代码（用 js2python）、不能编排爬虫（用 crawler）。',
+  systemPrompt: `你是 DeepSpider 的逆向分析专家。...`,
+  tools: [...analyzerTools, ...deobfuscatorTools, ...debugTools],
+  skills: ['static', 'dynamic', 'sandbox', 'env'],  // 加载多个领域的知识
+  evolveSkill: ['static-analysis', 'dynamic-analysis', 'sandbox', 'env'],  // 按领域分流写入
+});
 ```
 
-### 必需字段
+### createSubagent 参数
 
-| 字段 | 说明 |
-|------|------|
-| `name` | 子代理名称，用于调用 |
-| `description` | 描述何时使用该子代理 |
-| `systemPrompt` | 子代理的系统提示 |
-| `tools` | 子代理可用的工具 |
+| 字段 | 必需 | 说明 |
+|------|------|------|
+| `name` | ✅ | 子代理名称 |
+| `description` | ✅ | 描述何时使用（含正向 + 负向能力边界） |
+| `systemPrompt` | ✅ | 系统提示（只写职责和流程） |
+| `tools` | ✅ | 工具数组（不含 evolveTools，工厂自动注入） |
+| `skills` | ❌ | SKILLS config 的 key 列表，如 `['static']`、`['crawler', 'xpath']` |
+| `evolveSkill` | ❌ | evolve_skill 的目标 skill，支持字符串或字符串数组（多领域），默认 `'general'` |
+| `middleware` | ❌ | 额外中间件（追加到 createBaseMiddleware 之后） |
+| `includeEvolve` | ❌ | 是否注入 evolveTools，默认 `true` |
 
-### 可选字段
+### skills vs evolveSkill 的区别
 
-| 字段 | 说明 |
-|------|------|
-| `model` | 覆盖默认模型 |
-| `middleware` | 子代理中间件（如 Skills） |
+这两个参数容易混淆，但用途完全不同：
+
+| | `skills` | `evolveSkill` |
+|---|---|---|
+| 来源 | `SKILLS` config (`skills/config.js`) | `skillMap` (`tools/evolve.js`) |
+| 用途 | 加载哪些 skill 目录的知识 | 经验写入哪个 skill 目录 |
+| 值 | config key: `'static'`, `'dynamic'` | skillMap key: `'static-analysis'`, `'dynamic-analysis'`，支持数组 |
+| 示例 | `skills: ['static', 'dynamic']` → 加载两个目录的 SKILL.md | `evolveSkill: ['static-analysis', 'dynamic-analysis']` → 按领域分流写入 |
+
+当前完整映射：
+
+| 子代理 | skills | evolveSkill |
+|--------|--------|-------------|
+| reverse-agent | `['static', 'dynamic', 'sandbox', 'env']` | `['static-analysis', 'dynamic-analysis', 'sandbox', 'env']` |
+| js2python | `['js2python']` | `'js2python'` |
+| crawler | `['crawler', 'xpath']` | `'crawler'` |
+| captcha | `['captcha']` | `'captcha'` |
+| anti-detect | `['antiDetect']` | `'anti-detect'` |
+
+---
+
+## 防循环中间件
+
+### createToolCallLimitMiddleware
+
+工厂函数通过 `createBaseMiddleware` 自动为每个子代理注入工具调用次数限制：
+
+- `runLimit: 80`（正常任务 30-50 次足够，80 防止无限循环）
+- 达到上限后通过 `wrapModelCall` 注入 systemPrompt 提示，引导模型总结返回
+- `beforeAgent` 每次子代理被调用时重置计数器
+
+```javascript
+// factory.js 内部实现，不需要手动配置
+function createToolCallLimitMiddleware(runLimit = 80) {
+  let callCount = 0;
+  return createMiddleware({
+    beforeAgent: async () => { callCount = 0; },
+    wrapToolCall: async (request, handler) => { callCount++; return handler(request); },
+    wrapModelCall: async (request, handler) => {
+      if (callCount >= runLimit) {
+        // 注入提示引导总结，不清空 tools
+        return handler({ ...request, systemPrompt: request.systemPrompt + limitNotice });
+      }
+      return handler(request);
+    },
+  });
+}
+```
+
+> **Warning**: 达到上限时不要设置 `tools: []`，这会阻断子代理的返回机制（deepagents 框架依赖工具调用来返回结果）。
+
+### SUBAGENT_DISCIPLINE_PROMPT
+
+自动拼接到每个子代理 systemPrompt 末尾：
+
+```
+## 执行纪律（必须遵守）
+- 同一工具连续 3 次返回相同结果，必须停止并换策略或总结返回
+- 如果当前工具集无法完成任务，立即总结已有发现并返回，不要反复尝试
+- 先用最小代价验证假设（一次工具调用），确认可行后再展开
+```
 
 ---
 
@@ -100,19 +166,19 @@ export const SKILLS = {
 
 ### 子代理绑定 Skills
 
-```javascript
-import { createSkillsMiddleware } from 'deepagents';
-import { SKILLS, skillsBackend } from '../skills/config.js';
+通过 `createSubagent` 的 `skills` 参数自动绑定，无需手动配置 middleware：
 
-export const staticSubagent = {
-  // ...其他配置
-  middleware: [
-    createSkillsMiddleware({
-      backend: skillsBackend,
-      sources: [SKILLS.static],  // 只加载静态分析 skill
-    }),
-  ],
-};
+```javascript
+export const reverseSubagent = createSubagent({
+  // ...
+  skills: ['static', 'dynamic', 'sandbox', 'env'],  // 加载多个 skill 目录
+});
+
+// 单个 skill
+export const crawlerSubagent = createSubagent({
+  // ...
+  skills: ['crawler', 'xpath'],  // 加载两个 skill 目录
+});
 ```
 
 ### SKILL.md 格式
@@ -161,18 +227,21 @@ last_merged: 2024-01-15
 
 #### 触发经验记录
 
-在 subagent 的 systemPrompt 末尾添加引导：
+`createSubagent` 工厂自动在 systemPrompt 末尾拼接经验记录引导，无需手动添加：
 
 ```javascript
-systemPrompt: `...原有内容...
-
-## 经验记录
-完成分析后，如发现有价值的经验，使用 evolve_skill 记录：
-- skill: "static-analysis"
-- 新技巧、踩坑记录、通用方案都值得记录`,
+// 工厂自动生成的 prompt 段落（以 reverse-agent 为例）：
+// ## 经验记录
+// 完成任务后，如发现有价值的经验，使用 evolve_skill 记录。根据经验所属领域选择对应 skill：
+//   - "static-analysis"
+//   - "dynamic-analysis"
+//   - "sandbox"
+//   - "env"
 ```
 
-> **注意**: evolve_skill 工具不会自动触发，需要通过 Prompt 引导 Agent 主动调用。
+`evolveSkill` 参数决定写入哪个 skill 目录，必须是 `evolve.js` 的 `skillMap` 中的有效 key。
+
+> **注意**: evolve_skill 工具不会自动触发，需要通过 Prompt 引导 Agent 主动调用。新增子代理时需同步更新 `evolve.js` 的 `skillMap`。
 
 #### 合并策略
 
@@ -222,13 +291,13 @@ const agent = createDeepAgent({
 
 ## 最佳实践
 
-### 子代理描述要具体
+### 子代理描述要具体（含负向能力边界）
 
 ```javascript
-// ✅ 好
-description: '静态代码分析专家。当需要分析混淆代码结构时使用，适用于：Webpack 解包、反混淆、定位加密函数。'
+// ✅ 好：正向能力 + 负向边界，帮助主 agent 准确选择
+description: '静态代码分析专家。适用于：Webpack解包、反混淆、定位加密入口、算法还原。不能控制浏览器、不能设断点、不能采集运行时环境数据。'
 
-// ❌ 差
+// ❌ 差：只有正向描述
 description: '分析代码'
 ```
 
@@ -354,11 +423,11 @@ systemPrompt: `你是分析专家。
 
 ### 错误 6: 子代理职责重叠
 
-**问题**: 创建多个子代理处理相似任务（如 static-agent 和 algo-agent 都做加密分析）。
+**问题**: 创建多个子代理处理相似任务（如 static-agent 和 dynamic-agent 都参与加密分析但各自缺少关键能力）。
 
-**后果**: 主 agent 难以选择正确的子代理，导致任务分发混乱。
+**后果**: 主 agent 难以选择正确的子代理，导致任务分发混乱、信息在子代理间丢失。
 
-**正确做法**: 合并职责相近的子代理，确保每个子代理有明确独立的职责边界。
+**正确做法**: 按任务流程而非技术能力划分子代理，确保每个子代理能独立完成一个完整任务。例如将 static + dynamic + sandbox 合并为 reverse-agent。
 
 ### 错误 7: 引用不存在的工具模块
 
@@ -378,3 +447,66 @@ import { browserTools } from '../tools/browser.js';  // 文件确实存在
 1. 添加新子代理前，先确认所需工具模块存在
 2. 工具模块命名应语义化（如 `browser.js` 比 `trigger.js` 更清晰）
 3. 修改模块名时同步更新所有引用
+
+### 错误 8: 不使用 createSubagent 工厂函数
+
+**问题**: 直接定义子代理对象字面量，手动拼装 middleware。
+
+```javascript
+// ❌ 差：手动拼装，容易遗漏中间件
+export const mySubagent = {
+  name: 'my-agent',
+  tools: [...myTools, ...evolveTools],
+  middleware: [
+    createFilterToolsMiddleware(),
+    createToolCallLimitMiddleware(),
+    createSkillsMiddleware({ backend: skillsBackend, sources: [SKILLS.xxx] }),
+  ],
+  systemPrompt: `...` + SUBAGENT_DISCIPLINE_PROMPT,
+};
+
+// ✅ 好：工厂统一注入
+export const mySubagent = createSubagent({
+  name: 'my-agent',
+  tools: [...myTools],
+  skills: ['xxx'],
+  evolveSkill: 'xxx',
+  systemPrompt: `...`,
+});
+```
+
+**后果**: 遗漏防循环中间件、执行纪律 prompt、经验记录引导，导致子代理失控。
+
+**正确做法**: 所有子代理必须通过 `createSubagent` 创建。
+
+### 错误 9: 达到工具调用上限时清空 tools
+
+**问题**: 在 toolCallLimitMiddleware 中设置 `tools: []` 强制停止子代理。
+
+**后果**: deepagents 框架依赖工具调用来返回结果，清空 tools 会阻断子代理的返回机制，导致上下文丢失。
+
+**正确做法**: 只通过 systemPrompt 注入提示引导模型自行总结返回，不修改 tools。
+
+### 错误 10: evolveSkill 与 skillMap 不一致
+
+**问题**: `createSubagent` 的 `evolveSkill` 参数使用了 `evolve.js` skillMap 中不存在的 key。
+
+```javascript
+// ❌ 差：skillMap 中没有 'reverse' 这个 key
+createSubagent({ evolveSkill: 'reverse' });
+
+// ✅ 好：使用 skillMap 中的有效 key，支持数组
+createSubagent({ evolveSkill: ['static-analysis', 'dynamic-analysis'] });
+```
+
+**后果**: 子代理调用 evolve_skill 时报错"未知的 skill"，经验无法记录。
+
+**正确做法**: 确保 `evolveSkill` 参数使用 skillMap 的有效 key。合并子代理时使用数组形式，让经验按领域分流写回各自目录。
+
+### 错误 11: 主 agent 持有应委托给子代理的工具
+
+**问题**: 主 agent 的 coreTools 包含 hookManagerTools、captureTools、sandboxTools 等专业工具。
+
+**后果**: 主 agent 会自己执行本应委托给子代理的任务（如注入 Hook、沙箱执行），绕过子代理的专业流程，导致任务失败。硬约束（没有工具）比软约束（prompt 说"不要做"）更可靠。
+
+**正确做法**: 主 agent 只保留调度所需的最小工具集（浏览器生命周期、简单交互、数据溯源、文件操作），专业工具只分配给对应子代理。

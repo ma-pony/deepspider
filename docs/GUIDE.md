@@ -302,11 +302,8 @@ export const myTool = tool(
 | 子代理 | 职责 |
 |--------|------|
 | crawler | 爬虫编排：整合各模块、生成完整脚本 |
-| static | 静态分析：解包、反混淆、加密定位 |
-| dynamic | 动态分析：浏览器控制、Hook、数据采集 |
-| sandbox | 沙箱执行：环境补全、代码执行 |
+| reverse | 逆向分析全流程：反混淆、断点调试、Hook、沙箱验证、补环境 |
 | js2python | JS转Python：加密代码转换、验证 |
-| env-agent | 环境补全：生成浏览器环境模拟代码 |
 | captcha | 验证码处理：OCR、滑块、点选 |
 | anti-detect | 反检测：指纹管理、代理池 |
 
