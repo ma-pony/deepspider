@@ -19,7 +19,7 @@
     "cli": "node bin/cli.js",
     "mcp": "node src/mcp/server.js",
     "agent": "node bin/cli.js",
-    "test": "node --test test/",
+    "test": "node --test 'test/*.test.js'",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "setup:crypto": "uv venv .venv --python 3.11 2>/dev/null || true && uv pip install -r requirements-crypto.txt",
