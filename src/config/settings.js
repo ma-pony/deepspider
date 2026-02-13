@@ -16,12 +16,14 @@ export const DEFAULTS = {
   apiKey: '',
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o',
+  persistBrowserData: false,
 };
 
 export const ENV_MAP = {
   apiKey: 'DEEPSPIDER_API_KEY',
   baseUrl: 'DEEPSPIDER_BASE_URL',
   model: 'DEEPSPIDER_MODEL',
+  persistBrowserData: 'DEEPSPIDER_PERSIST_BROWSER',
 };
 
 /**
@@ -57,7 +59,11 @@ export function getEffectiveConfig() {
     const envVal = process.env[envVar];
 
     if (envVal !== undefined && envVal !== '') {
-      result[key] = { value: envVal, source: 'env' };
+      // 布尔类型配置项：环境变量字符串转布尔
+      const value = typeof DEFAULTS[key] === 'boolean'
+        ? (envVal === 'true' || envVal === '1')
+        : envVal;
+      result[key] = { value, source: 'env' };
     } else if (fileConfig[key] !== undefined && fileConfig[key] !== '') {
       result[key] = { value: fileConfig[key], source: 'file' };
     } else {

@@ -39,6 +39,7 @@ export class BrowserClient extends EventEmitter {
       headless = false,
       executablePath = null,
       args = [],
+      userDataDir = null,
     } = options;
 
     const launchOptions = {
@@ -55,12 +56,22 @@ export class BrowserClient extends EventEmitter {
       launchOptions.executablePath = executablePath;
     }
 
-    this.browser = await chromium.launch(launchOptions);
-    this.emit('launched', { headless });
+    this._persistent = !!userDataDir;
 
-    this.context = await this.browser.newContext({
-      ignoreHTTPSErrors: true,
-    });
+    if (userDataDir) {
+      // 持久化模式：launchPersistentContext 返回 BrowserContext
+      launchOptions.ignoreHTTPSErrors = true;
+      this.context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+      this.browser = this.context.browser();
+      this.emit('launched', { headless, persistent: true });
+    } else {
+      // 临时模式（原有逻辑）
+      this.browser = await chromium.launch(launchOptions);
+      this.emit('launched', { headless });
+      this.context = await this.browser.newContext({
+        ignoreHTTPSErrors: true,
+      });
+    }
 
     // 保存 hook 脚本
     this.hookScript = getDefaultHookScript();
@@ -68,7 +79,10 @@ export class BrowserClient extends EventEmitter {
     // 使用 addInitScript 在 context 级别注入
     await this.context.addInitScript(this.hookScript);
 
-    this.page = await this.context.newPage();
+    // 持久化上下文自带默认页面，临时模式需要新建
+    this.page = this._persistent
+      ? (this.context.pages()[0] || await this.context.newPage())
+      : await this.context.newPage();
 
     // 监听新页面创建（弹窗、新标签页）
     this.context.on('page', async (newPage) => {
@@ -231,7 +245,16 @@ export class BrowserClient extends EventEmitter {
       }
 
       // 关闭浏览器
-      if (this.browser) {
+      if (this._persistent) {
+        // 持久化模式：关闭 context 即保存数据并关闭浏览器
+        if (this.context) {
+          await this.context.close();
+          this.context = null;
+          this.browser = null;
+          this.page = null;
+          this.pages = [];
+        }
+      } else if (this.browser) {
         await this.browser.close();
         this.browser = null;
         this.context = null;

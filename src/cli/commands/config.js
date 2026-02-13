@@ -36,7 +36,7 @@ function list() {
   const effective = getEffectiveConfig();
   console.log('配置项:');
   for (const [key, { value, source }] of Object.entries(effective)) {
-    const display = key === 'apiKey' && value ? maskKey(value) : value || '(未设置)';
+    const display = key === 'apiKey' && value ? maskKey(value) : formatValue(value);
     console.log(`  ${key} = ${display}  [${source}]`);
   }
 }
@@ -52,7 +52,7 @@ function get(key) {
   }
   const effective = getEffectiveConfig();
   const { value, source } = effective[key];
-  const display = key === 'apiKey' && value ? maskKey(value) : value || '(未设置)';
+  const display = key === 'apiKey' && value ? maskKey(value) : formatValue(value);
   console.log(`${key} = ${display}  [${source}]`);
 }
 
@@ -66,7 +66,10 @@ function set(key, value) {
     process.exit(1);
   }
   const config = loadConfig();
-  config[key] = value;
+  // 布尔类型配置项：CLI 字符串转布尔值存储
+  config[key] = typeof DEFAULTS[key] === 'boolean'
+    ? (value === 'true' || value === '1')
+    : value;
   saveConfig(config);
 
   const envVar = ENV_MAP[key];
@@ -86,6 +89,11 @@ function reset() {
 
 function path() {
   console.log(CONFIG_FILE);
+}
+
+function formatValue(value) {
+  if (value === undefined || value === null || value === '') return '(未设置)';
+  return String(value);
 }
 
 function maskKey(key) {

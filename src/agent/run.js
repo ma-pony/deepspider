@@ -16,6 +16,8 @@ import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
 import { browserTools } from './tools/browser.js';
 import { ensureConfig } from './setup.js';
+import { getConfigValues } from '../config/settings.js';
+import { PATHS, ensureDir } from '../config/paths.js';
 import { StreamHandler, PanelBridge } from './core/index.js';
 
 let rl = null;
@@ -151,6 +153,7 @@ async function init() {
   const args = process.argv.slice(2);
   targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
   DEBUG = process.env.DEBUG === 'true' || args.includes('--debug');
+  const PERSIST = args.includes('--persist');
   debugFn = (...a) => { if (DEBUG) console.log('[DEBUG]', ...a); };
 
   debugFn('init: 启动');
@@ -201,7 +204,14 @@ async function init() {
     console.log(`正在打开: ${targetUrl}\n`);
     try {
       debugFn('init: 获取浏览器实例');
-      browser = await getBrowser();
+      const browserOptions = {};
+      const config = getConfigValues();
+      if (PERSIST || config.persistBrowserData) {
+        ensureDir(PATHS.BROWSER_DATA_DIR);
+        browserOptions.userDataDir = PATHS.BROWSER_DATA_DIR;
+        console.log(`[持久化模式] 浏览器数据保存在 ${PATHS.BROWSER_DATA_DIR}`);
+      }
+      browser = await getBrowser(browserOptions);
       browser.onMessage = handleBrowserMessage;
       debugFn('init: 导航到目标URL');
       await browser.navigate(targetUrl);

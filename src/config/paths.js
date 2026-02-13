@@ -27,6 +27,9 @@ export const PATHS = {
 
   // 配置（预留）
   CONFIG_DIR: join(DEEPSPIDER_HOME, 'config'),
+
+  // 浏览器持久化数据（按需创建，不加入 initDirectories）
+  BROWSER_DATA_DIR: join(DEEPSPIDER_HOME, 'browser-data'),
 };
 
 /**
@@ -41,8 +44,13 @@ export function ensureDir(dir) {
 /**
  * 初始化所有目录
  */
+// 按需创建的目录，不随 initDirectories 自动创建
+const ON_DEMAND_DIRS = new Set([PATHS.BROWSER_DATA_DIR]);
+
 export function initDirectories() {
-  Object.values(PATHS).forEach(dir => ensureDir(dir));
+  Object.values(PATHS).forEach(dir => {
+    if (!ON_DEMAND_DIRS.has(dir)) ensureDir(dir);
+  });
 }
 
 /**
