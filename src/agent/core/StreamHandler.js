@@ -250,11 +250,10 @@ export class StreamHandler {
       }
 
       if (isToolSchemaError(errMsg)) {
-        console.log(`\n[重试 ${retryCount + 1}/${this.retryManager.maxRetries}] 工具参数错误，发送修正请求...`);
+        console.log(`\n[重试 ${retryCount + 1}/${this.retryManager.maxRetries}] 工具参数错误，从检查点恢复...`);
         await this.panelBridge.sendToPanel('system',
           `工具调用失败，正在修正 (${retryCount + 1}/${this.retryManager.maxRetries})`);
-        const resumeInput = `工具调用失败: ${errMsg}\n请检查参数格式并重试。`;
-        return this.chatStream(resumeInput, retryCount + 1);
+        return this.chatStreamResume(retryCount + 1);
       }
     }
 

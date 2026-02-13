@@ -8,6 +8,8 @@ import { createDeepAgent, StateBackend, FilesystemBackend } from 'deepagents';
 import { ChatOpenAI } from '@langchain/openai';
 import { MemorySaver } from '@langchain/langgraph';
 
+import { toolRetryMiddleware } from 'langchain';
+
 import { coreTools } from './tools/index.js';
 import { allSubagents } from './subagents/index.js';
 import { systemPrompt } from './prompts/system.js';
@@ -74,6 +76,10 @@ export function createDeepSpiderAgent(options = {}) {
 
   // 中间件配置
   const middleware = [
+    toolRetryMiddleware({                    // 工具错误 → ToolMessage，LLM 自我修正
+      maxRetries: 0,                          // schema 错误是确定性的，不重试
+      onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
+    }),
     createFilterToolsMiddleware(),  // 过滤内置的 write_file/read_file
     createReportMiddleware({ onReportReady }),
   ];

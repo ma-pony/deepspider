@@ -3,7 +3,7 @@
  * 统一子代理创建，自动注入公共配置
  */
 
-import { createMiddleware } from 'langchain';
+import { createMiddleware, toolRetryMiddleware } from 'langchain';
 import { createSkillsMiddleware } from 'deepagents';
 import { SKILLS, skillsBackend } from '../skills/config.js';
 import { createFilterToolsMiddleware } from '../middleware/filterTools.js';
@@ -64,11 +64,15 @@ function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
 
 /**
  * 创建子代理基础中间件数组
- * 包含：工具过滤 + 调用次数限制 + 技能注入
+ * 包含：工具错误兜底 + 工具过滤 + 调用次数限制 + 技能注入
  * @param {Array} skillsSources - 技能源列表
  */
 export function createBaseMiddleware(skillsSources = []) {
   return [
+    toolRetryMiddleware({                    // 工具错误 → ToolMessage，LLM 自我修正
+      maxRetries: 0,                          // schema 错误是确定性的，不重试
+      onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
+    }),
     createFilterToolsMiddleware(),
     createToolCallLimitMiddleware(),
     createSkillsMiddleware({
