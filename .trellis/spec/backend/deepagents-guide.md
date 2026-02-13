@@ -12,21 +12,61 @@ DeepAgents 是基于 LangGraph 的 Agent 框架，DeepSpider 使用它构建多�
 
 ## Agent 创建
 
-### 基础配置
+### 为什么用 createAgent 而非 createDeepAgent
+
+`createDeepAgent` 硬编码了内置的 `createSubAgentMiddleware`，其 task tool schema 只有 `{ description, subagent_type }`，不支持扩展。AgentNode 的 `wrapModelCall` 按对象引用检查 tools，无法通过 middleware 替换内置 task tool。
+
+DeepSpider 需要在 task tool 上增加 `context` 字段（结构化上下文传递），因此使用底层 `createAgent`（langchain 导出）手动组装 middleware 栈，用自定义 `createCustomSubAgentMiddleware` 替换内置的。
+
+### 当前配置
 
 ```javascript
-import { createDeepAgent, FilesystemBackend } from 'deepagents';
-import { ChatOpenAI } from '@langchain/openai';
+import { createAgent, toolRetryMiddleware, summarizationMiddleware,
+         anthropicPromptCachingMiddleware, todoListMiddleware,
+         humanInTheLoopMiddleware } from 'langchain';
+import { FilesystemBackend, createFilesystemMiddleware,
+         createPatchToolCallsMiddleware } from 'deepagents';
+import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
 
-const agent = createDeepAgent({
+const BASE_PROMPT = 'In order to complete the objective that the user asks of you, you have access to a number of standard tools.';
+
+createAgent({
   name: 'deepspider',
-  model: new ChatOpenAI({ model: 'gpt-4o' }),
+  model: llm,
   tools: coreTools,
-  subagents: allSubagents,
-  systemPrompt,
-  backend: new FilesystemBackend({ rootDir: './.deepspider-agent' }),
-});
+  systemPrompt: `${systemPrompt}\n\n${BASE_PROMPT}`,
+  middleware: [
+    todoListMiddleware(),
+    createFilesystemMiddleware({ backend }),
+    createCustomSubAgentMiddleware({
+      defaultModel: llm,
+      defaultTools: coreTools,
+      subagents: allSubagents,
+      defaultMiddleware: subagentDefaultMiddleware,
+      generalPurposeAgent: false,
+      defaultInterruptOn: interruptOn,
+    }),
+    summarizationMiddleware({ model: llm, trigger: { tokens: 170000 }, keep: { messages: 6 } }),
+    anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
+    createPatchToolCallsMiddleware(),
+    ...(interruptOn ? [humanInTheLoopMiddleware({ interruptOn })] : []),
+    toolRetryMiddleware({ maxRetries: 0, onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.` }),
+    createFilterToolsMiddleware(),
+    createReportMiddleware({ onReportReady }),
+  ],
+  checkpointer,
+}).withConfig({ recursionLimit: 10000 });
 ```
+
+### createAgent vs createDeepAgent 差异
+
+`createDeepAgent` 在 `createAgent` 之上做了：
+1. 拼接 `BASE_PROMPT` 到 systemPrompt
+2. 组装 middleware 栈（todoList, filesystem, subAgent, summarization, promptCaching, patchToolCalls, skills, memory, HITL）
+3. 处理 subagents 的 skills middleware
+4. `.withConfig({ recursionLimit: 10000 })`
+
+手动使用 `createAgent` 时需自行复现这些。DeepSpider 不使用框架级 `skills` 和 `memory`，可省略。
 
 ### 必需参数
 
@@ -36,6 +76,52 @@ const agent = createDeepAgent({
 | `model` | BaseChatModel | LLM 模型实例 |
 | `tools` | Tool[] | 工具数组 |
 | `systemPrompt` | string | 系统提示词 |
+
+---
+
+## 自定义子代理中间件（context 传递）
+
+### 背景
+
+主 agent 委托子代理时，关键上下文（目标请求 site/id、加密参数名等）完全依赖 LLM 在自由文本 description 中"记得传"，容易丢失或变形。
+
+### 方案
+
+`createCustomSubAgentMiddleware`（`src/agent/middleware/subagent.js`）复刻 deepagents 内置的 `createSubAgentMiddleware`，task tool schema 新增 `context` 字段：
+
+```javascript
+schema: z.object({
+  description: z.string().describe('The task to execute with the selected agent'),
+  subagent_type: z.string().describe(`Name of the agent to use. Available: ${availableTypes}`),
+  context: z.record(z.string(), z.string()).optional().describe(
+    'Structured key-value context to pass to the subagent (e.g. site, requestId, targetParam)'
+  ),
+})
+```
+
+LLM 按需填写 key-value 对，子代理收到的 HumanMessage 中 context 以 `<context>` 块拼接在 description 之后：
+
+```
+// LLM 调用
+task({ description: "分析加密参数", subagent_type: "reverse-agent",
+       context: { site: "example.com", requestId: "req_001" } })
+
+// 子代理收到的 HumanMessage
+分析加密参数
+
+<context>
+{"site":"example.com","requestId":"req_001"}
+</context>
+```
+
+### 子代理默认中间件层次
+
+```
+子代理实际 middleware = defaultMiddleware（框架级） + subagent.middleware（业务级，来自 factory.js）
+```
+
+- 框架级（`subagentDefaultMiddleware`）：todoList, filesystem, summarization, promptCaching, patchToolCalls
+- 业务级（`createBaseMiddleware`）：toolRetry, filterTools, toolCallLimit, contextEditing, skills
 
 ---
 
@@ -305,11 +391,18 @@ const backend = new StateBackend();  // 数据不持久化
 ### 配置敏感工具审批
 
 ```javascript
-const agent = createDeepAgent({
-  interruptOn: {
-    sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
-    sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
-  },
+const interruptOn = {
+  sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
+  sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
+};
+
+// createAgent 模式下，HITL 作为 middleware 注入
+createAgent({
+  // ...
+  middleware: [
+    // ...其他 middleware
+    ...(interruptOn ? [humanInTheLoopMiddleware({ interruptOn })] : []),
+  ],
   checkpointer: new MemorySaver(),  // 必需
 });
 ```

@@ -248,7 +248,7 @@ export class DataStore {
    * 保存响应数据（带去重）
    */
   async saveResponse(data) {
-    const { url, method, status, requestHeaders, requestBody, responseBody, timestamp, pageUrl } = data;
+    const { url, method, status, requestHeaders, requestBody, responseBody, timestamp, pageUrl, initiator } = data;
     const { site, path } = parseUrl(pageUrl || url);
 
     // 生成去重 hash
@@ -261,6 +261,16 @@ export class DataStore {
       // 更新时间戳和会话，不重复存储
       existing.timestamp = timestamp || Date.now();
       existing.sessionId = this.getSessionId();
+      // 更新 initiator（不同代码路径可能调用同一 API）
+      if (initiator) {
+        existing.hasInitiator = true;
+        // 同步更新详情文件中的 initiator
+        try {
+          const detail = JSON.parse(await readFile(existing.file, 'utf-8'));
+          detail.initiator = initiator;
+          await writeFile(existing.file, JSON.stringify(detail));
+        } catch { /* 文件读写失败不影响主流程 */ }
+      }
       await this.saveSiteIndex(site);
       return { id: existing.id, site, path, deduplicated: true };
     }
@@ -278,7 +288,7 @@ export class DataStore {
     const content = JSON.stringify({
       url, method, status,
       requestHeaders, requestBody, responseBody,
-      pageUrl, timestamp
+      pageUrl, timestamp, initiator,
     });
 
     await writeFile(file, content);
@@ -287,7 +297,7 @@ export class DataStore {
       id, url, path, method, status,
       timestamp: timestamp || Date.now(),
       file, size: content.length,
-      hash,
+      hash, hasInitiator: !!initiator,
       sessionId: this.getSessionId()
     });
 
@@ -374,6 +384,7 @@ export class DataStore {
         id: r.id, url: r.url, path: r.path,
         method: r.method, status: r.status,
         timestamp: r.timestamp, size: r.size,
+        hasInitiator: !!r.hasInitiator,
         sessionId: r.sessionId
       }));
     }

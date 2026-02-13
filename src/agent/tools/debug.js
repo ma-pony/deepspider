@@ -20,18 +20,25 @@ async function getSession() {
     const browser = await getBrowser();
     cdpSession = await CDPSession.fromBrowser(browser);
 
-    // 监听暂停事件
+    // 过滤反调试 debugger 语句的噪音：只在命中我们设的断点时打日志
+    let lastPauseIsBreakpoint = false;
+
     cdpSession.on('Debugger.paused', (params) => {
-      isPaused = true;
-      currentCallFrames = params.callFrames || [];
-      console.log('[debug] Debugger paused, callFrames:', currentCallFrames.length);
+      lastPauseIsBreakpoint = params.reason === 'breakpoint' || params.hitBreakpoints?.length > 0;
+      if (lastPauseIsBreakpoint) {
+        isPaused = true;
+        currentCallFrames = params.callFrames || [];
+        console.log('[debug] Breakpoint hit, callFrames:', currentCallFrames.length);
+      }
     });
 
-    // 监听恢复事件
     cdpSession.on('Debugger.resumed', () => {
+      if (lastPauseIsBreakpoint) {
+        console.log('[debug] Debugger resumed');
+      }
       isPaused = false;
       currentCallFrames = [];
-      console.log('[debug] Debugger resumed');
+      lastPauseIsBreakpoint = false;
     });
   }
   return cdpSession;

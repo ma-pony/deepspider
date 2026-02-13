@@ -58,6 +58,28 @@ schema: z.object({
 
 ---
 
+## Zod v4 Breaking Changes
+
+> **Warning**: 项目使用 zod v4（`"zod": "^4.3.6"`），部分 v3 API 签名已变更。
+> `import { z } from 'zod'` 和 `import { z } from 'zod/v4'` 是同一个引用，不存在混用问题。
+
+### z.record() 必须双参数
+
+```javascript
+// ❌ zod v3 写法，v4 下 schema 定义不报错，但 .parse() 时崩溃：
+// TypeError: Cannot read properties of undefined (reading '_zod')
+z.record(z.string())
+
+// ✅ zod v4 正确写法：(keyType, valueType)
+z.record(z.string(), z.string())
+```
+
+**隐蔽性**: schema 定义阶段不触发 parse（惰性求值），只有 LLM 实际调用 tool 传入参数时才崩溃。单元测试中如果不走 LLM 调用路径，这个 bug 不会暴露。
+
+**替代方案**: `z.object({}).catchall(z.string())` 也能表达 `Record<string, string>`。
+
+---
+
 ## Forbidden Patterns
 
 ### 1. 缺少 describe

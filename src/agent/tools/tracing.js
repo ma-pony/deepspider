@@ -188,11 +188,37 @@ export const clearAllData = tool(
   }
 );
 
+/**
+ * 获取请求的 initiator（调用栈）
+ */
+export const getRequestInitiator = tool(
+  async ({ site, id }) => {
+    const store = getDataStore();
+    const result = await store.getResponse(site, id);
+    if (!result) {
+      return JSON.stringify({ error: '未找到该请求' });
+    }
+    if (!result.initiator) {
+      return JSON.stringify({ error: '该请求无 initiator 信息（可能是旧数据或浏览器内部请求）' });
+    }
+    return JSON.stringify(result.initiator, null, 2);
+  },
+  {
+    name: 'get_request_initiator',
+    description: '获取发起该请求的 JS 代码位置（脚本URL + 行号 + 函数名）。返回调用栈的前5帧。用于从目标请求反向定位加密函数入口，是逆向分析的第一步。',
+    schema: z.object({
+      site: z.string().describe('站点 hostname'),
+      id: z.string().describe('请求 ID'),
+    }),
+  }
+);
+
 export const tracingTools = [
   getSiteList,
   searchInResponses,
   getRequestDetail,
   getRequestList,
+  getRequestInitiator,
   getScriptList,
   getScriptSource,
   searchInScripts,

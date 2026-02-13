@@ -1,20 +1,26 @@
 ---
 name: dynamic-analysis
 description: |
-  JS 动态调试经验。断点技巧、Hook 策略、反调试绕过。
-  触发：运行时调试、拦截加密调用、绕过反调试。
+  JS 动态调试经验。请求追踪、调用栈分析、initiator、断点技巧、Hook 策略、反调试绕过。
+  触发：运行时调试、拦截加密调用、绕过反调试、请求追踪、调用栈、initiator。
 ---
 
 # 动态分析经验
 
 ## 定位技巧
 
-**XHR 断点法（最高效）：**
-1. 在目标请求 URL 设断点
-2. 触发请求，断住后看调用栈
-3. 从下往上找 encrypt/sign 相关函数
+**Initiator 追溯法（最高效，首选）：**
+1. get_request_list 找到目标请求（注意 hasInitiator 标记）
+2. get_request_initiator 获取调用栈
+3. 调用栈直接指向发起请求的函数位置（脚本URL + 行号）
+4. get_function_code 提取该函数及依赖
 
-**Hook 观察法：**
+**XHR 断点法（Initiator 不可用时）：**
+1. set_xhr_breakpoint(urlPattern) — 设置 URL 关键词断点
+2. 触发请求，断住后 get_call_stack
+3. 从栈底向上找 encrypt/sign 相关函数
+
+**Hook 观察法（需要持续监控时）：**
 1. 注入通用加密 Hook
 2. 触发操作，观察日志
 3. 根据日志定位具体函数
@@ -110,7 +116,7 @@ obj.func = function(...args) {
 6. set_breakpoint 在生成函数处断住，逐步分析
 
 ### 加密参数追踪工作流
-1. analyze_correlation(site, requestId) — 找到加密参数
+1. analyze_request_params(site, id) — 识别可疑加密参数（hex/base64/hash）
 2. search_in_scripts(site, paramName) — 搜索参数赋值位置
 3. 如果搜不到（动态生成）→ set_xhr_breakpoint + 调用栈追踪
 4. 定位到加密函数后 → get_function_code 提取完整代码

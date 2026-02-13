@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
+import { getDataStore } from '../../store/DataStore.js';
 
 /**
  * 分析请求-加密关联
@@ -294,10 +295,104 @@ export const analyzeResponseDecryption = tool(
   }
 );
 
+/**
+ * 识别加密模式
+ */
+function identifyPattern(value) {
+  if (/^[0-9a-fA-F]+$/.test(value)) {
+    if (value.length === 32) return 'hash-md5';
+    if (value.length === 40) return 'hash-sha1';
+    if (value.length === 64) return 'hash-sha256';
+    return 'hex';
+  }
+  if (/^[A-Za-z0-9+/]{20,}={0,2}$/.test(value)) return 'base64';
+  if (/^ey[A-Za-z0-9_-]+\./.test(value)) return 'jwt';
+  return 'unknown';
+}
+
+/**
+ * 判断值是否像加密结果
+ */
+function looksEncrypted(value) {
+  if (/^[0-9a-fA-F]{32,}$/.test(value)) return true;
+  if (/^[A-Za-z0-9+/]{20,}={0,2}$/.test(value)) return true;
+  if (/^ey[A-Za-z0-9_-]+\./.test(value)) return true;
+  return false;
+}
+
+/**
+ * 解析请求 body
+ */
+function parseBody(body) {
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    // 尝试 form-urlencoded
+    try {
+      return Object.fromEntries(new URLSearchParams(body));
+    } catch {
+      return { _raw: body.slice(0, 200) };
+    }
+  }
+}
+
+/**
+ * 分析请求参数结构（不依赖 Hook 日志）
+ */
+export const analyzeRequestParams = tool(
+  async ({ site, id }) => {
+    const store = getDataStore();
+    const detail = await store.getResponse(site, id);
+    if (!detail) return JSON.stringify({ error: '未找到该请求' });
+
+    let urlParams = {};
+    try {
+      urlParams = Object.fromEntries(new URL(detail.url).searchParams);
+    } catch { /* invalid URL */ }
+
+    const bodyParams = parseBody(detail.requestBody);
+
+    // 识别可疑参数
+    const suspiciousParams = [];
+    const allParams = { ...urlParams, ...bodyParams };
+    for (const [key, value] of Object.entries(allParams)) {
+      const str = String(value);
+      if (str.length > 20 && looksEncrypted(str)) {
+        suspiciousParams.push({
+          name: key,
+          value: str.slice(0, 50) + (str.length > 50 ? '...' : ''),
+          length: str.length,
+          pattern: identifyPattern(str),
+        });
+      }
+    }
+
+    return JSON.stringify({
+      url: detail.url,
+      method: detail.method,
+      urlParams,
+      bodyParams: typeof bodyParams === 'object' && !bodyParams._raw
+        ? bodyParams : { _raw: detail.requestBody?.slice(0, 200) },
+      suspiciousParams,
+      initiator: detail.initiator || null,
+    }, null, 2);
+  },
+  {
+    name: 'analyze_request_params',
+    description: '分析请求的参数结构，自动识别可疑的加密参数（hex/base64/hash）。不依赖 Hook 日志，可直接使用。',
+    schema: z.object({
+      site: z.string().describe('站点 hostname'),
+      id: z.string().describe('请求 ID'),
+    }),
+  }
+);
+
 export const correlateTools = [
   analyzeCorrelation,
   locateCryptoSource,
   analyzeHeaderEncryption,
   analyzeCookieEncryption,
   analyzeResponseDecryption,
+  analyzeRequestParams,
 ];

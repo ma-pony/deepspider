@@ -15,6 +15,7 @@ export default [
         __filename: 'readonly',
         // Web APIs
         URL: 'readonly',
+        URLSearchParams: 'readonly',
         fetch: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',

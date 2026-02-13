@@ -270,18 +270,27 @@ const myTool = tool(
 
 ### DeepAgent 创建
 
-```javascript
-import { ChatAnthropic } from '@langchain/anthropic';
-import { createDeepAgent } from 'deepagents';
+项目使用底层 `createAgent`（非 `createDeepAgent`），手动组装 middleware 栈以支持自定义 task tool schema（context 结构化传递）：
 
-export const agent = createDeepAgent({
-  model: new ChatAnthropic({
-    model: 'claude-sonnet-4-20250514',
-    temperature: 0,
-  }),
-  tools: [tool1, tool2],
-  systemPrompt: '系统提示',
-});
+```javascript
+import { createAgent, toolRetryMiddleware, summarizationMiddleware,
+         anthropicPromptCachingMiddleware, todoListMiddleware } from 'langchain';
+import { createFilesystemMiddleware, createPatchToolCallsMiddleware } from 'deepagents';
+import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
+
+createAgent({
+  name: 'deepspider',
+  model: llm,
+  tools: coreTools,
+  systemPrompt: `${systemPrompt}\n\n${BASE_PROMPT}`,
+  middleware: [
+    todoListMiddleware(),
+    createFilesystemMiddleware({ backend }),
+    createCustomSubAgentMiddleware({ defaultModel: llm, subagents: allSubagents, ... }),
+    summarizationMiddleware({ model: llm, trigger: { tokens: 170000 }, keep: { messages: 6 } }),
+    // ...其他 middleware
+  ],
+}).withConfig({ recursionLimit: 10000 });
 ```
 
 ## 运行

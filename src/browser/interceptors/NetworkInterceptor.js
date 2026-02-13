@@ -50,7 +50,7 @@ export class NetworkInterceptor {
   }
 
   onRequest(params) {
-    const { requestId, request, timestamp } = params;
+    const { requestId, request, timestamp, initiator } = params;
 
     // 只记录 XHR/Fetch 请求
     const type = params.type;
@@ -62,8 +62,35 @@ export class NetworkInterceptor {
       headers: request.headers,
       postData: request.postData,
       timestamp: timestamp * 1000,
-      pageUrl: this.getPageUrl()  // 记录请求时的页面 URL
+      pageUrl: this.getPageUrl(),
+      initiator: this.formatInitiator(initiator),
     });
+  }
+
+  /**
+   * 精简 initiator 调用栈（只保留前 5 帧，过滤内部帧）
+   */
+  formatInitiator(initiator) {
+    if (!initiator) return null;
+    const result = { type: initiator.type };
+    if (initiator.url) {
+      result.url = initiator.url;
+      result.lineNumber = initiator.lineNumber;
+    }
+    if (initiator.stack?.callFrames) {
+      result.callFrames = initiator.stack.callFrames
+        .filter(f => f.url && !f.url.includes('patchright') && !f.url.includes('__playwright'))
+        .slice(0, 5)
+        .map(f => ({
+          functionName: f.functionName || '(anonymous)',
+          url: f.url,
+          lineNumber: f.lineNumber,
+          columnNumber: f.columnNumber,
+        }));
+    }
+    // 只有 type 没有实际定位信息时返回 null
+    if (!result.url && !result.callFrames?.length) return null;
+    return result;
   }
 
   onResponse(params) {
@@ -100,7 +127,8 @@ export class NetworkInterceptor {
         requestBody: pending.postData,
         responseBody: responseBody.slice(0, 50000),
         timestamp: pending.timestamp,
-        pageUrl: pending.pageUrl  // 传递页面 URL 用于分站点存储
+        pageUrl: pending.pageUrl,
+        initiator: pending.initiator,
       }).catch(e => {
         console.error('[NetworkInterceptor] 保存失败:', e.message);
       });
