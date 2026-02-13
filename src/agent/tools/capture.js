@@ -33,6 +33,15 @@ export const collectProperty = tool(
     const browser = await getBrowser();
     const collector = new EnvCollector(browser.getPage());
     const data = await collector.collect(path, { depth });
+
+    // 变量未定义时追加 fallback 引导，引导 LLM 走断点路径
+    if (data?.success === false && /undefined|null/.test(data?.error || '')) {
+      return JSON.stringify({
+        ...data,
+        hint: `⚠️ 变量 ${path} 未定义。该变量可能仅在特定函数执行时存在（如请求发起时动态赋值，执行后被清理）。\n请使用 set_breakpoint 在目标函数处设断点，断点命中后用 evaluate_at_breakpoint 采集变量值。不要猜测变量值。`,
+      }, null, 2);
+    }
+
     return JSON.stringify(data, null, 2);
   },
   {

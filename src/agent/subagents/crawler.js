@@ -8,6 +8,7 @@ import { createSubagent } from './factory.js';
 import { crawlerTools } from '../tools/crawler.js';
 import { fileTools } from '../tools/file.js';
 import { storeTools } from '../tools/store.js';
+import { getPageSource, getElementHtml } from '../tools/browser.js';
 
 export const crawlerSubagent = createSubagent({
   name: 'crawler',
@@ -120,6 +121,9 @@ if __name__ == "__main__":
     ...crawlerTools,
     ...fileTools,
     ...storeTools,
+    // 页面结构分析（主 agent 不持有，防止拉 HTML 自己分析 JS）
+    getPageSource,
+    getElementHtml,
   ],
   skills: ['crawler', 'xpath'],
   evolveSkill: 'crawler',

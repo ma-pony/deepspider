@@ -13,7 +13,7 @@ export { profileTools, listProfiles, loadProfile, generateProfileCode } from './
 export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, clearCookies } from './runtime.js';
 export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver, getAgentLogs } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
-export { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, getInteractiveElements } from './browser.js';
+export { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement, getPageInfo, getPageSource, getElementHtml, getCookies, getInteractiveElements } from './browser.js';
 export { reportTools, saveAnalysisReport } from './report.js';
 export { webcrackTools, unpackBundle, analyzeBundle } from './webcrack.js';
 export { preprocessTools, preprocessCode } from './preprocess.js';
@@ -24,6 +24,9 @@ export { asyncTools, generatePromiseHook, generateTimerHook } from './async.js';
 export { antiDebugTools, generateAntiDebugger, generateAntiConsoleDetect, generateAntiCDP, generateFullAntiDebug } from './antidebug.js';
 export { verifyTools, verifyMD5, verifySHA256, verifyHMAC, verifyAES, identifyEncryption } from './verify.js';
 export { cryptoHookTools, generateCryptoJSHook, generateRSAHook } from './cryptohook.js';
+// 合并工具（reverse-agent 使用）
+export { generateHookTools, generateHook } from './generateHook.js';
+export { verifyAlgorithmTools, verifyAlgorithm } from './verifyAlgorithm.js';
 export { correlateTools, analyzeCorrelation, locateCryptoSource, analyzeHeaderEncryption, analyzeCookieEncryption, analyzeResponseDecryption, analyzeRequestParams } from './correlate.js';
 export { extractorTools, listFunctions, getFunctionCode } from './extractor.js';
 export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequestList, getRequestInitiator, getScriptList, getScriptSource, searchInScripts, clearSiteData, clearAllData } from './tracing.js';
@@ -50,7 +53,7 @@ import { profileTools } from './profile.js';
 import { runtimeTools } from './runtime.js';
 import { debugTools } from './debug.js';
 import { captureTools } from './capture.js';
-import { browserTools } from './browser.js';
+import { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement, getPageInfo, getPageSource, getElementHtml, getCookies, getInteractiveElements } from './browser.js';
 import { reportTools } from './report.js';
 import { webcrackTools } from './webcrack.js';
 import { preprocessTools } from './preprocess.js';
@@ -125,8 +128,11 @@ export const allTools = [
 export const coreTools = [
   // 浏览器运行时（生命周期管理）
   ...runtimeTools,
-  // 页面交互（简单点击、填写、等待）
-  ...browserTools,
+  // 页面交互（简单点击、填写、等待、截图、Cookie）
+  // get_page_source / get_element_html 不给主 agent（防止拉 HTML 自己分析 JS），给 crawler-agent
+  clickElement, fillInput, waitForSelector, takeScreenshot,
+  reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement,
+  getPageInfo, getCookies, getInteractiveElements,
   // 浏览器分析面板交互
   ...analysisTools,
   // 数据查询（仅调度所需的最小集：列表、搜索、详情、initiator）
