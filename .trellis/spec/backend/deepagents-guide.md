@@ -44,7 +44,7 @@ const agent = createDeepAgent({
 ### 使用 createSubagent 工厂函数（必须）
 
 所有子代理必须通过 `createSubagent` 创建，工厂函数自动注入：
-- `createBaseMiddleware`：工具过滤 + 调用次数限制 + Skills
+- `createBaseMiddleware`：工具错误兜底 + 工具过滤 + 调用次数限制 + Skills
 - `evolveTools`：经验记录工具
 - `SUBAGENT_DISCIPLINE_PROMPT`：防循环执行纪律
 - 经验记录 prompt：引导子代理调用 `evolve_skill`
@@ -128,6 +128,33 @@ function createToolCallLimitMiddleware(runLimit = 80) {
 ```
 
 > **Warning**: 达到上限时不要设置 `tools: []`，这会阻断子代理的返回机制（deepagents 框架依赖工具调用来返回结果）。
+
+### toolRetryMiddleware（工具错误兜底）
+
+`createBaseMiddleware` 在中间件数组首位注入 `toolRetryMiddleware`，将所有工具执行错误（schema 验证失败、运行时异常等）转为 `ToolMessage` 返回给 LLM，而非向上抛出。
+
+**为什么需要它**：ToolNode 的内置错误处理（`defaultHandleToolErrors`）对 middleware 路径的错误不生效——`#handleError(e, call, isMiddlewareError=true)` 检查 `this.handleToolErrors !== true`，而 `handleToolErrors` 默认值是函数（不是布尔 `true`），所以 middleware 错误总是被重新抛出，冒泡到 StreamHandler。
+
+```javascript
+import { toolRetryMiddleware } from 'langchain';
+
+// 在 createBaseMiddleware 和主 agent middleware 中均使用
+toolRetryMiddleware({
+  maxRetries: 0,       // schema 错误是确定性的，重试同样的坏参数毫无意义
+  onFailure: (err) =>  // 默认 formatFailureMessage 只输出错误类名，丢失具体信息
+    `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
+})
+```
+
+**关键配置说明**：
+
+| 配置 | 值 | 原因 |
+|------|-----|------|
+| `maxRetries` | `0` | schema 错误是确定性的，重试同样的参数必然失败；且每次重试会穿过内层 `toolCallLimitMiddleware` 导致计数膨胀 |
+| `onFailure` | 自定义函数 | 默认的 `formatFailureMessage` 只输出 `"Tool 'xxx' failed after 1 attempt with ToolInvocationError"`，LLM 看不到具体哪个参数有问题 |
+| 数组位置 | 首位 | `chainToolCallHandlers` 从末尾向前 reduce，首位元素成为最外层 wrapper，能兜住所有内层错误 |
+
+> **Warning**: 不要使用默认的 `toolRetryMiddleware()`（无参数）。默认 `maxRetries: 2` + `retryOn: () => true` 会对确定性错误做 2 次无意义重试，浪费 ~3s 并污染 toolCallLimitMiddleware 计数。
 
 ### SUBAGENT_DISCIPLINE_PROMPT
 
@@ -510,3 +537,62 @@ createSubagent({ evolveSkill: ['static-analysis', 'dynamic-analysis'] });
 **后果**: 主 agent 会自己执行本应委托给子代理的任务（如注入 Hook、沙箱执行），绕过子代理的专业流程，导致任务失败。硬约束（没有工具）比软约束（prompt 说"不要做"）更可靠。
 
 **正确做法**: 主 agent 只保留调度所需的最小工具集（浏览器生命周期、简单交互、数据溯源、文件操作），专业工具只分配给对应子代理。
+
+### 错误 12: 工具 schema 错误重试使用 chatStream 而非 chatStreamResume
+
+**问题**: `StreamHandler._handleError` 对 schema 错误使用 `chatStream()`（新对话），LLM 丢失所有对话历史。
+
+```javascript
+// ❌ 差：新对话，LLM 无上下文
+const resumeInput = `工具调用失败: ${errMsg}\n请检查参数格式并重试。`;
+return this.chatStream(resumeInput, retryCount + 1);
+```
+
+**后果**: LLM 没有之前的对话上下文，无法理解自己之前在做什么，重复生成同样的错误参数，3 次重试全部失败。
+
+**正确做法**: 使用 `chatStreamResume()` 从 checkpoint 恢复，LLM 能看到完整历史（包括 toolRetryMiddleware 转换的错误 ToolMessage），自我修正参数。
+
+```javascript
+// ✅ 好：从检查点恢复，保留完整上下文
+return this.chatStreamResume(retryCount + 1);
+```
+
+### 错误 13: toolRetryMiddleware 使用默认配置
+
+**问题**: 直接 `toolRetryMiddleware()` 不传参数。
+
+**后果**: 默认 `maxRetries: 2` + `retryOn: () => true`，对确定性的 schema 错误做 2 次无意义重试（同样的坏参数），浪费 ~3s，且每次重试穿过 `toolCallLimitMiddleware` 导致计数膨胀。默认 `formatFailureMessage` 只输出错误类名，LLM 看不到具体哪个参数有问题。
+
+**正确做法**: 配置 `maxRetries: 0` + 自定义 `onFailure`，见上方 toolRetryMiddleware 章节。
+
+### 错误 14: Skill 知识按"谁遇到"而非"谁执行"归类
+
+**问题**: CSS 反爬（字体映射、偏移还原、伪元素提取）放在 crawler skill，因为"爬虫会遇到这些反爬"。
+
+**后果**: crawler-agent 负责流程编排，不执行数据还原分析。这些知识实际由 reverse-agent 的静态分析能力处理，放错位置导致 SkillsMiddleware 在需要时匹配不到。
+
+**正确做法**: 按"哪个子代理执行这个任务"归类 skill 知识。CSS/字体反爬本质是"数据混淆还原"，属于 static-analysis skill，不属于 crawler skill。
+
+**判断标准**:
+- 这个知识是哪个子代理在执行任务时需要的？→ 放那个子代理的 skill
+- 移动内容后，同步更新 SKILL.md frontmatter 的 `description` 触发关键词
+
+### 错误 15: contextEditingMiddleware 的 excludeTools 遗漏关键工具
+
+**问题**: 配置 `contextEditingMiddleware` 时未将需要跨轮次保留的工具结果排除在清理范围外。
+
+**后果**: 工作记忆工具（如 `save_memo`）的结果被清理后，LLM 无法确认之前保存了什么，可能重复保存或丢失关键上下文。
+
+**正确做法**: 将持久化存储类工具加入 `excludeTools` 白名单：
+
+```javascript
+contextEditingMiddleware({
+  edits: [new ClearToolUsesEdit({
+    trigger: { tokens: 80000 },
+    keep: { messages: 5 },
+    excludeTools: ['save_memo'],  // 工作记忆不清理
+  })],
+})
+```
+
+**配置验证**: 新中间件的配置项（trigger/keep/excludeTools）必须对照 `.d.ts` 类型定义逐一确认，不能只看文档示例。

@@ -89,3 +89,64 @@ obj.func = function(...args) {
 - 现象：页面变卡
 - 原因：调用栈记录开销大
 - 经验：关闭 `captureStack` 或启用 `silent` 模式
+
+## 调试工作流模板
+
+### 标准 XHR 断点工作流
+1. set_xhr_breakpoint(urlPattern) — 设置 URL 关键词断点
+2. 在页面触发目标请求
+3. 断住后 get_call_stack() — 查看调用栈
+4. 从栈底向上找 encrypt/sign/token 相关帧
+5. get_frame_variables(frameIndex) — 查看关键帧的变量
+6. evaluate_at_breakpoint('JSON.stringify(arguments)') — 获取函数入参
+7. resume_execution() — 放行，观察下一次断住
+
+### Cookie 生成追踪工作流
+1. inject_hook('cookie') — 注入 Cookie Hook
+2. 触发页面操作（登录/翻页）
+3. get_hook_logs() — 查看 Cookie 写入日志
+4. 从日志中找到目标 Cookie 的写入调用栈
+5. 根据调用栈定位生成函数
+6. set_breakpoint 在生成函数处断住，逐步分析
+
+### 加密参数追踪工作流
+1. analyze_correlation(site, requestId) — 找到加密参数
+2. search_in_scripts(site, paramName) — 搜索参数赋值位置
+3. 如果搜不到（动态生成）→ set_xhr_breakpoint + 调用栈追踪
+4. 定位到加密函数后 → get_function_code 提取完整代码
+5. sandbox_execute 验证
+
+## Hook 模板库
+
+### Cookie 加密定位 Hook
+```javascript
+// 拦截 document.cookie 写入，记录调用栈
+// 使用 inject_hook('cookie') 自动注入
+// 日志格式：{ action: 'set', key, value, stack }
+```
+
+### XMLHttpRequest 参数 Hook
+```javascript
+// 拦截 XHR open/send，记录请求参数
+// 使用 inject_hook('xhr') 自动注入
+// 日志格式：{ method, url, body, headers, stack }
+```
+
+### CryptoJS 全量 Hook
+```javascript
+// 拦截 CryptoJS 所有加密/解密调用
+// 使用 generate_cryptojs_hook() 生成
+// 日志格式：{ algorithm, mode, input, key, iv, output, stack }
+```
+
+### 自定义函数 Hook 模式
+```javascript
+// 当标准 Hook 未捕获到加密调用时：
+// 1. 通过静态分析找到可疑函数名
+// 2. evaluate_at_breakpoint 注入针对性 Hook：
+//    const _orig = window.targetFunc;
+//    window.targetFunc = function(...args) {
+//      console.log('[Hook]', args, new Error().stack);
+//      return _orig.apply(this, args);
+//    };
+```

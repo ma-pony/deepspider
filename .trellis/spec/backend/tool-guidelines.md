@@ -142,3 +142,19 @@ return result;
 // ✅ 正确：返回 JSON 字符串
 return JSON.stringify(result, null, 2);
 ```
+
+### 4. 文件路径类工具未清理用户输入
+
+```javascript
+// ❌ 危险：key 直接拼接路径，存在路径穿越
+const filePath = join(MEMO_DIR, `${key}.txt`);
+// key = "../../config/settings" → 写到 MEMO_DIR 外部
+
+// ✅ 安全：白名单过滤，只保留安全字符
+function sanitizeKey(key) {
+  return key.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
+}
+const filePath = join(MEMO_DIR, `${sanitizeKey(key)}.txt`);
+```
+
+**原因**: LLM 生成的参数不可信，`join(dir, userInput)` 中含 `../` 可逃逸目标目录。凡是用户/LLM 输入拼接到文件路径的工具，都必须做白名单过滤。

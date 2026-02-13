@@ -70,3 +70,78 @@ var document = {
 | headless | `navigator.plugins.length` |
 | canvas | `toDataURL()` |
 | WebGL | `getParameter()` |
+
+## 完整环境补丁模板
+
+### navigator 完整补丁
+```javascript
+var navigator = {
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  appVersion: '5.0 (Windows NT 10.0; Win64; x64)',
+  platform: 'Win32',
+  language: 'zh-CN',
+  languages: ['zh-CN', 'zh'],
+  cookieEnabled: true,
+  webdriver: undefined,
+  plugins: { length: 3, 0: {name: 'Chrome PDF Plugin'}, 1: {name: 'Chrome PDF Viewer'}, 2: {name: 'Native Client'} },
+  mimeTypes: { length: 4 },
+  hardwareConcurrency: 8,
+  maxTouchPoints: 0,
+  vendor: 'Google Inc.',
+  productSub: '20030107',
+};
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+```
+
+### localStorage / sessionStorage 补丁
+```javascript
+class FakeStorage {
+  constructor() { this._data = {}; }
+  getItem(k) { return this._data[k] ?? null; }
+  setItem(k, v) { this._data[k] = String(v); }
+  removeItem(k) { delete this._data[k]; }
+  clear() { this._data = {}; }
+  get length() { return Object.keys(this._data).length; }
+  key(i) { return Object.keys(this._data)[i] ?? null; }
+}
+var localStorage = new FakeStorage();
+var sessionStorage = new FakeStorage();
+```
+
+### XMLHttpRequest 补丁
+```javascript
+class XMLHttpRequest {
+  constructor() { this.readyState = 0; this.status = 0; this.responseText = ''; }
+  open(method, url) { this._method = method; this._url = url; this.readyState = 1; }
+  send(body) { this.readyState = 4; this.status = 200; if (this.onreadystatechange) this.onreadystatechange(); }
+  setRequestHeader() {}
+  getResponseHeader() { return null; }
+}
+```
+
+### Canvas / WebGL 指纹补丁
+```javascript
+// Canvas
+var HTMLCanvasElement = function() {};
+HTMLCanvasElement.prototype.getContext = function(type) {
+  if (type === '2d') return {
+    fillRect: () => {}, fillText: () => {}, measureText: () => ({width: 0}),
+    getImageData: () => ({data: new Uint8Array(0)}),
+  };
+  return null;
+};
+HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,iVBOR...';
+
+// WebGL
+var WebGLRenderingContext = function() {};
+WebGLRenderingContext.prototype.getParameter = function(p) {
+  const map = { 7937: 'WebKit WebGL', 7936: 'WebKit', 37445: 'Google Inc.', 37446: 'ANGLE' };
+  return map[p] || 0;
+};
+```
+
+### 补环境调试策略
+1. 先跑一遍，收集所有 `xxx is not defined` 错误
+2. 按错误顺序逐个补丁（window → document → navigator → ...）
+3. 每补一个重新跑，直到无报错
+4. 对比浏览器输出验证结果一致性
