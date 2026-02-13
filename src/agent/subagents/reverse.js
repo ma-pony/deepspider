@@ -5,8 +5,11 @@
 
 import { createSubagent } from './factory.js';
 
-// 数据查询（读脚本、搜索请求）
-import { tracingTools } from '../tools/tracing.js';
+// 数据查询（读脚本、搜索请求，不含 clear 工具）
+import {
+  getSiteList, searchInResponses, getRequestDetail, getRequestList,
+  getRequestInitiator, getScriptList, getScriptSource, searchInScripts,
+} from '../tools/tracing.js';
 // 静态分析
 import { preprocessTools } from '../tools/preprocess.js';
 import { webcrackTools } from '../tools/webcrack.js';
@@ -18,11 +21,8 @@ import { extractorTools } from '../tools/extractor.js';
 // 动态分析
 import { debugTools } from '../tools/debug.js';
 import { captureTools } from '../tools/capture.js';
-import { cryptoHookTools } from '../tools/cryptohook.js';
 import { hookManagerTools } from '../tools/hookManager.js';
-import { hookTools } from '../tools/hook.js';
-import { asyncTools } from '../tools/async.js';
-import { antiDebugTools } from '../tools/antidebug.js';
+import { generateHookTools } from '../tools/generateHook.js';
 // 沙箱 + 补环境
 import { sandboxTools } from '../tools/sandbox.js';
 import { envTools } from '../tools/env.js';
@@ -30,11 +30,13 @@ import { envDumpTools } from '../tools/envdump.js';
 import { extractTools } from '../tools/extract.js';
 import { patchTools } from '../tools/patch.js';
 // 验证 + 执行
-import { verifyTools } from '../tools/verify.js';
+import { verifyAlgorithmTools } from '../tools/verifyAlgorithm.js';
 import { nodejsTools } from '../tools/nodejs.js';
 // 输出
 import { fileTools } from '../tools/file.js';
 import { storeTools } from '../tools/store.js';
+// 页面交互（仅断点触发 + Cookie 采集所需的最小集）
+import { reloadPage, clickElement, scrollPage, getCookies } from '../tools/browser.js';
 // 工作记忆
 import { scratchpadTools } from '../tools/scratchpad.js';
 
@@ -65,7 +67,13 @@ export const reverseSubagent = createSubagent({
    - get_function_code 提取目标函数及其依赖
 4. **分析加密** — 在定位到的函数范围内分析加密逻辑
    - 代码混淆严重 → preprocess_code + deobfuscate
-   - 引用运行时变量 → set_breakpoint 在该函数设断点采集
+   - 引用运行时变量（window.x、document.x 等）→ **必须用断点采集，禁止猜测**：
+     a. set_breakpoint 在目标函数入口设断点
+     b. 触发目标代码执行（根据场景选择触发方式，见「断点触发」）
+     c. evaluate_at_breakpoint 采集所有运行时变量值
+     d. resume_execution 继续执行
+   - collect_property 返回 undefined 时，说明变量仅在函数执行时存在，必须走断点路径
+   - **禁止用 search_in_scripts 搜索变量定义来猜测值，禁止用 run_node_code 穷举尝试**
 5. **验证** — sandbox_execute 或 run_node_code 验证算法正确性
 
 ### 退化路径（initiator 不可用时）
@@ -84,6 +92,7 @@ export const reverseSubagent = createSubagent({
 - 需要持续监控（如观察多次请求的加密参数变化）→ Hook
 - 断点无法使用时（如异步回调链复杂）→ Hook
 - 注意：inject_hook 可能触发反调试检测，优先用内置 Hook（enable_hook）
+- 需要生成 Hook 代码时，使用 generate_hook(type) 生成，再通过 inject_hook 注入
 
 ### 补环境路径（算法复杂难还原时）
 1. generate_env_dump_code 生成环境自吐代码
@@ -98,8 +107,18 @@ export const reverseSubagent = createSubagent({
 
 ## 浏览器状态
 - 浏览器生命周期由主 agent 管理，你没有 launch_browser / navigate_to 工具
-- 如果任务描述中包含"浏览器已就绪"，你可以直接使用断点、Hook、采集工具
+- 如果任务描述中包含"浏览器已就绪"，你可以直接使用断点、Hook、采集工具、页面交互工具
 - 如果浏览器未启动，返回结果告知主 agent 需要先启动浏览器
+- 你有 reload_page、click_element、scroll_page 用于触发断点，get_cookies 用于采集 Cookie
+
+### 断点触发（必须掌握）
+设置断点后，断点不会立即命中 — 需要目标代码被执行。根据目标代码的执行时机选择触发方式：
+- 代码在页面加载时执行（如初始化、首次请求）→ **reload_page**
+- 代码在用户交互时执行（如翻页、点击按钮、提交表单）→ **click_element**
+- 代码在滚动时执行（如懒加载、无限滚动）→ **scroll_page**
+- 不确定触发时机 → 先看调用栈上下文判断，或用 **reload_page** 尝试
+
+断点命中后，用 **evaluate_at_breakpoint** 采集运行时变量，用 **resume_execution** 继续执行
 
 ## 工作记忆
 多步分析时，用 save_memo 记录关键发现，防止上下文丢失：
@@ -113,13 +132,19 @@ export const reverseSubagent = createSubagent({
 - 如已验证成功，返回可独立运行的 JS 代码片段
 - 如需转 Python，明确告知主 agent 委托 js2python
 
+### 保存前置条件（必须遵守）
+- **只有通过 run_node_code 或 sandbox_execute 验证算法正确后，才能调用 artifact_save 保存代码**
+- 未验证成功时，返回文本说明当前进度和卡点，不保存文件
+- 禁止保存"框架代码"或"需要动态采集"的半成品代码
+
 ## 能力边界
 - 你不能生成 Python 代码，需要转换时返回结果让主 agent 委托 js2python
 - 你不能编排完整爬虫流程，那是 crawler 的工作
-- 你没有页面交互工具（click/fill/scroll），需要页面操作时返回让主 agent 处理`,
+- 你不能启动/关闭浏览器或导航到新 URL，需要时返回让主 agent 处理`,
   tools: [
-    // 数据查询
-    ...tracingTools,
+    // 数据查询（不含 clear_site_data / clear_all_data）
+    getSiteList, searchInResponses, getRequestDetail, getRequestList,
+    getRequestInitiator, getScriptList, getScriptSource, searchInScripts,
     // 静态分析
     ...preprocessTools,
     ...webcrackTools,
@@ -131,11 +156,8 @@ export const reverseSubagent = createSubagent({
     // 动态分析
     ...debugTools,
     ...captureTools,
-    ...cryptoHookTools,
     ...hookManagerTools,
-    ...hookTools,
-    ...asyncTools,
-    ...antiDebugTools,
+    ...generateHookTools,
     // 沙箱 + 补环境
     ...sandboxTools,
     ...envTools,
@@ -143,8 +165,10 @@ export const reverseSubagent = createSubagent({
     ...extractTools,
     ...patchTools,
     // 验证 + 执行
-    ...verifyTools,
+    ...verifyAlgorithmTools,
     ...nodejsTools,
+    // 页面交互（仅断点触发 + Cookie 采集）
+    reloadPage, clickElement, scrollPage, getCookies,
     // 输出
     ...fileTools,
     ...storeTools,
