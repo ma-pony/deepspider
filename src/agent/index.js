@@ -16,6 +16,7 @@ import { systemPrompt } from './prompts/system.js';
 import { createReportMiddleware } from './middleware/report.js';
 import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
+import { createToolGuardMiddleware } from './middleware/toolGuard.js';
 
 // createDeepAgent 内部拼接的 BASE_PROMPT
 const BASE_PROMPT = 'In order to complete the objective that the user asks of you, you have access to a number of standard tools.';
@@ -115,6 +116,7 @@ export function createDeepSpiderAgent(options = {}) {
         maxRetries: 0,
         onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
       }),
+      createToolGuardMiddleware(),
       createFilterToolsMiddleware(),
       createReportMiddleware({ onReportReady }),
     ],

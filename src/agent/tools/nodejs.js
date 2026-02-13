@@ -17,10 +17,19 @@ const PROJECT_ROOT = join(__dirname, '../../..');
 // 输出大小限制
 const MAX_OUTPUT_SIZE = 100000;
 
+// 超时上限（防止 LLM 传入过大值）
+const MAX_TIMEOUT = 30000;
+
+// 连续超时计数器
+let consecutiveTimeouts = 0;
+const MAX_CONSECUTIVE_TIMEOUTS = 3;
+
 /**
  * 执行 Node.js 代码
  */
 async function executeNode(code, timeout = 10000) {
+  const effectiveTimeout = Math.min(timeout, MAX_TIMEOUT);
+
   return new Promise((resolve) => {
     const proc = spawn('node', ['-e', code], {
       env: { ...process.env },
@@ -30,12 +39,17 @@ async function executeNode(code, timeout = 10000) {
     let stdout = '';
     let stderr = '';
     let killed = false;
+    let killTimer = null;
 
-    // 手动实现超时
+    // SIGTERM 超时
     const timer = setTimeout(() => {
       killed = true;
       proc.kill('SIGTERM');
-    }, timeout);
+      // SIGKILL 兜底：环境检测死循环可能忽略 SIGTERM
+      killTimer = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch { /* already dead */ }
+      }, 2000);
+    }, effectiveTimeout);
 
     proc.stdout.on('data', (data) => {
       if (stdout.length < MAX_OUTPUT_SIZE) {
@@ -51,21 +65,25 @@ async function executeNode(code, timeout = 10000) {
 
     proc.on('close', (exitCode) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve({
         success: !killed && exitCode === 0,
         stdout: stdout.trim(),
-        stderr: killed ? 'Timeout: process killed' : stderr.trim(),
+        stderr: killed ? `Timeout after ${effectiveTimeout}ms: process killed` : stderr.trim(),
         exitCode: killed ? -1 : exitCode,
+        timedOut: killed,
       });
     });
 
     proc.on('error', (err) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve({
         success: false,
         stdout: '',
         stderr: err.message,
         exitCode: -1,
+        timedOut: false,
       });
     });
   });
@@ -76,8 +94,25 @@ async function executeNode(code, timeout = 10000) {
  */
 export const runNodeCode = tool(
   async ({ code, timeout }) => {
-    const result = await executeNode(code, timeout || 10000);
-    return JSON.stringify(result);
+    // 连续超时保护：降级为短超时探测，而非完全拒绝
+    const isBlocked = consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS;
+    const effectiveTimeout = isBlocked ? 5000 : (timeout || 10000);
+    const result = await executeNode(code, effectiveTimeout);
+
+    // 更新连续超时计数
+    if (result.timedOut) {
+      consecutiveTimeouts++;
+      if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+        result.stderr += `\n\n⚠️ 已连续超时 ${consecutiveTimeouts} 次，后续调用将降级为 5s 短超时。代码很可能存在死循环或触发了环境检测。请停止重试相同逻辑，改用 sandbox_execute（沙箱执行）、断点调试或静态分析。`;
+      } else {
+        result.stderr += `\n\n⚠️ 连续超时 ${consecutiveTimeouts}/${MAX_CONSECUTIVE_TIMEOUTS} 次。如果代码包含从网站提取的混淆代码，可能存在环境检测导致死循环。建议：1) 检查代码是否有 while(true)/setInterval 等循环 2) 改用 sandbox_execute 在受控环境中执行`;
+      }
+    } else {
+      consecutiveTimeouts = 0; // 成功执行或非超时失败，重置计数
+    }
+
+    const { timedOut: _, ...output } = result;
+    return JSON.stringify(output);
   },
   {
     name: 'run_node_code',
@@ -93,7 +128,7 @@ export const runNodeCode = tool(
 示例：const CryptoJS = require('crypto-js'); console.log(CryptoJS.MD5('test').toString());`,
     schema: z.object({
       code: z.string().describe('要执行的 JS 代码，可使用 require 引入加密库'),
-      timeout: z.number().optional().default(10000).describe('超时时间（毫秒）'),
+      timeout: z.number().optional().default(10000).describe('超时时间（毫秒），上限 30000'),
     }),
   }
 );

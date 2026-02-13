@@ -63,7 +63,7 @@ import { verifyTools } from './verify.js';
 import { cryptoHookTools } from './cryptohook.js';
 import { correlateTools } from './correlate.js';
 import { extractorTools } from './extractor.js';
-import { tracingTools } from './tracing.js';
+import { tracingTools, getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator } from './tracing.js';
 import { analysisTools } from './analysis.js';
 import { fileTools } from './file.js';
 import { evolveTools } from './evolve.js';
@@ -129,8 +129,9 @@ export const coreTools = [
   ...browserTools,
   // 浏览器分析面板交互
   ...analysisTools,
-  // 数据溯源查询（判断委托方向的依据）
-  ...tracingTools,
+  // 数据查询（仅调度所需的最小集：列表、搜索、详情、initiator）
+  // 完整 tracingTools（含 get_script_source、search_in_scripts 等）只给 reverse-agent
+  getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator,
   // 报告生成
   ...reportTools,
   // 文件操作
