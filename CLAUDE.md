@@ -298,6 +298,7 @@ pnpm run setup:crypto
 deepspider config set apiKey your-api-key
 deepspider config set baseUrl https://api.openai.com/v1
 deepspider config set model gpt-4o
+deepspider config set persistBrowserData true  # 可选，持久化浏览器数据
 
 # 方式二：环境变量 / .env 文件
 cp .env.example .env
@@ -305,6 +306,7 @@ cp .env.example .env
 #   DEEPSPIDER_API_KEY=your-api-key
 #   DEEPSPIDER_BASE_URL=https://api.openai.com/v1
 #   DEEPSPIDER_MODEL=gpt-4o
+#   DEEPSPIDER_PERSIST_BROWSER=true  # 可选，持久化浏览器数据
 
 # CLI 命令
 deepspider --version              # 显示版本
@@ -318,6 +320,9 @@ deepspider update                 # 检查更新
 
 # Agent 模式（推荐）- 指定目标网站
 pnpm run agent https://example.com
+
+# Agent 模式 - 持久化浏览器数据（一次性，不修改配置）
+pnpm run agent --persist https://example.com
 
 # Agent 模式 - 纯交互（不启动浏览器）
 pnpm run agent

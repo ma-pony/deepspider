@@ -53,6 +53,7 @@ DeepSpider 需要配置 LLM API 才能运行。支持任何兼容 OpenAI 格式�
 | `apiKey` | `DEEPSPIDER_API_KEY` | API 密钥 |
 | `baseUrl` | `DEEPSPIDER_BASE_URL` | API 地址 |
 | `model` | `DEEPSPIDER_MODEL` | 模型名称 |
+| `persistBrowserData` | `DEEPSPIDER_PERSIST_BROWSER` | 持久化浏览器数据（保持登录态） |
 
 优先级：环境变量 > 配置文件 (`~/.deepspider/config/settings.json`) > 默认值
 
@@ -92,6 +93,9 @@ deepspider config set model deepseek-chat
 # 启动 Agent - 指定目标网站
 deepspider https://example.com
 
+# 启动 Agent - 持久化浏览器数据（一次性）
+deepspider --persist https://example.com
+
 # 启动 Agent - 纯交互模式
 deepspider
 
@@ -102,6 +106,9 @@ deepspider --help
 deepspider config list            # 查看所有配置
 deepspider config set apiKey sk-xxx
 deepspider config set model gpt-4o
+
+# 持久化浏览器数据（需要登录的网站，下次启动自动恢复登录态）
+deepspider config set persistBrowserData true
 
 # 检查更新
 deepspider update
