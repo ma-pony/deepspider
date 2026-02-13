@@ -172,7 +172,7 @@ async function init() {
     output: process.stdout,
   });
 
-  const loggerCallbacks = createLogger({ enabled: DEBUG, verbose: false });
+  const loggerCallbacks = createLogger();
 
   async function onReportReady(mdFilePath) {
     console.log('[report] 中间件触发报告显示:', mdFilePath);

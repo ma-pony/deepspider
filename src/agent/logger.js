@@ -4,17 +4,45 @@
  */
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
-import { appendFileSync, mkdirSync, existsSync } from 'fs';
+import { appendFileSync, mkdirSync, existsSync, statSync, renameSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { DEEPSPIDER_HOME } from '../config/paths.js';
 
 const LOG_DIR = join(DEEPSPIDER_HOME, 'logs');
 const LOG_FILE = join(LOG_DIR, 'agent.log');
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_LOG_FILES = 3;              // agent.log, agent.log.1, agent.log.2
 
 function ensureLogDir() {
   if (!existsSync(LOG_DIR)) {
     mkdirSync(LOG_DIR, { recursive: true });
   }
+}
+
+/**
+ * 日志滚动：agent.log 超过 MAX_LOG_SIZE 时轮转
+ * agent.log → agent.log.1 → agent.log.2 → 删除
+ */
+function rotateIfNeeded(logFile) {
+  try {
+    if (!existsSync(logFile)) return;
+    const { size } = statSync(logFile);
+    if (size < MAX_LOG_SIZE) return;
+
+    // 删除最老的
+    const oldest = `${logFile}.${MAX_LOG_FILES - 1}`;
+    if (existsSync(oldest)) unlinkSync(oldest);
+
+    // 依次轮转
+    for (let i = MAX_LOG_FILES - 2; i >= 1; i--) {
+      const from = `${logFile}.${i}`;
+      const to = `${logFile}.${i + 1}`;
+      if (existsSync(from)) renameSync(from, to);
+    }
+
+    // 当前文件变为 .1
+    renameSync(logFile, `${logFile}.1`);
+  } catch { /* 滚动失败不影响主流程 */ }
 }
 
 function formatTime() {
@@ -182,6 +210,8 @@ export class FileLoggerCallback extends BaseCallbackHandler {
   }
 
   log(level, category, message, data = null) {
+    rotateIfNeeded(this.logFile);
+
     const line = JSON.stringify({
       time: formatTime(),
       level,
@@ -291,20 +321,19 @@ export class FileLoggerCallback extends BaseCallbackHandler {
 
 /**
  * 创建日志回调实例数组
- * 始终包含 InMemoryLoggerCallback，DEBUG 模式额外包含 FileLoggerCallback
+ * 始终包含 InMemoryLoggerCallback + FileLoggerCallback
+ * DEBUG=true 时额外开启 verbose（控制台输出）
  */
 export function createLogger(options = {}) {
-  const callbacks = [new InMemoryLoggerCallback()];
+  const verbose = process.env.DEBUG === 'true' || options.verbose || false;
 
-  const fileEnabled = process.env.DEBUG === 'true' || options.enabled;
-  if (fileEnabled) {
-    callbacks.push(new FileLoggerCallback({
-      verbose: options.verbose || false,
+  return [
+    new InMemoryLoggerCallback(),
+    new FileLoggerCallback({
+      verbose,
       logFile: options.logFile || LOG_FILE,
-    }));
-  }
-
-  return callbacks;
+    }),
+  ];
 }
 
 export default FileLoggerCallback;
