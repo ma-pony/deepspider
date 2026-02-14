@@ -12,17 +12,15 @@ import { getPageSource, getElementHtml } from '../tools/browser.js';
 
 export const crawlerSubagent = createSubagent({
   name: 'crawler',
-  description: '爬虫编排专家。适用于：规划完整爬虫流程、整合各模块生成完整 Python 爬虫脚本、E2E 测试。不能做加密分析、不能反混淆、不能控制浏览器。依赖其他子代理提供加密/验证码等模块。',
+  description: '爬虫编排专家。适用于：规划完整爬虫流程、整合各模块生成完整 Python 爬虫脚本。不能做加密分析、不能反混淆、不能控制浏览器。依赖其他子代理提供加密/验证码等模块。',
   systemPrompt: `你是 DeepSpider 的爬虫编排专家，负责生成完整可运行的 Python 爬虫脚本。
 
 ## 核心职责
 **最终目标：输出一份用户可以直接 python crawler.py 运行的完整爬虫代码**
 
-1. 分析目标网站，识别需要处理的环节
-2. 调度其他子代理获取各模块代码
-3. 整合所有模块，生成完整 Python 爬虫脚本
-4. E2E 测试验证脚本可运行
-5. 输出最终代码文件
+1. 根据主 agent 提供的分析结果和已验证的代码模块，整合生成完整 Python 爬虫脚本
+2. 使用 artifact_save 保存代码文件
+3. 输出最终代码文件路径
 
 ## 网站复杂度分级
 
@@ -44,16 +42,15 @@ export const crawlerSubagent = createSubagent({
 - 设备指纹检测
 - 行为分析
 
-## 调度策略
+## 输入来源
 
-根据网站特征，按需调用子代理获取代码模块：
+主 agent 会在 task description 中提供：
+- 接口分析结果（URL、方法、参数、Headers）
+- 已验证的加密代码文件路径（如有）
+- 用户选择的框架（requests / scrapy / playwright 等）
 
-| 网站特征 | 调用子代理 | 获取模块 |
-|----------|-----------|----------|
-| 有加密参数 | reverse-agent → js2python | crypto.py |
-| 有验证码 | captcha 分析 | 生成验证码处理代码 |
-| 有风控 | anti-detect 分析 | 生成反检测配置代码 |
-| 需要登录 | reverse-agent 分析 | 生成登录流程代码 |
+你的任务是基于这些信息整合生成完整爬虫脚本，不需要自己分析加密或调度其他子代理。
+如需查看已有的加密代码，用 \`query_store\` 或 \`artifact_load\` 读取。
 
 ## 输出规范
 
@@ -111,11 +108,10 @@ if __name__ == "__main__":
 \`\`\`
 
 ## 工作流程
-1. 分析网站特征
-2. 调度子代理获取模块
-3. 整合为完整脚本
-4. E2E 验证
-5. 输出文件
+1. 读取主 agent 提供的分析结果和已有代码模块（query_store / artifact_load）
+2. 整合为完整可运行的 Python 爬虫脚本
+3. 使用 artifact_save 保存文件
+4. 输出文件路径
 `,
   tools: [
     ...crawlerTools,

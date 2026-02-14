@@ -113,4 +113,5 @@ export const e2eTest = tool(
   }
 );
 
-export const crawlerTools = [siteAnalyze, complexityAssess, e2eTest];
+// e2eTest 暂未实现（stub），不导出到子代理工具列表，避免子代理浪费轮次调用空壳工具
+export const crawlerTools = [siteAnalyze, complexityAssess];

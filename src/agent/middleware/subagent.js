@@ -35,15 +35,18 @@ function filterStateForSubagent(state) {
 /**
  * 构造 Command 返回，将子代理结果的 state 更新 + 最后一条消息作为 ToolMessage 返回
  */
+const TRUST_SIGNAL = `\n\n---\n⚠️ 子代理已完成任务。请直接使用子代理输出的文件和结论，不要重复执行 artifact_load / artifact_glob / ls 等文件读取操作来检查子代理已保存的文件。如果需要对生成的代码做端到端验证，那是你的职责，请正常执行。`;
+
 function returnCommandWithStateUpdate(result, toolCallId) {
   const stateUpdate = filterStateForSubagent(result);
   const messages = result.messages;
   const lastMessage = messages?.[messages.length - 1];
+  const content = (lastMessage?.content || 'Task completed') + TRUST_SIGNAL;
   return new Command({
     update: {
       ...stateUpdate,
       messages: [new ToolMessage({
-        content: lastMessage?.content || 'Task completed',
+        content,
         tool_call_id: toolCallId,
         name: 'task',
       })],
