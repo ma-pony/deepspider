@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 import { writeFileSync, readFileSync, existsSync, readdirSync } from 'fs';
-import { dirname, join, isAbsolute, relative } from 'path';
+import { dirname, join, isAbsolute, relative, resolve } from 'path';
 import { PATHS, ensureDir, DEEPSPIDER_HOME } from '../../config/paths.js';
 
 const OUTPUT_DIR = PATHS.OUTPUT_DIR;
@@ -17,15 +17,24 @@ function ensureFileDir(filePath) {
 }
 
 function getSafePath(filePath) {
+  let resolved;
   if (isAbsolute(filePath)) {
     // 如果是 ~/.deepspider/ 目录下的路径，直接使用
     if (filePath.startsWith(DEEPSPIDER_HOME)) {
-      return filePath;
+      resolved = filePath;
+    } else {
+      // 其他绝对路径：放到 OUTPUT_DIR 下
+      resolved = join(OUTPUT_DIR, filePath.replace(/^\/+/, ''));
     }
-    // 其他绝对路径：放到 OUTPUT_DIR 下
-    return join(OUTPUT_DIR, filePath.replace(/^\/+/, ''));
+  } else {
+    resolved = join(OUTPUT_DIR, filePath);
   }
-  return join(OUTPUT_DIR, filePath);
+  // 防止 ../ 穿越到 DEEPSPIDER_HOME 之外
+  const normalized = resolve(resolved);
+  if (!normalized.startsWith(DEEPSPIDER_HOME)) {
+    throw new Error(`路径不允许超出 ${DEEPSPIDER_HOME}: ${filePath}`);
+  }
+  return normalized;
 }
 
 export const artifactSave = tool(

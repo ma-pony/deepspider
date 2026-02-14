@@ -9,11 +9,14 @@ import { getBrowser } from '../../browser/index.js';
 export const proxyTest = tool(
   async ({ proxy_url }) => {
     try {
-      // 测试代理可用性
+      // 测试代理可用性（用 AbortController 实现超时，Node.js fetch 不支持 timeout 选项）
+      const controller = new globalThis.AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
       const response = await fetch('https://httpbin.org/ip', {
         agent: proxy_url ? new (await import('https-proxy-agent')).HttpsProxyAgent(proxy_url) : undefined,
-        timeout: 10000,
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const data = await response.json();
       return JSON.stringify({ success: true, ip: data.origin, proxy: proxy_url });
     } catch (e) {
