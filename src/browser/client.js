@@ -321,6 +321,9 @@ export class BrowserClient extends EventEmitter {
       this.emit('error', e);
     } finally {
       this._isCleaningUp = false;
+      // 重置 CDP 相关状态
+      this._cdpLastCheck = 0;
+      this._cdpSessionPage = null;
     }
   }
 }
