@@ -163,14 +163,16 @@ export class DataStore {
 
     // 当前已锁定，加入等待队列
     return new Promise((resolve, reject) => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
       const timer = setTimeout(() => {
         // 从队列中移除
-        const idx = lockState.queue.findIndex(item => item.resolve === resolve);
+        const idx = lockState.queue.findIndex(item => item.id === id);
         if (idx > -1) lockState.queue.splice(idx, 1);
         reject(new Error(`获取站点 ${site} 的锁超时`));
       }, timeout);
 
       lockState.queue.push({
+        id,
         resolve: () => {
           clearTimeout(timer);
           lockState.locked = true;

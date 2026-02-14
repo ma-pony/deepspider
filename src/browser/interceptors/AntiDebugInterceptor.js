@@ -17,6 +17,7 @@ export class AntiDebugInterceptor {
     this.PAUSED_WINDOW_MS = 1000;  // 1秒窗口
     this.PAUSED_THRESHOLD = 5;     // 1秒内超过5次paused认为是debugger风暴
     this.stormMode = false;        // 风暴模式：跳过所有断点
+    this.stormTimer = null;        // 风暴模式自动退出定时器
   }
 
   async start() {
@@ -27,6 +28,12 @@ export class AntiDebugInterceptor {
       // 手动设置的断点（除非在风暴模式）
       if (!this.stormMode && params.reason === 'breakpoint') return;
       if (!this.stormMode && params.hitBreakpoints?.length > 0) return;
+
+      // 风暴模式下直接 resume，不参与计数
+      if (this.stormMode) {
+        this.client.send('Debugger.resume').catch(() => {});
+        return;
+      }
 
       // 高频 debugger 检测
       const now = Date.now();
@@ -39,14 +46,19 @@ export class AntiDebugInterceptor {
       }
 
       // 触发风暴模式
-      if (this.pausedCount > this.PAUSED_THRESHOLD && !this.stormMode) {
+      if (this.pausedCount > this.PAUSED_THRESHOLD) {
         console.log('[AntiDebugInterceptor] 检测到 debugger 风暴，启用风暴模式');
         this.stormMode = true;
+        // 清除之前的定时器
+        if (this.stormTimer) {
+          clearTimeout(this.stormTimer);
+        }
         // 3秒后退出风暴模式
-        setTimeout(() => {
+        this.stormTimer = setTimeout(() => {
           console.log('[AntiDebugInterceptor] 退出风暴模式');
           this.stormMode = false;
           this.pausedCount = 0;
+          this.stormTimer = null;
         }, 3000);
       }
 
@@ -90,16 +102,24 @@ export class AntiDebugInterceptor {
    * 用于绕过强反调试场景
    */
   setStormMode(enabled) {
+    // 清除之前的定时器
+    if (this.stormTimer) {
+      clearTimeout(this.stormTimer);
+      this.stormTimer = null;
+    }
+
     this.stormMode = enabled;
     if (enabled) {
       console.log('[AntiDebugInterceptor] 手动启用风暴模式');
       // 自动退出
-      setTimeout(() => {
+      this.stormTimer = setTimeout(() => {
         this.stormMode = false;
+        this.stormTimer = null;
         console.log('[AntiDebugInterceptor] 自动退出风暴模式');
       }, 5000);
     } else {
       console.log('[AntiDebugInterceptor] 手动禁用风暴模式');
+      this.pausedCount = 0;
     }
   }
 
