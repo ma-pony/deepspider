@@ -115,7 +115,28 @@ export function createValidationWorkflowMiddleware() {
     // 工具调用前检查是否允许
     wrapToolCall: async (request, handler) => {
       const toolName = request.tool?.name ?? request.toolCall?.name;
+      const args = request.toolCall?.args || {};
       const state = request.state || {};
+
+      // 保存 Python 代码前检查算法验证
+      if (toolName === 'artifact_save') {
+        const filePath = args.file_path || '';
+        if (filePath.endsWith('.py')) {
+          if (!state.algorithmVerified) {
+            return {
+              type: 'tool',
+              name: 'artifact_save',
+              content: JSON.stringify({
+                success: false,
+                error: '保存 Python 代码前必须先完成算法验证。请委托 js2python 子代理验证加密/解密逻辑。',
+                requiredStep: '算法验证',
+                hint: '使用 task 工具，指定 subagent_type: "js2python"',
+              }),
+              tool_call_id: request.toolCall?.id || 'blocked',
+            };
+          }
+        }
+      }
 
       // 保存报告前强制检查验证状态
       if (toolName === 'save_analysis_report') {
@@ -124,8 +145,8 @@ export function createValidationWorkflowMiddleware() {
         if (stage !== 'passed') {
           // 构造阻止消息
           const missing = [];
-          if (!state.algorithmVerified) missing.push('算法验证');
-          if (!state.endToEndVerified) missing.push('端到端验证');
+          if (!state.algorithmVerified) missing.push('算法验证（委托 js2python）');
+          if (!state.endToEndVerified) missing.push('端到端验证（sandbox_execute）');
           if (!state.savedPythonCode) missing.push('保存 Python 代码');
 
           return {
