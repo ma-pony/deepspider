@@ -109,7 +109,13 @@
       "WebFetch(domain:chromedevtools.github.io)",
       "WebFetch(domain:developer.chrome.com)",
       "Bash(pnpm update:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(while read:*)",
+      "Bash(do if git show $hash:src/browser/client.js)",
+      "Bash(then echo \"$hash: $msg\")",
+      "Bash(break)",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   },
   "enableAllProjectMcpServers": true,

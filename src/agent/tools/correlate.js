@@ -75,22 +75,40 @@ export const analyzeCorrelation = tool(
 
 /**
  * 解析调用栈顶部
+ * 支持两种格式：
+ * 1. 字符串栈（来自 Error.stack）
+ * 2. callFrames 数组（来自 CDP initiator）
  */
 function parseStackTop(stack) {
   if (!stack) return null;
-  const lines = stack.split('\n').slice(2, 5);
-  return lines.map(line => {
-    const match = line.match(/at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)/) ||
-                  line.match(/at\s+(.+?):(\d+):(\d+)/);
-    if (match) {
-      return {
-        func: match[1] || 'anonymous',
-        file: match[2] || match[1],
-        line: parseInt(match[3] || match[2])
-      };
-    }
-    return { raw: line.trim() };
-  });
+
+  // 处理 callFrames 数组格式（来自 CDP initiator）
+  if (Array.isArray(stack)) {
+    return stack.slice(0, 3).map(frame => ({
+      func: frame.functionName || frame.func || '(anonymous)',
+      file: frame.url || frame.file || '',
+      line: frame.lineNumber || frame.line || 0
+    }));
+  }
+
+  // 处理字符串栈格式（来自 Error.stack）
+  if (typeof stack === 'string') {
+    const lines = stack.split('\n').slice(2, 5);
+    return lines.map(line => {
+      const match = line.match(/at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)/) ||
+                    line.match(/at\s+(.+?):(\d+):(\d+)/);
+      if (match) {
+        return {
+          func: match[1] || 'anonymous',
+          file: match[2] || match[1],
+          line: parseInt(match[3] || match[2])
+        };
+      }
+      return { raw: line.trim() };
+    });
+  }
+
+  return null;
 }
 
 /**

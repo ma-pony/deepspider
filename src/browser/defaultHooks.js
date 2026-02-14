@@ -160,7 +160,9 @@ function getCookieHook() {
         return value;
       },
       set: function(val) {
-        deepspider.log('cookie', { action: 'write', value: val });
+        // 解析 cookie name（cookie 格式: "name=value; expires=...; path=..."）
+        const cookieName = val?.split('=')[0]?.trim();
+        deepspider.log('cookie', { action: 'write', name: cookieName, value: val });
         return cookieDesc.set.call(document, val);
       },
       configurable: true

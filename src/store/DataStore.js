@@ -128,10 +128,28 @@ export class DataStore {
     this.sessionId = null;
     // 上次清理时间
     this.lastCleanup = 0;
+    // 文件锁：防止并发写入同一站点索引
+    this.siteLocks = new Map();
 
     ensureDir(DATA_DIR);
     ensureDir(SITES_DIR);
     this.loadGlobalIndex();
+  }
+
+  /**
+   * 获取站点锁
+   */
+  async acquireLock(site) {
+    while (this.siteLocks.get(site)) {
+      await this.siteLocks.get(site);
+    }
+    let resolveLock;
+    const lockPromise = new Promise(resolve => { resolveLock = resolve; });
+    this.siteLocks.set(site, lockPromise);
+    return () => {
+      this.siteLocks.delete(site);
+      resolveLock();
+    };
   }
 
   /**
@@ -241,71 +259,87 @@ export class DataStore {
       this.globalIndex.sites.push(stats);
     }
 
-    this.saveGlobalIndex().catch(() => {});
+    await this.saveGlobalIndex();
   }
 
   /**
-   * 保存响应数据（带去重）
+   * 保存响应数据（带去重，带锁防止竞态条件）
    */
   async saveResponse(data) {
     const { url, method, status, requestHeaders, requestBody, responseBody, timestamp, pageUrl, initiator } = data;
     const { site, path } = parseUrl(pageUrl || url);
 
-    // 生成去重 hash
-    const hash = requestHash(url, method, requestBody);
-    const index = await this.getSiteIndex(site);
+    // 获取站点锁，防止并发写入
+    const releaseLock = await this.acquireLock(site);
+    let result;
 
-    // 检查是否已存在相同内容
-    const existing = index.responses.find(r => r.hash === hash);
-    if (existing) {
-      // 更新时间戳和会话，不重复存储
-      existing.timestamp = timestamp || Date.now();
-      existing.sessionId = this.getSessionId();
-      // 更新 initiator（不同代码路径可能调用同一 API）
-      if (initiator) {
-        existing.hasInitiator = true;
-        // 同步更新详情文件中的 initiator
-        try {
-          const detail = JSON.parse(await readFile(existing.file, 'utf-8'));
-          detail.initiator = initiator;
-          await writeFile(existing.file, JSON.stringify(detail));
-        } catch { /* 文件读写失败不影响主流程 */ }
+    try {
+      // 生成去重 hash
+      const hash = requestHash(url, method, requestBody);
+
+      // 重新加载索引（获取最新状态）
+      this.siteIndexCache.delete(site);
+      const index = await this.getSiteIndex(site);
+
+      // 检查是否已存在相同内容
+      const existing = index.responses.find(r => r.hash === hash);
+      if (existing) {
+        // 更新时间戳和会话，不重复存储
+        existing.timestamp = timestamp || Date.now();
+        existing.sessionId = this.getSessionId();
+        // 更新 initiator（不同代码路径可能调用同一 API）
+        if (initiator) {
+          existing.hasInitiator = true;
+          // 同步更新详情文件中的 initiator
+          try {
+            const detail = JSON.parse(await readFile(existing.file, 'utf-8'));
+            detail.initiator = initiator;
+            await writeFile(existing.file, JSON.stringify(detail));
+          } catch { /* 文件读写失败不影响主流程 */ }
+        }
+        await this.saveSiteIndex(site);
+        result = { id: existing.id, site, path, deduplicated: true };
+      } else {
+        const siteDir = this.getSiteDir(site);
+        const responsesDir = join(siteDir, 'responses', path);
+        ensureDir(responsesDir);
+
+        // 生成可读文件名（使用当前索引长度作为序号）
+        const readableName = getReadableFilename(url, 'response', method);
+        const seq = String(index.responses.length).padStart(3, '0');
+        const id = `${readableName}_${seq}`;
+        const file = join(responsesDir, `${id}.json`);
+
+        const content = JSON.stringify({
+          url, method, status,
+          requestHeaders, requestBody, responseBody,
+          pageUrl, timestamp, initiator,
+        });
+
+        await writeFile(file, content);
+
+        index.responses.push({
+          id, url, path, method, status,
+          timestamp: timestamp || Date.now(),
+          file, size: content.length,
+          hash, hasInitiator: !!initiator,
+          sessionId: this.getSessionId()
+        });
+
+        await this.saveSiteIndex(site);
+        result = { id, site, path };
       }
-      await this.saveSiteIndex(site);
-      return { id: existing.id, site, path, deduplicated: true };
+    } finally {
+      // 确保锁被释放
+      releaseLock();
     }
 
-    const siteDir = this.getSiteDir(site);
-    const responsesDir = join(siteDir, 'responses', path);
-    ensureDir(responsesDir);
-
-    // 生成可读文件名
-    const readableName = getReadableFilename(url, 'response', method);
-    const seq = String(index.responses.length).padStart(3, '0');
-    const id = `${readableName}_${seq}`;
-    const file = join(responsesDir, `${id}.json`);
-
-    const content = JSON.stringify({
-      url, method, status,
-      requestHeaders, requestBody, responseBody,
-      pageUrl, timestamp, initiator,
-    });
-
-    await writeFile(file, content);
-
-    index.responses.push({
-      id, url, path, method, status,
-      timestamp: timestamp || Date.now(),
-      file, size: content.length,
-      hash, hasInitiator: !!initiator,
-      sessionId: this.getSessionId()
-    });
-
-    await this.saveSiteIndex(site);
-    await this.updateSiteStats(site);
+    if (!result.deduplicated) {
+      await this.updateSiteStats(site);
+    }
     this.maybeCleanup();
 
-    return { id, site, path };
+    return result;
   }
 
   /**

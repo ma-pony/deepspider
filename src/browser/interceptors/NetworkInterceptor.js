@@ -119,9 +119,23 @@ export class NetworkInterceptor {
         { requestId }
       );
 
-      const responseBody = base64Encoded
-        ? Buffer.from(body, 'base64').toString('utf-8')
-        : body;
+      // 处理响应体：检测二进制内容，避免损坏
+      let responseBody;
+      const contentType = pending.responseHeaders?.['content-type'] || '';
+
+      if (this.isBinaryContent(contentType)) {
+        // 二进制内容：存储元数据而非原始内容
+        const binarySize = base64Encoded
+          ? Math.floor(body.length * 0.75)  // base64 大致解码后大小
+          : body.length;
+        responseBody = `[Binary: ${contentType}, ${binarySize} bytes]`;
+      } else {
+        // 文本内容：安全地转换为字符串
+        const rawBody = base64Encoded
+          ? Buffer.from(body, 'base64').toString('utf-8')
+          : body;
+        responseBody = rawBody.slice(0, 50000);
+      }
 
       // 异步存储到文件
       this.store.saveResponse({
@@ -130,7 +144,7 @@ export class NetworkInterceptor {
         status: pending.status,
         requestHeaders: pending.headers,
         requestBody: pending.postData,
-        responseBody: responseBody.slice(0, 50000),
+        responseBody,
         timestamp: pending.timestamp,
         pageUrl: pending.pageUrl,
         initiator: pending.initiator,
@@ -143,6 +157,21 @@ export class NetworkInterceptor {
     }
 
     this.pendingRequests.delete(requestId);
+  }
+
+  /**
+   * 检测是否为二进制内容类型
+   */
+  isBinaryContent(contentType) {
+    if (!contentType) return false;
+    const binaryTypes = [
+      'image/', 'audio/', 'video/', 'application/pdf',
+      'application/octet-stream', 'application/zip',
+      'application/gzip', 'application/x-protobuf',
+      'font/', 'application/vnd.'
+    ];
+    const lowerType = contentType.toLowerCase();
+    return binaryTypes.some(type => lowerType.includes(type));
   }
 }
 
