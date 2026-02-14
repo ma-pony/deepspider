@@ -87,6 +87,14 @@ export class BrowserClient extends EventEmitter {
     // 监听新页面创建（弹窗、新标签页）
     this.context.on('page', async (newPage) => {
       console.log('[BrowserClient] 检测到新页面');
+
+      // 清理旧页面的 CDP session（避免泄漏）
+      if (this.cdpSession && this._cdpSessionPage && this._cdpSessionPage !== newPage) {
+        await this.cdpSession.detach().catch(() => {});
+        this.cdpSession = null;
+        this._cdpSessionPage = null;
+      }
+
       this.pages.push(newPage);
       this.page = newPage;  // 切换到新页面
       await this.setupPage(newPage);
@@ -112,6 +120,13 @@ export class BrowserClient extends EventEmitter {
    */
   async setupPage(page) {
     try {
+      // 如果这是当前页面的重新设置，先清理旧的 session
+      if (page === this.page && this.cdpSession && this._cdpSessionPage === page) {
+        await this.cdpSession.detach().catch(() => {});
+        this.cdpSession = null;
+        this._cdpSessionPage = null;
+      }
+
       const cdp = await page.context().newCDPSession(page);
 
       // 1. 启用 Runtime 域
@@ -150,9 +165,10 @@ export class BrowserClient extends EventEmitter {
         antiDebugInterceptor.checkScript(scriptId, source);
       };
 
-      // 保存引用
+      // 保存引用（仅对当前活动页面）
       if (page === this.page) {
         this.cdpSession = cdp;
+        this._cdpSessionPage = page;  // 关键：设置标记，让 getCDPSession 知道这是当前页面的 session
         this.networkInterceptor = networkInterceptor;
         this.scriptInterceptor = scriptInterceptor;
         this.antiDebugInterceptor = antiDebugInterceptor;
@@ -177,19 +193,34 @@ export class BrowserClient extends EventEmitter {
   async getCDPSession() {
     if (!this.page) return this.cdpSession;
 
-    // page 未变且 session 存在 → 复用
+    // page 未变且 session 存在 → 复用前检查 session 是否仍然有效
     if (this.cdpSession && this._cdpSessionPage === this.page) {
-      return this.cdpSession;
+      try {
+        // 通过简单的 Runtime.evaluate 验证 session 是否还活着
+        await this.cdpSession.send('Runtime.evaluate', { expression: '1' });
+        return this.cdpSession;
+      } catch (e) {
+        // session 已失效，需要重新创建
+        console.log('[BrowserClient] CDP session 已失效，重新创建');
+        this.cdpSession = null;
+        this._cdpSessionPage = null;
+      }
     }
 
-    // page 变了或首次调用 → detach 旧 session，创建新的
+    // page 变了或 session 失效 → detach 旧 session，创建新的
     if (this.cdpSession) {
-      await this.cdpSession.detach().catch(() => {});
+      try {
+        await this.cdpSession.detach();
+      } catch {
+        // 忽略 detach 错误（session 可能已断开）
+      }
+      this.cdpSession = null;
     }
 
     try {
       this.cdpSession = await this.page.context().newCDPSession(this.page);
       this._cdpSessionPage = this.page;
+      console.log('[BrowserClient] CDP session 已创建');
     } catch (e) {
       console.error('[BrowserClient] 创建 CDP session 失败:', e.message);
       this.cdpSession = null;
