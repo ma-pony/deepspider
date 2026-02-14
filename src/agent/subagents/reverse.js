@@ -36,7 +36,7 @@ import { nodejsTools } from '../tools/nodejs.js';
 import { fileTools } from '../tools/file.js';
 import { storeTools } from '../tools/store.js';
 // 页面交互（仅断点触发 + Cookie 采集所需的最小集）
-import { reloadPage, clickElement, scrollPage, getCookies } from '../tools/browser.js';
+import { reloadPage, clickElement, scrollPage, getCookies, getPageSource } from '../tools/browser.js';
 // 工作记忆
 import { scratchpadTools } from '../tools/scratchpad.js';
 
@@ -109,7 +109,7 @@ export const reverseSubagent = createSubagent({
 - 浏览器生命周期由主 agent 管理，你没有 launch_browser / navigate_to 工具
 - 如果任务描述中包含"浏览器已就绪"，你可以直接使用断点、Hook、采集工具、页面交互工具
 - 如果浏览器未启动，返回结果告知主 agent 需要先启动浏览器
-- 你有 reload_page、click_element、scroll_page 用于触发断点，get_cookies 用于采集 Cookie
+- 你有 reload_page、click_element、scroll_page 用于触发断点，get_cookies 用于采集 Cookie，get_page_source 用于获取页面源码（定位内联脚本等）
 
 ### 断点触发（必须掌握）
 设置断点后，断点不会立即命中 — 需要目标代码被执行。根据目标代码的执行时机选择触发方式：
@@ -167,8 +167,8 @@ export const reverseSubagent = createSubagent({
     // 验证 + 执行
     ...verifyAlgorithmTools,
     ...nodejsTools,
-    // 页面交互（仅断点触发 + Cookie 采集）
-    reloadPage, clickElement, scrollPage, getCookies,
+    // 页面交互（断点触发 + Cookie 采集 + 页面源码）
+    reloadPage, clickElement, scrollPage, getCookies, getPageSource,
     // 输出
     ...fileTools,
     ...storeTools,

@@ -107,7 +107,9 @@
       "Bash(git -C /Users/rccpony/Projects/deepspider commit -m \"chore: bump version to 0.3.1\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\")",
       "Bash(npx eslint:*)",
       "WebFetch(domain:chromedevtools.github.io)",
-      "WebFetch(domain:developer.chrome.com)"
+      "WebFetch(domain:developer.chrome.com)",
+      "Bash(pnpm update:*)",
+      "Bash(git status:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

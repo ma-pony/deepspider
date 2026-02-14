@@ -28,14 +28,15 @@ async function getSession() {
       if (lastPauseIsBreakpoint) {
         isPaused = true;
         currentCallFrames = params.callFrames || [];
-        console.log('[debug] Breakpoint hit, callFrames:', currentCallFrames.length);
+        const top = currentCallFrames[0];
+        const func = top?.functionName || '(anonymous)';
+        const url = top?.url?.split('/').pop() || top?.url || '?';
+        const line = top?.location?.lineNumber ?? '?';
+        console.log(`[debug] Breakpoint hit: ${func} @ ${url}:${line}`);
       }
     });
 
     cdpSession.on('Debugger.resumed', () => {
-      if (lastPauseIsBreakpoint) {
-        console.log('[debug] Debugger resumed');
-      }
       isPaused = false;
       currentCallFrames = [];
       lastPauseIsBreakpoint = false;
