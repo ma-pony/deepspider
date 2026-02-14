@@ -11,6 +11,12 @@ export class AntiDebugInterceptor {
   constructor(cdpClient) {
     this.client = cdpClient;
     this.blackboxedScripts = new Set();
+    // 高频 debugger 检测
+    this.pausedCount = 0;
+    this.pausedWindowStart = 0;
+    this.PAUSED_WINDOW_MS = 1000;  // 1秒窗口
+    this.PAUSED_THRESHOLD = 5;     // 1秒内超过5次paused认为是debugger风暴
+    this.stormMode = false;        // 风暴模式：跳过所有断点
   }
 
   async start() {
@@ -18,8 +24,33 @@ export class AntiDebugInterceptor {
     // reason 可能是 'other' 或 'debugCommand'（不同 Chrome 版本），
     // 只要不是我们主动设的断点（hitBreakpoints 非空 / reason=breakpoint）就 resume
     this.client.on('Debugger.paused', (params) => {
-      if (params.reason === 'breakpoint') return;
-      if (params.hitBreakpoints?.length > 0) return;
+      // 手动设置的断点（除非在风暴模式）
+      if (!this.stormMode && params.reason === 'breakpoint') return;
+      if (!this.stormMode && params.hitBreakpoints?.length > 0) return;
+
+      // 高频 debugger 检测
+      const now = Date.now();
+      if (now - this.pausedWindowStart > this.PAUSED_WINDOW_MS) {
+        // 新窗口
+        this.pausedWindowStart = now;
+        this.pausedCount = 1;
+      } else {
+        this.pausedCount++;
+      }
+
+      // 触发风暴模式
+      if (this.pausedCount > this.PAUSED_THRESHOLD && !this.stormMode) {
+        console.log('[AntiDebugInterceptor] 检测到 debugger 风暴，启用风暴模式');
+        this.stormMode = true;
+        // 3秒后退出风暴模式
+        setTimeout(() => {
+          console.log('[AntiDebugInterceptor] 退出风暴模式');
+          this.stormMode = false;
+          this.pausedCount = 0;
+        }, 3000);
+      }
+
+      // 自动 resume
       this.client.send('Debugger.resume').catch(() => {});
     });
 
@@ -52,5 +83,30 @@ export class AntiDebugInterceptor {
       });
       this.blackboxedScripts.delete(scriptId);
     }
+  }
+
+  /**
+   * 手动启用/禁用风暴模式
+   * 用于绕过强反调试场景
+   */
+  setStormMode(enabled) {
+    this.stormMode = enabled;
+    if (enabled) {
+      console.log('[AntiDebugInterceptor] 手动启用风暴模式');
+      // 自动退出
+      setTimeout(() => {
+        this.stormMode = false;
+        console.log('[AntiDebugInterceptor] 自动退出风暴模式');
+      }, 5000);
+    } else {
+      console.log('[AntiDebugInterceptor] 手动禁用风暴模式');
+    }
+  }
+
+  /**
+   * 检查当前是否在风暴模式
+   */
+  isStormMode() {
+    return this.stormMode;
   }
 }
