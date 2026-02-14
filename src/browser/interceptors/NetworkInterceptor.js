@@ -46,6 +46,11 @@ export class NetworkInterceptor {
       this.onLoadingFinished(params);
     });
 
+    // 监听加载失败（清理 pendingRequests，防止内存泄漏）
+    this.client.on('Network.loadingFailed', (params) => {
+      this.pendingRequests.delete(params.requestId);
+    });
+
     console.log('[NetworkInterceptor] 已启动');
   }
 

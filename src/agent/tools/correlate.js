@@ -184,11 +184,12 @@ export const analyzeCookieEncryption = tool(
   async ({ logs, cookieName }) => {
     const parsed = typeof logs === 'string' ? JSON.parse(logs) : logs;
 
-    // 找到设置该 cookie 的日志
+    // 找到设置该 cookie 的日志（匹配 cookie 键名）
     const cookieLogs = parsed.filter(entry => {
       if (entry._type !== 'cookie') return false;
       if (entry.action !== 'write') return false;
-      return entry.value?.includes(cookieName);
+      // cookie hook 日志的 value 格式为 "name=value"，匹配键名部分
+      return entry.value?.startsWith(cookieName + '=') || entry.name === cookieName;
     });
 
     if (cookieLogs.length === 0) {

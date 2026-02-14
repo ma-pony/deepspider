@@ -37,7 +37,8 @@ export class Store {
   }
 
   _getFilePath(type, name) {
-    const typeDir = path.join(this.baseDir, type);
+    const safeType = type.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const typeDir = path.join(this.baseDir, safeType);
     if (!fs.existsSync(typeDir)) {
       fs.mkdirSync(typeDir, { recursive: true });
     }

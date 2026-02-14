@@ -172,17 +172,29 @@ export class BrowserClient extends EventEmitter {
   }
 
   /**
-   * 获取 CDP 会话（始终使用当前页面的 session）
+   * 获取 CDP 会话（复用已有 session，仅在 page 变化时重建）
    */
   async getCDPSession() {
-    // 每次都为当前页面创建新的 CDP session，确保上下文正确
-    if (this.page) {
-      try {
-        this.cdpSession = await this.page.context().newCDPSession(this.page);
-      } catch (e) {
-        console.error('[BrowserClient] 创建 CDP session 失败:', e.message);
-        return null;
-      }
+    if (!this.page) return this.cdpSession;
+
+    // page 未变且 session 存在 → 复用
+    if (this.cdpSession && this._cdpSessionPage === this.page) {
+      return this.cdpSession;
+    }
+
+    // page 变了或首次调用 → detach 旧 session，创建新的
+    if (this.cdpSession) {
+      await this.cdpSession.detach().catch(() => {});
+    }
+
+    try {
+      this.cdpSession = await this.page.context().newCDPSession(this.page);
+      this._cdpSessionPage = this.page;
+    } catch (e) {
+      console.error('[BrowserClient] 创建 CDP session 失败:', e.message);
+      this.cdpSession = null;
+      this._cdpSessionPage = null;
+      return null;
     }
     return this.cdpSession;
   }

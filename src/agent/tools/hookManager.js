@@ -115,14 +115,12 @@ export const injectHook = tool(
       if (!browser.getPage()) {
         return JSON.stringify({ success: false, error: '浏览器未就绪' });
       }
-      const escapedCode = code
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'")
-        .replace(/\n/g, '\\n');
+      // 用 JSON.stringify 安全转义，避免手动转义遗漏特殊字符
+      const safeCode = JSON.stringify(code);
 
       const result = await evaluateViaCDP(
         browser,
-        `JSON.stringify(window.__deepspider__?.injectHook?.('${escapedCode}'))`
+        `JSON.stringify(window.__deepspider__?.injectHook?.(${safeCode}))`
       );
       return result || JSON.stringify({ success: false, error: '注入失败' });
     } catch (e) {

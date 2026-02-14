@@ -7,6 +7,7 @@
 export class HookManager {
   constructor() {
     this.logs = [];
+    this.maxLogs = 5000;
     this.onLog = null;
     this.injected = false;
   }
@@ -37,6 +38,10 @@ export class HookManager {
           text,
           timestamp: Date.now(),
         });
+        // 超过上限时丢弃最旧的 20%
+        if (this.logs.length > this.maxLogs) {
+          this.logs = this.logs.slice(Math.floor(this.maxLogs * 0.2));
+        }
         if (this.onLog) {
           this.onLog({ type: msg.type(), text });
         }
