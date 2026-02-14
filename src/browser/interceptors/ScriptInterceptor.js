@@ -58,10 +58,12 @@ export class ScriptInterceptor {
 
   async fetchAndNotify(scriptId) {
     try {
-      const { scriptSource } = await this.client.send(
-        'Debugger.getScriptSource',
-        { scriptId }
+      // 添加超时保护防止 CDP 命令挂起
+      const sourcePromise = this.client.send('Debugger.getScriptSource', { scriptId });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('getScriptSource timeout')), 5000)
       );
+      const { scriptSource } = await Promise.race([sourcePromise, timeoutPromise]);
       try { this.onSource(scriptId, scriptSource); } catch { /* 订阅者异常不影响主流程 */ }
     } catch {
       // 获取失败（脚本已卸载等），忽略
@@ -70,10 +72,12 @@ export class ScriptInterceptor {
 
   async fetchAndSave(scriptId, url) {
     try {
-      const { scriptSource } = await this.client.send(
-        'Debugger.getScriptSource',
-        { scriptId }
+      // 添加超时保护防止 CDP 命令挂起
+      const sourcePromise = this.client.send('Debugger.getScriptSource', { scriptId });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('getScriptSource timeout')), 5000)
       );
+      const { scriptSource } = await Promise.race([sourcePromise, timeoutPromise]);
 
       // 通知订阅者（AntiDebugInterceptor 等）
       try { this.onSource?.(scriptId, scriptSource); } catch { /* 订阅者异常不影响主流程 */ }

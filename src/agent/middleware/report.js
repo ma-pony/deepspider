@@ -14,9 +14,32 @@ const reportStateSchema = z.object({
 });
 
 /**
+ * 检测并触发报告显示
+ */
+async function detectAndTriggerReport(result, onReportReady) {
+  try {
+    const content = typeof result?.content === 'string'
+      ? JSON.parse(result.content)
+      : result?.content;
+
+    if (content?.success && content?.path?.endsWith('.md')) {
+      console.log('[reportMiddleware] 检测到 .md 文件:', content.path);
+
+      if (onReportReady) {
+        await onReportReady(content.path);
+      }
+      return true;
+    }
+  } catch {
+    // 解析失败，忽略
+  }
+  return false;
+}
+
+/**
  * 创建报告中间件
- * 在 afterModel 中检测 artifact_save 工具调用结果
- * 在 afterAgent 中触发报告显示回调
+ * 在 wrapToolCall 中检测 artifact_save 工具调用结果，立即触发报告
+ * 同时在 afterModel 和 afterAgent 中保留检测逻辑作为备选
  */
 export function createReportMiddleware(options = {}) {
   const { onReportReady } = options;
@@ -25,7 +48,20 @@ export function createReportMiddleware(options = {}) {
     name: 'reportMiddleware',
     stateSchema: reportStateSchema,
 
-    // 模型调用后，检测工具调用结果
+    // 工具调用包装器：在 artifact_save 完成时立即检测
+    wrapToolCall: async (request, handler) => {
+      const toolName = request.tool?.name ?? request.toolCall?.name;
+      const result = await handler(request);
+
+      // 检测 artifact_save 工具返回的 .md 文件
+      if (toolName === 'artifact_save') {
+        await detectAndTriggerReport(result, onReportReady);
+      }
+
+      return result;
+    },
+
+    // 模型调用后，检测工具调用结果（备选方案）
     afterModel: (state) => {
       const messages = state.messages;
       if (!messages || messages.length === 0) return undefined;
@@ -41,7 +77,7 @@ export function createReportMiddleware(options = {}) {
 
             // 检测是否是 artifact_save 写入的 .md 文件
             if (content.success && content.path?.endsWith('.md')) {
-              console.log('[reportMiddleware] 检测到 .md 文件:', content.path);
+              console.log('[reportMiddleware] afterModel 检测到 .md 文件:', content.path);
               return { lastWrittenMdFile: content.path };
             }
           } catch {
@@ -52,22 +88,12 @@ export function createReportMiddleware(options = {}) {
       return undefined;
     },
 
-    // Agent 执行完成后
+    // Agent 执行完成后（streamEvents 模式下可能不被调用）
     afterAgent: async (state) => {
       const mdFile = state.lastWrittenMdFile;
 
       if (mdFile) {
         console.log('[reportMiddleware] afterAgent: 准备显示报告:', mdFile);
-
-        // 调用回调通知外部
-        if (onReportReady) {
-          try {
-            await onReportReady(mdFile);
-          } catch (e) {
-            console.error('[reportMiddleware] onReportReady 失败:', e.message);
-          }
-        }
-
         return { reportReady: true };
       }
 

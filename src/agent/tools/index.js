@@ -36,6 +36,7 @@ export { evolveTools, evolveSkill } from './evolve.js';
 export { captchaTools } from './captcha.js';
 export { antiDetectTools } from './anti-detect.js';
 export { crawlerTools } from './crawler.js';
+export { crawlerGeneratorTools, generateCrawlerWithConfirm, delegateCrawlerGeneration } from './crawlerGenerator.js';
 export { nodejsTools, runNodeCode } from './nodejs.js';
 export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig } from './hookManager.js';
 export { scratchpadTools, saveMemo, loadMemo, listMemo } from './scratchpad.js';
@@ -53,7 +54,7 @@ import { profileTools } from './profile.js';
 import { runtimeTools } from './runtime.js';
 import { debugTools } from './debug.js';
 import { captureTools } from './capture.js';
-import { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement, getPageInfo, getPageSource, getElementHtml, getCookies, getInteractiveElements } from './browser.js';
+import { browserTools } from './browser.js';
 import { reportTools } from './report.js';
 import { webcrackTools } from './webcrack.js';
 import { preprocessTools } from './preprocess.js';
@@ -73,6 +74,7 @@ import { evolveTools } from './evolve.js';
 import { captchaTools } from './captcha.js';
 import { antiDetectTools } from './anti-detect.js';
 import { crawlerTools } from './crawler.js';
+import { crawlerGeneratorTools } from './crawlerGenerator.js';
 import { nodejsTools } from './nodejs.js';
 import { hookManagerTools } from './hookManager.js';
 import { scratchpadTools } from './scratchpad.js';
@@ -109,6 +111,7 @@ export const allTools = [
   ...captchaTools,
   ...antiDetectTools,
   ...crawlerTools,
+  ...crawlerGeneratorTools,
   ...nodejsTools,
   ...hookManagerTools,
   ...scratchpadTools,
@@ -128,15 +131,9 @@ export const allTools = [
 export const coreTools = [
   // 浏览器运行时（生命周期管理）
   ...runtimeTools,
-  // 页面交互（简单点击、填写、等待、截图、Cookie）
-  // get_page_source / get_element_html 不给主 agent（防止拉 HTML 自己分析 JS），给 crawler-agent
-  clickElement, fillInput, waitForSelector, takeScreenshot,
-  reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement,
-  getPageInfo, getCookies, getInteractiveElements,
   // 浏览器分析面板交互
   ...analysisTools,
   // 数据查询（仅调度所需的最小集：列表、搜索、详情、initiator）
-  // 完整 tracingTools（含 get_script_source、search_in_scripts 等）只给 reverse-agent
   getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator,
   // 报告生成
   ...reportTools,
@@ -144,8 +141,10 @@ export const coreTools = [
   ...fileTools,
   // 经验进化
   ...evolveTools,
-  // Node.js 执行（委托前快速验证假设）
+  // Node.js 执行（委托前快速验证假设）- 已添加网络请求防护
   ...nodejsTools,
   // 工作记忆
   ...scratchpadTools,
+  // 爬虫代码生成（带 HITL 确认）
+  ...crawlerGeneratorTools,
 ];

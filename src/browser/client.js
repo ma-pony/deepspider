@@ -209,7 +209,7 @@ export class BrowserClient extends EventEmitter {
         await this.cdpSession.send('Runtime.evaluate', { expression: '1' });
         this._cdpLastCheck = now;
         return this.cdpSession;
-      } catch (e) {
+      } catch {
         // session 已失效，需要重新创建
         console.log('[BrowserClient] CDP session 已失效，重新创建');
         this.cdpSession = null;
@@ -245,8 +245,19 @@ export class BrowserClient extends EventEmitter {
    * 导航到 URL
    */
   async navigate(url, options = {}) {
-    const { waitUntil = 'domcontentloaded' } = options;
-    await this.page.goto(url, { waitUntil });
+    const { waitUntil = 'domcontentloaded', timeout = 30000 } = options;
+    try {
+      await this.page.goto(url, { waitUntil, timeout });
+    } catch (e) {
+      // 超时不一定是错误，页面可能仍在加载，继续执行
+      if (e.message?.includes('timeout')) {
+        console.log('[BrowserClient] 导航超时，继续等待页面稳定...');
+        // 等待一小段时间让页面尽可能完成加载
+        await this.page.waitForTimeout(2000);
+      } else {
+        throw e;
+      }
+    }
     return this.page.url();
   }
 

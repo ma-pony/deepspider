@@ -115,7 +115,9 @@
       "Bash(then echo \"$hash: $msg\")",
       "Bash(break)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(/tmp/test_afteragent.js << 'EOF'\n// 测试 afterAgent 在 streamEvents 中的行为\nimport { createMiddleware, createAgent } from 'langchain';\nimport { MemorySaver } from '@langchain/langgraph';\nimport { ChatOpenAI } from '@langchain/openai';\n\nconst reportMiddleware = createMiddleware\\({\n  name: 'reportTest',\n  stateSchema: {\n    lastWrittenMdFile: { type: 'string' }\n  },\n  afterModel: \\(state\\) => {\n    console.log\\('[afterModel] called, messages count:', state.messages?.length\\);\n    return undefined;\n  },\n  afterAgent: \\(state\\) => {\n    console.log\\('[afterAgent] called!'\\);\n    return undefined;\n  }\n}\\);\n\nconsole.log\\('Middleware:', reportMiddleware.name\\);\nconsole.log\\('Testing if afterAgent is called in streamEvents mode...'\\);\nconsole.log\\('This would require a full agent setup to verify.'\\);\nEOF)",
+      "Bash(xxd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

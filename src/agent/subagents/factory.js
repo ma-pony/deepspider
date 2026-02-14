@@ -16,13 +16,12 @@ import { evolveTools } from '../tools/evolve.js';
 const SUBAGENT_RUN_LIMIT = 80;
 
 /**
- * 子代理执行纪律提示（拼接到每个子代理 systemPrompt 末尾）
+ * 子代理执行纪律提示（精简版）
+ * 强制纪律通过 middleware 实现，而非提示词
  */
 export const SUBAGENT_DISCIPLINE_PROMPT = `
 
-## 执行纪律（必须遵守）
-- 同一工具连续 3 次返回相同结果，必须停止并换策略或总结返回
-- 如果当前工具集无法完成任务，立即总结已有发现并返回，不要反复尝试
+## 执行纪律
 - 先用最小代价验证假设（一次工具调用），确认可行后再展开`;
 
 /**
@@ -46,17 +45,23 @@ function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
 
     wrapToolCall: async (request, handler) => {
       callCount++;
-      return handler(request);
-    },
 
-    wrapModelCall: async (request, handler) => {
-      if (callCount >= runLimit) {
-        const limitNotice = `\n\n[系统提示] 你已执行 ${callCount} 次工具调用，已达上限。请立即总结当前发现并返回结果，不要再调用任何工具。`;
-        return handler({
-          ...request,
-          systemPrompt: (request.systemPrompt || '') + limitNotice,
-        });
+      // 超过上限直接阻止，不经过 LLM
+      if (callCount > runLimit) {
+        return {
+          type: 'tool',
+          name: request.tool?.name || request.toolCall?.name || 'unknown',
+          content: JSON.stringify({
+            success: false,
+            error: `工具调用次数已达上限 (${runLimit})。请总结当前发现并返回。`,
+            callCount,
+            runLimit,
+          }),
+          tool_call_id: request.toolCall?.id || `limit_${callCount}`,
+          status: 'error',
+        };
       }
+
       return handler(request);
     },
   });

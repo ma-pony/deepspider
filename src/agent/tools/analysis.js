@@ -89,7 +89,26 @@ export const sendPanelMessage = tool(
 
     const escaped = JSON.stringify(message);
     const r = role || 'assistant';
-    await evaluateViaCDP(client, `window.__deepspider__?.addMessage?.('${r}', ${escaped})`);
+
+    // 检查 __deepspider__ 和 addMessage 是否存在
+    const checkResult = await evaluateViaCDP(client, `
+      (function() {
+        if (!window.__deepspider__) return { error: '__deepspider__ not found' };
+        if (!window.__deepspider__.addMessage) return { error: 'addMessage not found' };
+        return { ok: true };
+      })()
+    `);
+
+    if (checkResult?.error) {
+      return JSON.stringify({ error: `面板未就绪: ${checkResult.error}` });
+    }
+
+    // 调用 addMessage
+    const result = await evaluateViaCDP(client, `window.__deepspider__.addMessage('${r}', ${escaped})`);
+
+    if (result === null || result === undefined) {
+      return JSON.stringify({ error: 'addMessage 调用失败或返回空值' });
+    }
 
     return JSON.stringify({ success: true });
   },

@@ -113,11 +113,12 @@ export class NetworkInterceptor {
     if (!pending) return;
 
     try {
-      // 获取响应体
-      const { body, base64Encoded } = await this.client.send(
-        'Network.getResponseBody',
-        { requestId }
+      // 获取响应体，添加超时保护防止 CDP 命令挂起
+      const bodyPromise = this.client.send('Network.getResponseBody', { requestId });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('getResponseBody timeout')), 5000)
       );
+      const { body, base64Encoded } = await Promise.race([bodyPromise, timeoutPromise]);
 
       // 处理响应体：检测二进制内容，避免损坏
       let responseBody;

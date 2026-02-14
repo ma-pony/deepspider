@@ -149,6 +149,35 @@ await saveReport({ pythonCodeFile: 'domain/decrypt.py' });
 
 **原因**: LLM 输出有长度限制，大段代码作为参数传递时可能被截断。分步保存确保代码完整性。
 
+### 8. 模板字符串中使用未转义的 Markdown 反引号
+
+```javascript
+// ❌ 禁止：在模板字符串中使用未转义的 Markdown 行内代码反引号
+export const fullAnalysisPrompt = `
+## 完整分析任务
+
+**必须调用 `generate_crawler_code` 工具**
+//    ^ 这里会关闭模板字符串！
+`;
+// SyntaxError: Unexpected identifier 'generate_crawler_code'
+
+// ✅ 使用反斜杠转义所有内部反引号
+export const fullAnalysisPrompt = `
+## 完整分析任务
+
+**必须调用 \`generate_crawler_code\` 工具**
+//    ^ 转义后成为字符串内容
+`;
+```
+
+**原因**: JavaScript 模板字符串使用反引号（`）定义，内部的任何反引号都会被视为字符串结束标记，除非用反斜杠转义。在编写包含 Markdown 行内代码（如 `` `code` ``）的系统提示词时特别容易忽略。
+
+**检查方法**:
+```bash
+# 查找所有未转义的反引号（排除转义后的 \` 和代码块 ```）
+grep -n '`' src/agent/prompts/system.js | grep -v '\\`' | grep -v '^[0-9]*:\s*\`\\`\\`\\`'
+```
+
 ---
 
 ## Required Patterns
@@ -258,6 +287,7 @@ pnpm test
 - [ ] 对象访问前检查空值
 - [ ] 文件路径类工具对用户输入做白名单过滤
 - [ ] Skill 知识归属到执行该任务的子代理（非遇到该场景的子代理）
+- [ ] 模板字符串中的 Markdown 反引号已转义（`\``）
 
 ---
 

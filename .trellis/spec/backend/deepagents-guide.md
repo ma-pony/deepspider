@@ -192,7 +192,7 @@ export const reverseSubagent = createSubagent({
 工厂函数通过 `createBaseMiddleware` 自动为每个子代理注入工具调用次数限制：
 
 - `runLimit: 80`（正常任务 30-50 次足够，80 防止无限循环）
-- 达到上限后通过 `wrapModelCall` 注入 systemPrompt 提示，引导模型总结返回
+- 达到上限后通过 `wrapToolCall` **直接阻止调用**，不经过 LLM
 - `beforeAgent` 每次子代理被调用时重置计数器
 
 ```javascript
@@ -201,11 +201,22 @@ function createToolCallLimitMiddleware(runLimit = 80) {
   let callCount = 0;
   return createMiddleware({
     beforeAgent: async () => { callCount = 0; },
-    wrapToolCall: async (request, handler) => { callCount++; return handler(request); },
-    wrapModelCall: async (request, handler) => {
-      if (callCount >= runLimit) {
-        // 注入提示引导总结，不清空 tools
-        return handler({ ...request, systemPrompt: request.systemPrompt + limitNotice });
+    wrapToolCall: async (request, handler) => {
+      callCount++;
+      // 超过上限直接阻止，不经过 LLM（确定性 vs 提示工程）
+      if (callCount > runLimit) {
+        return {
+          type: 'tool',
+          name: request.tool?.name || 'unknown',
+          content: JSON.stringify({
+            success: false,
+            error: `工具调用次数已达上限 (${runLimit})。请总结当前发现并返回。`,
+            callCount,
+            runLimit,
+          }),
+          tool_call_id: request.toolCall?.id || `limit_${callCount}`,
+          status: 'error',
+        };
       }
       return handler(request);
     },
@@ -213,7 +224,38 @@ function createToolCallLimitMiddleware(runLimit = 80) {
 }
 ```
 
-> **Warning**: 达到上限时不要设置 `tools: []`，这会阻断子代理的返回机制（deepagents 框架依赖工具调用来返回结果）。
+> **关键设计**: 使用 `wrapToolCall` 直接阻止而非 `wrapModelCall` 注入提示。这是**框架机制替代提示工程**的典型模式——确定性阻止比"建议"更可靠。
+
+### 框架机制 vs 提示工程
+
+控制 Agent 行为有两种方式：
+
+| 方式 | 机制 | 可靠性 | 适用场景 |
+|------|------|--------|----------|
+| **提示工程** | Prompt 中写"禁止/必须" | 软约束，LLM 可能忽略 | 复杂判断、创意任务 |
+| **框架机制** | Middleware 直接阻止/过滤 | 硬约束，确定性执行 | 工具权限、调用限制、验证流程 |
+
+**本次会话的改进示例**:
+
+```javascript
+// ❌ 提示工程（不可靠）
+// systemPrompt: "禁止调用超过 80 次工具"
+// → LLM 可能忽略，继续循环
+
+// ✅ 框架机制（确定性）
+wrapToolCall: async (request, handler) => {
+  if (callCount > runLimit) {
+    return { type: 'tool', content: JSON.stringify({ error: '已达上限' }), status: 'error' };
+  }
+  return handler(request);
+}
+// → 物理阻止，不经过 LLM
+```
+
+其他框架机制替代提示工程的案例：
+- **工具权限**: 从 coreTools 移除 `clickElement` 等（硬移除）vs prompt 写"不要点击"（软约束）
+- **验证流程**: `validationWorkflowMiddleware` 在 `save_analysis_report` 前检查状态
+- **HITL 确认**: `generate_crawler_code` 使用 `interrupt()` 强制等待用户选择
 
 ### toolRetryMiddleware（工具错误兜底）
 
@@ -383,6 +425,49 @@ import { StateBackend } from 'deepagents';
 
 const backend = new StateBackend();  // 数据不持久化
 ```
+
+---
+
+## Middleware Hook 行为差异
+
+### streamEvents 模式下的 afterAgent
+
+**关键发现**: `streamEvents` 模式下 `afterAgent` hook **不会触发**。
+
+**影响**: 依赖 `afterAgent` 执行清理或触发副作用的 middleware 会失效。
+
+**案例**: `reportMiddleware` 原在 `afterAgent` 中触发报告展示回调：
+
+```javascript
+// ❌ 在 streamEvents 模式下不工作
+createMiddleware({
+  afterAgent: async (state) => {
+    if (state.lastWrittenMdFile) {
+      await onReportReady(state.lastWrittenMdFile);  // 不会执行
+    }
+  },
+});
+```
+
+**解决方案**: 使用 `wrapToolCall` 在工具完成时立即触发：
+
+```javascript
+// ✅ 在 streamEvents 模式下正常工作
+createMiddleware({
+  wrapToolCall: async (request, handler) => {
+    const result = await handler(request);
+    if (request.tool?.name === 'artifact_save') {
+      await detectAndTriggerReport(result, onReportReady);
+    }
+    return result;
+  },
+});
+```
+
+**最佳实践**:
+- 需要立即响应工具结果 → 使用 `wrapToolCall`
+- Agent 完全结束后执行 → 使用 `afterAgent`（但确认不是 streamEvents 模式）
+- 模型调用后处理 → 使用 `afterModel`
 
 ---
 

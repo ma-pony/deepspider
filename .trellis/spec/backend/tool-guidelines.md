@@ -158,3 +158,94 @@ const filePath = join(MEMO_DIR, `${sanitizeKey(key)}.txt`);
 ```
 
 **原因**: LLM 生成的参数不可信，`join(dir, userInput)` 中含 `../` 可逃逸目标目录。凡是用户/LLM 输入拼接到文件路径的工具，都必须做白名单过滤。
+
+---
+
+## HITL (Human-in-the-Loop) 工具
+
+### 使用 LangGraph interrupt 机制
+
+需要用户确认的工具应使用 LangGraph 的 `interrupt` 函数，而非前端表单或外部流程。
+
+```javascript
+import { tool } from '@langchain/core/tools';
+import { interrupt } from '@langchain/langgraph';
+
+export const generateCrawlerWithConfirm = tool(
+  async ({ analysisSummary, domain }) => {
+    // 暂停执行，等待用户选择
+    const userChoice = interrupt({
+      type: 'crawler_framework_selection',
+      message: '分析完成！选择爬虫框架：',
+      options: [
+        { id: 'requests', label: 'requests', description: '简单易用' },
+        { id: 'httpx', label: 'httpx', description: '异步高性能' },
+        { id: 'scrapy', label: 'Scrapy', description: '企业级框架' },
+        { id: 'skip', label: '不需要', description: '仅保存结果' }
+      ],
+      domain
+    });
+
+    // 用户选择后恢复执行
+    return JSON.stringify({ framework: userChoice.framework });
+  },
+  {
+    name: 'generate_crawler_code',
+    description: '生成爬虫代码（带用户确认）',
+    schema: z.object({
+      analysisSummary: z.string().describe('分析摘要'),
+      domain: z.string().describe('目标域名'),
+    }),
+  }
+);
+```
+
+**关键特性**:
+- 调用 `interrupt()` 后 Agent 暂停执行
+- 前端展示选择界面
+- 用户选择后通过 `Command.Resume` 恢复执行
+- 返回值包含用户选择
+
+**对比其他方案**:
+
+| 方案 | 实现复杂度 | 用户体验 | 状态管理 |
+|------|-----------|----------|----------|
+| `interrupt()` | 低 | 统一 | 框架自动处理 |
+| 前端表单 | 高 | 割裂 | 需手动同步状态 |
+| WebSocket 通知 | 中 | 延迟 | 需额外通道 |
+
+**示例**: `src/agent/tools/crawlerGenerator.js`
+
+---
+
+## 工具边界与权限
+
+### 通过工具注册控制权限（硬约束）
+
+**原则**: 硬约束（没有工具）比软约束（prompt 说"不要做"）更可靠。
+
+```javascript
+// ❌ 差：主 agent 持有专业工具，依赖 prompt 约束
+export const coreTools = [
+  ...runtimeTools,
+  ...hookManagerTools,  // 主 agent 不应该注入 Hook
+  ...sandboxTools,      // 主 agent 不应该执行沙箱
+];
+// prompt: "禁止自己注入 Hook，必须委托 reverse-agent"
+// → LLM 可能忽略
+
+// ✅ 好：主 agent 只保留调度所需最小工具集
+export const coreTools = [
+  ...runtimeTools,
+  // 页面交互已移除，只给 crawler-agent
+  // hook/sandbox 工具只给 reverse-agent
+  getSiteList, getRequestList, searchInResponses,  // 仅数据查询
+];
+// 没有工具 = 物理上无法执行
+```
+
+**工具分配原则**:
+- **主 agent**: 调度决策（数据查询、文件操作、委托子代理）
+- **reverse-agent**: 逆向分析（Hook、断点、沙箱、AST）
+- **crawler-agent**: 页面交互（点击、填写、翻页）
+- **js2python**: 代码转换（JS 执行、Python 生成）

@@ -30,8 +30,11 @@ DeepSpider 是基于 DeepAgents + Patchright 的智能爬虫 Agent。
 
 核心规范要点：
 
-1. **Agent 创建**: 使用 `createDeepAgent()` + 配置对象
+1. **Agent 创建**: 使用 `createAgent()` 手动组装 middleware 栈（支持自定义 task tool schema）
 2. **工具定义**: 使用 `@langchain/core/tools` + Zod schema
 3. **浏览器交互**: 优先使用 CDP，避免 `page.evaluate()`
 4. **AST 遍历**: 使用 `@babel/traverse`
 5. **数据存储**: 使用 `getDataStore()` 单例
+6. **约束机制**: 优先使用框架机制（middleware 阻止/工具过滤）而非提示工程
+7. **HITL 实现**: 使用 LangGraph `interrupt()` 机制
+8. **Hook 选择**: `streamEvents` 模式下 `afterAgent` 不触发，使用 `wrapToolCall` 替代
