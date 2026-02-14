@@ -200,9 +200,12 @@ export class EnvCollector {
    * 深度采集整个对象
    */
   async collectDeep(rootPath, options = {}) {
-    const { maxDepth = 3, maxProps = 100 } = options;
+    const { maxDepth = 3, maxProps = 100, timeout = 5000 } = options;
 
-    return await this.page.evaluate(({ rootPath, maxDepth, maxProps }) => {
+    const evaluatePromise = this.page.evaluate(({ rootPath, maxDepth, maxProps }) => {
+      // 用于检测循环引用的 WeakSet
+      const seen = new WeakSet();
+
       function getByPath(obj, path) {
         return path.split('.').reduce((o, k) => o && o[k], obj);
       }
@@ -211,19 +214,38 @@ export class EnvCollector {
         if (depth > maxDepth || collected.size > maxProps) return;
         if (!obj || typeof obj !== 'object') return;
 
+        // 检测循环引用
+        if (seen.has(obj)) return;
+        seen.add(obj);
+
         const keys = Object.getOwnPropertyNames(obj);
-        for (const key of keys) {
+        for (const key of keys.slice(0, 30)) {
           if (collected.size > maxProps) break;
 
           const fullPath = path ? `${path}.${key}` : key;
           try {
-            const val = obj[key];
-            const type = typeof val;
+            const desc = Object.getOwnPropertyDescriptor(obj, key);
+            if (!desc) continue;
+
+            // 安全处理：避免触发有副作用的 getter
+            let val;
+            let type;
+            if (desc.get) {
+              type = 'getter';
+              val = '[Getter]';
+            } else if (desc.set && desc.value === undefined) {
+              type = 'setter';
+              val = '[Setter]';
+            } else {
+              val = desc.value;
+              type = typeof val;
+            }
 
             collected.set(fullPath, {
               type,
               value: type === 'function' ? '[Function]' :
                      type === 'object' ? '[Object]' :
+                     type === 'getter' || type === 'setter' ? val :
                      val
             });
 
@@ -250,6 +272,17 @@ export class EnvCollector {
         properties: Object.fromEntries(collected)
       };
     }, { rootPath, maxDepth, maxProps });
+
+    // 添加超时保护
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('collectDeep timeout')), timeout)
+    );
+
+    try {
+      return await Promise.race([evaluatePromise, timeoutPromise]);
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   }
 
   // === 特殊环境采集 ===
