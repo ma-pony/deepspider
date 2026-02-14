@@ -115,7 +115,11 @@ export function createDeepSpiderAgent(options = {}) {
       // === 自定义 middleware ===
       toolRetryMiddleware({
         maxRetries: 0,
-        onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
+        onFailure: (err) => {
+          // GraphInterrupt / ParentCommand 等 LangGraph 内部控制流异常必须透传，不能吞掉
+          if (err?.is_bubble_up === true) throw err;
+          return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`;
+        },
       }),
       createToolGuardMiddleware(),
       createFilterToolsMiddleware(),
@@ -123,7 +127,7 @@ export function createDeepSpiderAgent(options = {}) {
       createReportMiddleware({ onReportReady }),
     ],
     checkpointer,
-  }).withConfig({ recursionLimit: 10000 });
+  });
 }
 
 // 默认导出

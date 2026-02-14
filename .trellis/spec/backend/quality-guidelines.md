@@ -178,6 +178,68 @@ export const fullAnalysisPrompt = `
 grep -n '`' src/agent/prompts/system.js | grep -v '\\`' | grep -v '^[0-9]*:\s*\`\\`\\`\\`'
 ```
 
+### 9. Middleware 吞掉 LangGraph 控制流异常
+
+```javascript
+// ❌ 禁止：onFailure 不检查 is_bubble_up，GraphInterrupt 被转为 ToolMessage
+toolRetryMiddleware({
+  maxRetries: 0,
+  onFailure: (err) => `Tool call failed: ${err.message}`,
+})
+
+// ✅ 透传 LangGraph 控制流异常
+toolRetryMiddleware({
+  maxRetries: 0,
+  onFailure: (err) => {
+    if (err?.is_bubble_up === true) throw err;
+    return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`;
+  },
+})
+```
+
+**原因**: `interrupt()` 抛出 `GraphInterrupt`（`is_bubble_up === true`），toolRetryMiddleware 的 `wrapToolCall` 会 catch 它。如果 `onFailure` 不 re-throw，interrupt 被包装为错误消息，LLM 继续运行，graph 永远不会暂停。任何自定义 `wrapToolCall` 中间件都需要同样处理。
+
+### 10. 注入到宿主页面的 UI 不做 CSS 隔离
+
+```css
+/* ❌ 禁止：普通选择器，会被宿主网站 CSS 覆盖 */
+.deepspider-report-content { color: #c9d1d9; }
+.deepspider-report-content h1 { color: #63b3ed; }
+/* 宿主网站 div { color: #000 } 或 * { color: inherit } 会覆盖上面的规则 */
+
+/* ✅ 用通配 !important 建立颜色隔离层 */
+.deepspider-report-content { color: #c9d1d9 !important; }
+.deepspider-report-content * { color: inherit !important; }
+/* 需要特殊颜色的子元素用更具体选择器 + !important 覆盖 */
+.deepspider-report-content h1 { color: #63b3ed !important; }
+.deepspider-report-content code { color: #79c0ff !important; }
+```
+
+**原因**: 面板和报告模态框注入到目标网站的 DOM 中，宿主页面的 CSS 规则（如 `body { color: #1e2530 }` 或 `div { color: #000 }`）可能优先级更高，导致文本颜色与深色背景融为一体，完全不可见。`!important` + 通配符是唯一可靠的隔离手段（Shadow DOM 在 CDP 注入场景下不可用）。
+
+**适用范围**: 所有注入到宿主页面的 UI 组件（面板、消息气泡、报告模态框）。
+
+### 11. Flex 布局中动态内容导致溢出裁切
+
+```css
+/* ❌ 禁止：固定容器 + overflow:hidden + 底部全部 flex-shrink:0 */
+#panel { height: 70vh; overflow: hidden; display: flex; flex-direction: column; }
+.messages { flex: 1; min-height: 80px; }  /* min-height 阻止收缩 */
+.bottom-fixed { flex-shrink: 0; }          /* 动态展开时撑出容器 */
+
+/* ✅ 方案 A：可收缩区域用 min-height: 0 */
+.messages { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* ✅ 方案 B：动态底部区域加 max-height + 内部滚动 */
+.bottom-section {
+  flex-shrink: 0;
+  max-height: 50%;
+  overflow-y: auto;
+}
+```
+
+**原因**: Flex column 布局中，`overflow: hidden` 的容器不会让内容溢出显示，而是直接裁切。当底部多个 `flex-shrink: 0` 区域动态展开（如快捷按钮、已选标签），唯一能收缩的 messages 区域如果有 `min-height` 硬编码，就无法让出空间，导致底部按钮被裁切不可见。
+
 ---
 
 ## Required Patterns
@@ -288,6 +350,8 @@ pnpm test
 - [ ] 文件路径类工具对用户输入做白名单过滤
 - [ ] Skill 知识归属到执行该任务的子代理（非遇到该场景的子代理）
 - [ ] 模板字符串中的 Markdown 反引号已转义（`\``）
+- [ ] 注入宿主页面的 UI 组件使用 `!important` 做 CSS 颜色隔离
+- [ ] Flex 布局中动态展开区域不会导致兄弟元素被裁切
 
 ---
 

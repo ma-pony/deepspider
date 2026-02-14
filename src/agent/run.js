@@ -10,7 +10,7 @@ import readline from 'readline';
 import { readFileSync } from 'fs';
 import { marked } from 'marked';
 import { createDeepSpiderAgent } from './index.js';
-import { fullAnalysisPrompt } from './prompts/system.js';
+import { fullAnalysisPrompt, tracePrompt, decryptPrompt, extractPrompt } from './prompts/system.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
 import { createLogger } from './logger.js';
@@ -58,6 +58,16 @@ async function showReportFromFile(mdFilePath) {
   }
 }
 
+function getActionPrompt(action) {
+  switch (action) {
+    case 'trace': return tracePrompt;
+    case 'decrypt': return decryptPrompt;
+    case 'extract': return extractPrompt;
+    case 'full':
+    default: return fullAnalysisPrompt;
+  }
+}
+
 /**
  * 处理浏览器消息（通过 CDP binding 接收）
  */
@@ -74,12 +84,13 @@ async function handleBrowserMessage(data, page) {
     ).join('\n');
 
     const supplementText = data.text ? `\n\n用户补充说明: ${data.text}` : '';
+    const action = data.action || 'full';
 
-    userPrompt = `${browserReadyPrefix}用户选中了以下数据要求完整分析：
+    userPrompt = `${browserReadyPrefix}用户选中了以下数据：
 
 ${elementsDesc}${supplementText}
 
-${fullAnalysisPrompt}`;
+${getActionPrompt(action)}`;
   } else if (data.type === 'generate-config') {
     const config = data.config;
     userPrompt = `${browserReadyPrefix}请使用 crawler 子代理生成爬虫。
@@ -118,6 +129,20 @@ ${elementsDesc}`;
         else console.log('[open-file] 已打开:', filePath);
       });
     }
+    return;
+  } else if (data.type === 'choice') {
+    // interrupt 恢复：用户点击了选项
+    console.log('\n[浏览器] 用户选择: ' + data.value);
+    await streamHandler.resumeInterrupt(data.value);
+    console.log('\n');
+    process.stdout.write('> ');
+    return;
+  } else if (data.type === 'confirm-result') {
+    // interrupt 恢复：用户点击了确认/取消
+    console.log('\n[浏览器] 用户' + (data.confirmed ? '确认' : '取消'));
+    await streamHandler.resumeInterrupt(data.confirmed);
+    console.log('\n');
+    process.stdout.write('> ');
     return;
   } else {
     return;

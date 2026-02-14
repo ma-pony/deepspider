@@ -1,22 +1,12 @@
 /**
  * DeepSpider - 面板通信桥接
- * 处理与浏览器面板的消息通信
+ * 处理与浏览器面板的结构化消息通信
  */
 
 export class PanelBridge {
   constructor(browserGetter, debugFn = () => {}) {
     this.getBrowser = browserGetter;
     this.debug = debugFn;
-    this.textBuffer = '';
-    this.hasStartedAssistantMsg = false;
-  }
-
-  /**
-   * 重置状态
-   */
-  reset() {
-    this.textBuffer = '';
-    this.hasStartedAssistantMsg = false;
   }
 
   /**
@@ -40,81 +30,31 @@ export class PanelBridge {
   }
 
   /**
-   * 发送消息到前端面板
+   * 发送结构化消息到前端面板
    */
-  async sendToPanel(role, content) {
-    if (!content?.trim()) return;
-
+  async sendMessage(type, data) {
     const browser = this.getBrowser();
     const page = browser?.getPage?.();
     if (!page) return;
 
     try {
-      const escaped = JSON.stringify(content.trim());
-      const code = `window.__deepspider__?.addMessage?.('${role}', ${escaped})`;
-      await this.evaluateInPage(code);
+      const escapedType = JSON.stringify(type);
+      const escapedData = JSON.stringify(data);
+      await this.evaluateInPage(
+        `window.__deepspider__?.addStructuredMessage?.(${escapedType}, ${escapedData})`
+      );
     } catch {
       // ignore
     }
   }
 
   /**
-   * 累积文本到缓冲区（用于 LLM 流式输出）
+   * 按 role 发送消息到前端面板
    */
-  async appendToPanel(text) {
-    if (!text) return;
-    this.textBuffer += text;
-
-    // 每累积一定量或遇到换行时刷新
-    if (this.textBuffer.length > 200 || text.includes('\n')) {
-      await this.flushPanelText();
-    }
-  }
-
-  /**
-   * 刷新累积的文本到面板
-   */
-  async flushPanelText() {
-    if (!this.textBuffer.trim()) return;
-
-    const browser = this.getBrowser();
-    const page = browser?.getPage?.();
-    if (!page) {
-      this.textBuffer = '';
-      return;
-    }
-
-    try {
-      const content = this.textBuffer.trim();
-      const escaped = JSON.stringify(content);
-
-      if (!this.hasStartedAssistantMsg) {
-        const code = `(function() {
-          const fn = window.__deepspider__?.addMessage;
-          if (typeof fn === 'function') {
-            fn('assistant', ${escaped});
-            return { ok: true };
-          }
-          return { ok: false };
-        })()`;
-        await this.evaluateInPage(code);
-        this.hasStartedAssistantMsg = true;
-      } else {
-        const code = `(function() {
-          const fn = window.__deepspider__?.appendToLastMessage;
-          if (typeof fn === 'function') {
-            fn('assistant', ${escaped});
-            return { ok: true };
-          }
-          return { ok: false };
-        })()`;
-        await this.evaluateInPage(code);
-      }
-    } catch {
-      // ignore
-    }
-
-    this.textBuffer = '';
+  async sendToPanel(role, content) {
+    if (!content?.trim()) return;
+    const type = role === 'system' ? 'system' : role === 'user' ? 'user' : 'text';
+    await this.sendMessage(type, { content: content.trim() });
   }
 
   /**
@@ -125,9 +65,21 @@ export class PanelBridge {
   }
 
   /**
-   * 完成消息，触发渲染
+   * 删除面板中最后一条 assistant 消息
+   * 用于 interrupt 场景：LLM 在调用 interrupt 工具前输出的冗余描述文字需要清除
    */
-  async finalizeMessage(role) {
-    await this.evaluateInPage(`window.__deepspider__?.finalizeMessage?.("${role}")`);
+  async removeLastAssistantMessage() {
+    await this.evaluateInPage(`
+      (function() {
+        const ds = window.__deepspider__;
+        if (!ds?.chatMessages) return;
+        for (let i = ds.chatMessages.length - 1; i >= 0; i--) {
+          if (ds.chatMessages[i].role === 'assistant') {
+            ds.chatMessages.splice(i, 1);
+            break;
+          }
+        }
+      })()
+    `);
   }
 }

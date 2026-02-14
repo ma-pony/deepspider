@@ -50,7 +50,7 @@ createAgent({
     anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
     createPatchToolCallsMiddleware(),
     ...(interruptOn ? [humanInTheLoopMiddleware({ interruptOn })] : []),
-    toolRetryMiddleware({ maxRetries: 0, onFailure: (err) => `Tool call failed: ${err.message}\nPlease fix the arguments and retry.` }),
+    toolRetryMiddleware({ maxRetries: 0, onFailure: (err) => { if (err?.is_bubble_up === true) throw err; return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`; } }),
     createFilterToolsMiddleware(),
     createReportMiddleware({ onReportReady }),
   ],
@@ -269,8 +269,11 @@ import { toolRetryMiddleware } from 'langchain';
 // 在 createBaseMiddleware 和主 agent middleware 中均使用
 toolRetryMiddleware({
   maxRetries: 0,       // schema 错误是确定性的，重试同样的坏参数毫无意义
-  onFailure: (err) =>  // 默认 formatFailureMessage 只输出错误类名，丢失具体信息
-    `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`,
+  onFailure: (err) => {
+    // GraphInterrupt / ParentCommand 等 LangGraph 控制流异常必须透传
+    if (err?.is_bubble_up === true) throw err;
+    return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`;
+  },
 })
 ```
 
@@ -742,6 +745,35 @@ return this.chatStreamResume(retryCount + 1);
 **后果**: 默认 `maxRetries: 2` + `retryOn: () => true`，对确定性的 schema 错误做 2 次无意义重试（同样的坏参数），浪费 ~3s，且每次重试穿过 `toolCallLimitMiddleware` 导致计数膨胀。默认 `formatFailureMessage` 只输出错误类名，LLM 看不到具体哪个参数有问题。
 
 **正确做法**: 配置 `maxRetries: 0` + 自定义 `onFailure`，见上方 toolRetryMiddleware 章节。
+
+### 错误 16: toolRetryMiddleware 的 onFailure 未透传 GraphInterrupt
+
+**问题**: `onFailure` 回调直接返回错误消息字符串，未检查 LangGraph 控制流异常。
+
+```javascript
+// ❌ 差：GraphInterrupt 被转为 ToolMessage，interrupt 机制失效
+toolRetryMiddleware({
+  maxRetries: 0,
+  onFailure: (err) => `Tool call failed: ${err.message}`,
+})
+```
+
+**后果**: `interrupt()` 抛出的 `GraphInterrupt`（`is_bubble_up === true`）被 `wrapToolCall` catch 后调用 `handleFailure`，`onFailure` 返回字符串 → 包装为 `ToolMessage(status: 'error')` → LLM 收到错误消息继续运行 → graph 永远不会暂停。表现为：事件数暴增（1000+）、LLM 用 fallback 工具代替 interrupt、CLI 无 `[交互]` 日志。
+
+**正确做法**: 在 `onFailure` 中检查 `is_bubble_up` 并 re-throw：
+
+```javascript
+// ✅ 好：GraphInterrupt / ParentCommand 透传
+toolRetryMiddleware({
+  maxRetries: 0,
+  onFailure: (err) => {
+    if (err?.is_bubble_up === true) throw err;
+    return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`;
+  },
+})
+```
+
+**检测方法**: `is_bubble_up === true` 是 `GraphBubbleUp` 基类的标记，覆盖 `GraphInterrupt`、`NodeInterrupt`、`ParentCommand`。比检查 `err.name === 'GraphInterrupt'` 更通用。
 
 ### 错误 14: Skill 知识按"谁遇到"而非"谁执行"归类
 

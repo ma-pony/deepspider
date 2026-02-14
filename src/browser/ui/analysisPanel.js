@@ -157,30 +157,12 @@ export function getAnalysisPanelScript() {
 
   // 状态 - 从 sessionStorage 恢复消息
   const STORAGE_KEY = 'deepspider_chat_messages';
-  const STAGES_STORAGE_KEY = 'deepspider_stages';
-  const CURRENT_STAGE_KEY = 'deepspider_current_stage';
   const SELECTED_ELEMENTS_KEY = 'deepspider_selected_elements';
   try {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     deepspider.chatMessages = saved ? JSON.parse(saved) : [];
   } catch (e) {
     deepspider.chatMessages = [];
-  }
-  // 阶段配置 - 支持多阶段爬取流程
-  try {
-    const savedStages = sessionStorage.getItem(STAGES_STORAGE_KEY);
-    deepspider.stages = savedStages ? JSON.parse(savedStages) : [
-      { name: 'list', fields: [], entry: null, pagination: null }
-    ];
-  } catch (e) {
-    deepspider.stages = [{ name: 'list', fields: [], entry: null, pagination: null }];
-  }
-  // 当前选中的阶段
-  try {
-    const savedCurrentStage = sessionStorage.getItem(CURRENT_STAGE_KEY);
-    deepspider.currentStageIndex = savedCurrentStage ? parseInt(savedCurrentStage) : 0;
-  } catch (e) {
-    deepspider.currentStageIndex = 0;
   }
   // 已选元素列表 - 从 sessionStorage 恢复
   try {
@@ -198,16 +180,6 @@ export function getAnalysisPanelScript() {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(deepspider.chatMessages));
     } catch (e) {
       console.warn('[DeepSpider] 保存消息失败:', e);
-    }
-  }
-
-  // 保存阶段配置到 sessionStorage
-  function saveStages() {
-    try {
-      sessionStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(deepspider.stages));
-      sessionStorage.setItem(CURRENT_STAGE_KEY, String(deepspider.currentStageIndex));
-    } catch (e) {
-      console.warn('[DeepSpider] 保存阶段配置失败:', e);
     }
   }
 
@@ -251,7 +223,12 @@ export function getAnalysisPanelScript() {
         position: fixed;
         top: 20px; right: 20px;
         width: 400px;
-        max-height: 70vh;
+        height: 70vh;
+        min-width: 320px;
+        min-height: 300px;
+        max-width: 90vw;
+        max-height: 95vh;
+        overflow: hidden;
         background: linear-gradient(180deg, #1e2530 0%, #161b22 100%);
         border: 1px solid rgba(99, 179, 237, 0.2);
         border-radius: 16px;
@@ -266,10 +243,25 @@ export function getAnalysisPanelScript() {
         backdrop-filter: blur(10px);
       }
       #deepspider-panel.visible { display: flex; animation: deepspider-fadein 0.25s ease-out; }
+      #deepspider-panel.resizing { transition: none; }
       #deepspider-panel.minimized { max-height: 48px; overflow: hidden; }
       #deepspider-panel.minimized .deepspider-messages,
       #deepspider-panel.minimized .deepspider-input,
-      #deepspider-panel.minimized .deepspider-report-btn { display: none !important; }
+      #deepspider-panel.minimized .deepspider-report-btn,
+      #deepspider-panel.minimized .deepspider-resize-handle { display: none !important; }
+      /* 边缘拖拽缩放手柄 */
+      .deepspider-resize-handle {
+        position: absolute;
+        z-index: 1;
+      }
+      .deepspider-resize-handle.top    { top: -4px; left: 8px; right: 8px; height: 8px; cursor: n-resize; }
+      .deepspider-resize-handle.bottom { bottom: -4px; left: 8px; right: 8px; height: 8px; cursor: s-resize; }
+      .deepspider-resize-handle.left   { left: -4px; top: 8px; bottom: 8px; width: 8px; cursor: w-resize; }
+      .deepspider-resize-handle.right  { right: -4px; top: 8px; bottom: 8px; width: 8px; cursor: e-resize; }
+      .deepspider-resize-handle.top-left     { top: -4px; left: -4px; width: 14px; height: 14px; cursor: nw-resize; }
+      .deepspider-resize-handle.top-right    { top: -4px; right: -4px; width: 14px; height: 14px; cursor: ne-resize; }
+      .deepspider-resize-handle.bottom-left  { bottom: -4px; left: -4px; width: 14px; height: 14px; cursor: sw-resize; }
+      .deepspider-resize-handle.bottom-right { bottom: -4px; right: -4px; width: 14px; height: 14px; cursor: se-resize; }
       @keyframes deepspider-fadein {
         from { opacity: 0; transform: translateY(-12px) scale(0.98); }
         to { opacity: 1; transform: translateY(0) scale(1); }
@@ -337,12 +329,29 @@ export function getAnalysisPanelScript() {
         font-size: 13px;
         cursor: pointer;
         text-align: center;
-        transition: all 0.2s;
+        transition: all 0.25s;
         box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
       }
       .deepspider-report-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4); }
       .deepspider-report-btn:active { transform: translateY(0); }
       .deepspider-report-btn.visible { display: block; }
+      .deepspider-report-btn.viewed {
+        margin: 6px 14px;
+        padding: 6px 12px;
+        background: rgba(72, 187, 120, 0.1);
+        border: 1px solid rgba(72, 187, 120, 0.25);
+        color: #48bb78;
+        font-size: 12px;
+        font-weight: 500;
+        box-shadow: none;
+        border-radius: 8px;
+      }
+      .deepspider-report-btn.viewed:hover {
+        background: rgba(72, 187, 120, 0.18);
+        border-color: rgba(72, 187, 120, 0.4);
+        transform: none;
+        box-shadow: none;
+      }
       /* 报告模态框 */
       #deepspider-report-modal {
         display: none;
@@ -414,28 +423,32 @@ export function getAnalysisPanelScript() {
         flex: 1;
         overflow-y: auto;
         padding: 28px 32px;
-        color: #c9d1d9;
+        color: #c9d1d9 !important;
         font-size: 14px;
         line-height: 1.7;
+      }
+      .deepspider-report-content * {
+        color: inherit !important;
+        font-family: inherit;
       }
       .deepspider-report-content::-webkit-scrollbar { width: 10px; }
       .deepspider-report-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 5px; }
       .deepspider-report-content::-webkit-scrollbar-thumb { background: rgba(99, 179, 237, 0.3); border-radius: 5px; }
       .deepspider-report-content::-webkit-scrollbar-thumb:hover { background: rgba(99, 179, 237, 0.5); }
       .deepspider-report-content h1, .deepspider-report-content h2, .deepspider-report-content h3 {
-        color: #63b3ed;
+        color: #63b3ed !important;
         margin-top: 1.8em;
         margin-bottom: 0.6em;
         font-weight: 600;
       }
       .deepspider-report-content h1 { font-size: 24px; border-bottom: 1px solid rgba(99, 179, 237, 0.2); padding-bottom: 12px; }
       .deepspider-report-content h2 { font-size: 20px; }
-      .deepspider-report-content h3 { font-size: 16px; color: #8b949e; }
+      .deepspider-report-content h3 { font-size: 16px; color: #8b949e !important; }
       .deepspider-report-content h1:first-child { margin-top: 0; }
       .deepspider-report-content p { margin: 12px 0; }
       .deepspider-report-content ul, .deepspider-report-content ol { margin: 12px 0; padding-left: 24px; }
       .deepspider-report-content li { margin: 6px 0; }
-      .deepspider-report-content strong { color: #e6edf3; font-weight: 600; }
+      .deepspider-report-content strong { color: #e6edf3 !important; font-weight: 600; }
       /* 代码块容器 - 支持复制 */
       .deepspider-code-block {
         position: relative;
@@ -487,11 +500,11 @@ export function getAnalysisPanelScript() {
         background: rgba(99, 179, 237, 0.1);
         padding: 3px 8px;
         border-radius: 6px;
-        font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace !important;
         font-size: 13px;
-        color: #79c0ff;
+        color: #79c0ff !important;
       }
-      .deepspider-report-content pre code { background: transparent; padding: 0; color: #c9d1d9; }
+      .deepspider-report-content pre code { background: transparent; padding: 0; color: #c9d1d9 !important; }
       .deepspider-report-content table {
         width: 100%;
         border-collapse: collapse;
@@ -505,14 +518,16 @@ export function getAnalysisPanelScript() {
         padding: 12px 16px;
         text-align: left;
       }
-      .deepspider-report-content th { background: rgba(99, 179, 237, 0.08); color: #63b3ed; font-weight: 600; }
+      .deepspider-report-content th { background: rgba(99, 179, 237, 0.08); color: #63b3ed !important; font-weight: 600; }
       .deepspider-report-content tr:hover td { background: rgba(99, 179, 237, 0.03); }
+      .deepspider-report-content a { color: #79c0ff !important; text-decoration: underline; }
+      .deepspider-report-content blockquote { border-left: 3px solid rgba(99, 179, 237, 0.3); padding-left: 14px; color: #8b949e !important; margin: 12px 0; }
+      .deepspider-report-content hr { border: none; border-top: 1px solid rgba(99, 179, 237, 0.15); margin: 20px 0; }
       .deepspider-messages {
         flex: 1;
         overflow-y: auto;
         padding: 14px;
-        max-height: 400px;
-        min-height: 120px;
+        min-height: 0;
         background: rgba(0,0,0,0.15);
       }
       .deepspider-messages::-webkit-scrollbar { width: 6px; }
@@ -534,6 +549,7 @@ export function getAnalysisPanelScript() {
         line-height: 1.6;
         word-break: break-word;
         animation: deepspider-msg-in 0.25s ease-out;
+        color: #c9d1d9;
       }
       .deepspider-msg pre {
         background: #0d1117;
@@ -589,19 +605,57 @@ export function getAnalysisPanelScript() {
       .deepspider-msg-user {
         background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
         margin-left: 40px;
-        color: #fff;
+        color: #fff !important;
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
       }
+      .deepspider-msg-user * { color: inherit !important; }
       .deepspider-msg-assistant {
         background: rgba(99, 179, 237, 0.08);
         margin-right: 40px;
         border: 1px solid rgba(99, 179, 237, 0.15);
+        color: #c9d1d9 !important;
       }
-      .deepspider-msg-assistant.streaming {
-        white-space: pre-wrap;
-        font-family: 'SF Mono', 'Monaco', monospace;
-        font-size: 12px;
-        opacity: 0.9;
+      .deepspider-msg-assistant * { color: inherit !important; }
+      .deepspider-msg-assistant code { color: #79c0ff !important; }
+      .deepspider-msg-assistant pre code { color: #c9d1d9 !important; }
+      .deepspider-msg-assistant a { color: #79c0ff !important; }
+      /* 选项卡片 */
+      .deepspider-choices { margin-top: 10px; }
+      .deepspider-choices-question { margin-bottom: 10px; font-size: 13px; color: #c9d1d9; }
+      .deepspider-choices-grid { display: flex; flex-direction: column; gap: 8px; }
+      .deepspider-choice-btn {
+        padding: 10px 14px;
+        background: rgba(99, 179, 237, 0.08);
+        border: 1px solid rgba(99, 179, 237, 0.2);
+        border-radius: 10px;
+        color: #c9d1d9;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s;
+        font-size: 13px;
+      }
+      .deepspider-choice-btn:hover {
+        background: rgba(99, 179, 237, 0.15);
+        border-color: rgba(99, 179, 237, 0.4);
+      }
+      .deepspider-choice-btn.selected {
+        background: rgba(99, 179, 237, 0.2);
+        border-color: #63b3ed;
+        color: #63b3ed;
+      }
+      .deepspider-choice-label { font-weight: 500; }
+      .deepspider-choice-desc { font-size: 11px; color: #8b949e; margin-top: 4px; }
+      /* 确认按钮组 */
+      .deepspider-confirm-btns { display: flex; gap: 8px; margin-top: 10px; }
+      .deepspider-confirm-btn {
+        flex: 1; padding: 10px; border-radius: 8px; font-size: 13px;
+        font-weight: 500; cursor: pointer; transition: all 0.2s; border: none;
+      }
+      .deepspider-confirm-yes {
+        background: linear-gradient(135deg, #48bb78, #38a169); color: #fff;
+      }
+      .deepspider-confirm-no {
+        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #8b949e;
       }
       .deepspider-msg-system {
         background: transparent;
@@ -616,7 +670,6 @@ export function getAnalysisPanelScript() {
         display: flex;
         gap: 10px;
         background: rgba(0,0,0,0.2);
-        border-radius: 0 0 16px 16px;
       }
       .deepspider-input textarea {
         flex: 1;
@@ -630,6 +683,9 @@ export function getAnalysisPanelScript() {
         font-family: inherit;
         transition: all 0.2s;
         outline: none;
+        min-height: 40px;
+        max-height: 110px;
+        overflow-y: auto;
       }
       .deepspider-input textarea:focus {
         border-color: rgba(99, 179, 237, 0.5);
@@ -653,6 +709,16 @@ export function getAnalysisPanelScript() {
       .deepspider-input button:active:not(:disabled) { transform: translateY(0); }
       .deepspider-input button:disabled { background: rgba(255,255,255,0.1); color: #6e7681; cursor: not-allowed; box-shadow: none; }
       /* 已选元素标签区域 */
+      .deepspider-bottom-section {
+        flex-shrink: 0;
+        max-height: 50%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .deepspider-bottom-section::-webkit-scrollbar { width: 4px; }
+      .deepspider-bottom-section::-webkit-scrollbar-track { background: transparent; }
+      .deepspider-bottom-section::-webkit-scrollbar-thumb { background: rgba(99, 179, 237, 0.2); border-radius: 2px; }
       .deepspider-selected-tags {
         padding: 10px 14px;
         border-bottom: 1px solid rgba(99, 179, 237, 0.15);
@@ -718,44 +784,49 @@ export function getAnalysisPanelScript() {
       /* 功能按钮行 */
       .deepspider-action-buttons {
         display: flex;
+        flex-direction: column;
         gap: 8px;
         padding: 10px 14px;
         border-top: 1px solid rgba(99, 179, 237, 0.1);
         background: rgba(0,0,0,0.1);
+        flex-shrink: 0;
       }
-      .deepspider-action-buttons button {
-        flex: 1;
+      .deepspider-quick-actions {
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+      }
+      .deepspider-quick-actions.visible { display: flex; }
+      .deepspider-quick-btn {
+        width: 100%;
+        padding: 9px 14px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        color: #c9d1d9;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s;
+      }
+      .deepspider-quick-btn:hover {
+        background: rgba(99, 179, 237, 0.1);
+        border-color: rgba(99, 179, 237, 0.3);
+        color: #63b3ed;
+      }
+      .deepspider-btn-send-msg {
+        width: 100%;
         padding: 10px 14px;
         border-radius: 8px;
         font-size: 12px;
         font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-      }
-      .deepspider-btn-analyze {
-        background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
-        border: none;
-        color: #fff;
-        box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
-      }
-      .deepspider-btn-analyze:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(128, 90, 213, 0.4);
-      }
-      .deepspider-btn-analyze:disabled {
-        background: rgba(128, 90, 213, 0.3);
-        color: rgba(255,255,255,0.5);
-        cursor: not-allowed;
-        box-shadow: none;
-      }
-      .deepspider-btn-send-msg {
         background: linear-gradient(135deg, #63b3ed 0%, #4299e1 100%);
         border: none;
         color: #fff;
+        cursor: pointer;
+        transition: all 0.2s;
         box-shadow: 0 2px 8px rgba(99, 179, 237, 0.3);
       }
       .deepspider-btn-send-msg:hover:not(:disabled) {
@@ -768,6 +839,52 @@ export function getAnalysisPanelScript() {
         cursor: not-allowed;
         box-shadow: none;
       }
+      .deepspider-select-banner {
+        display: none;
+        padding: 8px 14px;
+        background: linear-gradient(135deg, rgba(99,179,237,0.15) 0%, rgba(99,179,237,0.08) 100%);
+        border-bottom: 1px solid rgba(99,179,237,0.2);
+        font-size: 12px;
+        color: #63b3ed;
+        align-items: center;
+        justify-content: space-between;
+        animation: deepspider-fadein 0.2s ease-out;
+      }
+      .deepspider-select-banner.visible { display: flex; }
+      .deepspider-select-banner button {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(99,179,237,0.3);
+        color: #63b3ed;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      #deepspider-reopen-btn {
+        display: none;
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, #1e2530 0%, #161b22 100%);
+        border: 1px solid rgba(99, 179, 237, 0.3);
+        border-radius: 50%;
+        color: #63b3ed;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 2147483640;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        transition: all 0.2s;
+      }
+      #deepspider-reopen-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 24px rgba(99,179,237,0.3);
+        border-color: rgba(99,179,237,0.5);
+      }
+      #deepspider-reopen-btn.visible { display: flex; }
       #deepspider-overlay {
         position: fixed;
         pointer-events: none;
@@ -793,7 +910,6 @@ export function getAnalysisPanelScript() {
         box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         border: 1px solid rgba(99, 179, 237, 0.2);
       }
-      #deepspider-config-modal.visible { display: flex !important; }
     \`;
     document.head.appendChild(style);
 
@@ -812,23 +928,37 @@ export function getAnalysisPanelScript() {
           <button id="deepspider-btn-close" title="关闭">&times;</button>
         </div>
       </div>
-      <button id="deepspider-report-btn" class="deepspider-report-btn">📊 查看分析报告</button>
-      <div class="deepspider-messages" id="deepspider-messages">
-        <div class="deepspider-empty">
-          <div class="deepspider-empty-icon">🔍</div>
-          点击上方 ⦿ 按钮选择页面元素<br>或在下方输入问题开始分析
-        </div>
+      <div class="deepspider-select-banner" id="deepspider-select-banner">
+        <span>选择模式 · 点击选择元素 · ESC 退出</span>
+        <button id="deepspider-exit-select">退出选择</button>
       </div>
+      <button id="deepspider-report-btn" class="deepspider-report-btn">📊 查看分析报告</button>
+      <div class="deepspider-messages" id="deepspider-messages"></div>
+      <div class="deepspider-bottom-section">
       <div class="deepspider-selected-tags" id="deepspider-selected-tags">
         <div class="deepspider-selected-tags-list" id="deepspider-selected-tags-list"></div>
       </div>
       <div class="deepspider-input">
-        <textarea id="deepspider-chat-input" placeholder="输入问题，按 Enter 发送..." rows="2"></textarea>
+        <textarea id="deepspider-chat-input" placeholder="输入问题，按 Enter 发送..." rows="1"></textarea>
       </div>
       <div class="deepspider-action-buttons" id="deepspider-action-buttons">
-        <button class="deepspider-btn-analyze" id="deepspider-btn-analyze" disabled>📊 完整分析</button>
+        <div class="deepspider-quick-actions" id="deepspider-quick-actions">
+          <button class="deepspider-quick-btn" data-action="trace">🔍 追踪数据来源</button>
+          <button class="deepspider-quick-btn" data-action="decrypt">🔓 分析加密参数</button>
+          <button class="deepspider-quick-btn" data-action="full">🚀 完整分析并生成爬虫</button>
+          <button class="deepspider-quick-btn" data-action="extract">📋 提取页面结构</button>
+        </div>
         <button class="deepspider-btn-send-msg" id="deepspider-btn-send-msg" disabled>发送</button>
       </div>
+      </div>
+      <div class="deepspider-resize-handle top"></div>
+      <div class="deepspider-resize-handle bottom"></div>
+      <div class="deepspider-resize-handle left"></div>
+      <div class="deepspider-resize-handle right"></div>
+      <div class="deepspider-resize-handle top-left"></div>
+      <div class="deepspider-resize-handle top-right"></div>
+      <div class="deepspider-resize-handle bottom-left"></div>
+      <div class="deepspider-resize-handle bottom-right"></div>
     \`;
     document.body.appendChild(panel);
 
@@ -846,306 +976,26 @@ export function getAnalysisPanelScript() {
     \`;
     document.body.appendChild(reportModal);
 
-    // ========== 创建配置弹窗 ==========
-    const configModal = document.createElement('div');
-    configModal.id = 'deepspider-config-modal';
-    configModal.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(13,17,23,0.85);z-index:2147483649;justify-content:center;align-items:center;';
-    configModal.innerHTML = \`
-      <div style="width:400px;background:linear-gradient(180deg,#1e2530,#161b22);border:1px solid rgba(99,179,237,0.2);border-radius:16px;overflow:hidden;">
-        <div style="padding:16px 20px;background:linear-gradient(180deg,rgba(99,179,237,0.08),transparent);border-bottom:1px solid rgba(99,179,237,0.15);display:flex;justify-content:space-between;align-items:center;">
-          <h4 style="margin:0;color:#63b3ed;font-size:15px;">⚙️ 配置爬虫</h4>
-          <button id="deepspider-config-close" style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;">&times;</button>
-        </div>
-        <div style="padding:16px 20px;">
-          <div style="margin-bottom:16px;">
-            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">抓取方式</label>
-            <select id="deepspider-grab-method" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;">
-              <option value="browser">浏览器渲染 (browser)</option>
-              <option value="html">静态HTML (html)</option>
-              <option value="api">API请求 (api)</option>
-            </select>
-          </div>
-          <div style="margin-bottom:16px;">
-            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">最大页数</label>
-            <input type="number" id="deepspider-max-page" value="10" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;box-sizing:border-box;">
-          </div>
-          <div style="margin-bottom:16px;">
-            <label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">下一页按钮 XPath（可选）</label>
-            <input type="text" id="deepspider-next-xpath" placeholder="例如: //a[contains(text(),'下一页')]" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;box-sizing:border-box;">
-          </div>
-          <button id="deepspider-config-submit" style="width:100%;padding:12px;background:linear-gradient(135deg,#48bb78,#38a169);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">生成爬虫</button>
-        </div>
-      </div>
-    \`;
-    document.body.appendChild(configModal);
+    // ========== 创建重新打开按钮 ==========
+    const reopenBtn = document.createElement('div');
+    reopenBtn.id = 'deepspider-reopen-btn';
+    reopenBtn.textContent = '🔍';
+    document.body.appendChild(reopenBtn);
 
-    // 配置弹窗事件
-    document.getElementById('deepspider-config-close').onclick = () => {
-      configModal.classList.remove('visible');
-    };
-    configModal.addEventListener('click', (e) => {
-      if (e.target === configModal) configModal.classList.remove('visible');
-    });
-    document.getElementById('deepspider-config-submit').onclick = submitConfig;
-
-    // 创建空阶段对象
-    function createStage(name) {
-      return { name: name, fields: [], entry: null, pagination: null };
-    }
-
-    // 更新阶段面板显示
-    function updateStagesPanel() {
-      let stagesPanel = document.getElementById('deepspider-stages-panel');
-      if (!stagesPanel) {
-        stagesPanel = document.createElement('div');
-        stagesPanel.id = 'deepspider-stages-panel';
-        stagesPanel.style.cssText = 'padding:10px 14px;border-top:1px solid rgba(99,179,237,0.15);background:rgba(0,0,0,0.1);';
-        const inputArea = panel.querySelector('.deepspider-input');
-        panel.insertBefore(stagesPanel, inputArea);
-      }
-
-      const totalFields = deepspider.stages.reduce((sum, s) => sum + s.fields.length, 0);
-      if (totalFields === 0 && !deepspider.stages.some(s => s.entry)) {
-        stagesPanel.style.display = 'none';
-        return;
-      }
-
-      stagesPanel.style.display = 'block';
-      const currentStage = deepspider.stages[deepspider.currentStageIndex];
-
-      // 阶段标签
-      const stageTabs = deepspider.stages.map((s, i) => {
-        const isActive = i === deepspider.currentStageIndex;
-        const fieldCount = s.fields.length;
-        const hasEntry = s.entry ? ' →' : '';
-        return '<span data-stage="' + i + '" style="' +
-          'background:' + (isActive ? 'rgba(99,179,237,0.3)' : 'rgba(99,179,237,0.1)') + ';' +
-          'border:1px solid ' + (isActive ? 'rgba(99,179,237,0.5)' : 'rgba(99,179,237,0.2)') + ';' +
-          'padding:4px 10px;border-radius:6px;font-size:11px;color:#63b3ed;cursor:pointer;' +
-          'display:inline-flex;align-items:center;gap:4px;">' +
-          s.name + ' (' + fieldCount + ')' + hasEntry + '</span>';
-      }).join('');
-
-      // 当前阶段的字段
-      const fieldTags = currentStage.fields.map((f, i) =>
-        '<span style="background:rgba(72,187,120,0.15);border:1px solid rgba(72,187,120,0.2);' +
-        'padding:4px 8px;border-radius:6px;font-size:11px;color:#48bb78;' +
-        'display:inline-flex;align-items:center;gap:4px;">' +
-        f.name + '<span style="cursor:pointer;color:#8b949e;" data-remove="' + i + '">&times;</span></span>'
-      ).join('');
-
-      // 入口显示
-      const entryTag = currentStage.entry ?
-        '<span style="background:rgba(237,137,54,0.15);border:1px solid rgba(237,137,54,0.2);' +
-        'padding:4px 8px;border-radius:6px;font-size:11px;color:#ed8936;' +
-        'display:inline-flex;align-items:center;gap:4px;">' +
-        currentStage.entry.field + ' → ' + currentStage.entry.to_stage +
-        '<span style="cursor:pointer;color:#8b949e;" data-remove-entry="1">&times;</span></span>' : '';
-
-      stagesPanel.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + stageTabs +
-        '<span id="deepspider-add-stage" style="background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.2);' +
-        'padding:4px 10px;border-radius:6px;font-size:11px;color:#8b949e;cursor:pointer;">+ 阶段</span></div>' +
-        '<div style="display:flex;gap:6px;">' +
-        '<button id="deepspider-gen-config" style="background:linear-gradient(135deg,#48bb78,#38a169);' +
-        'border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">生成配置</button>' +
-        '<button id="deepspider-clear-all" style="background:rgba(248,81,73,0.2);border:1px solid rgba(248,81,73,0.3);' +
-        'color:#f85149;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">清空</button>' +
-        '</div></div>' +
-        '<div style="margin-bottom:6px;font-size:11px;color:#8b949e;">阶段: ' + currentStage.name + '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + fieldTags + entryTag + '</div>';
-
-      bindStagesPanelEvents(stagesPanel);
-    }
-
-    // 绑定阶段面板事件
-    function bindStagesPanelEvents(stagesPanel) {
-      // 阶段切换
-      stagesPanel.querySelectorAll('[data-stage]').forEach(tab => {
-        tab.onclick = () => {
-          const idx = parseInt(tab.dataset.stage);
-          if (idx >= 0 && idx < deepspider.stages.length) {
-            deepspider.currentStageIndex = idx;
-            saveStages();
-            updateStagesPanel();
-          }
-        };
-      });
-      // 添加阶段
-      document.getElementById('deepspider-add-stage').onclick = addStage;
-      // 生成配置
-      document.getElementById('deepspider-gen-config').onclick = generateConfig;
-      // 清空
-      document.getElementById('deepspider-clear-all').onclick = clearAll;
-      // 移除字段
-      stagesPanel.querySelectorAll('[data-remove]').forEach(btn => {
-        btn.onclick = () => removeField(parseInt(btn.dataset.remove));
-      });
-      // 移除入口
-      stagesPanel.querySelectorAll('[data-remove-entry]').forEach(btn => {
-        btn.onclick = removeEntry;
-      });
-    }
-
-    // 移除当前阶段的字段
-    function removeField(index) {
-      const currentStage = deepspider.stages[deepspider.currentStageIndex];
-      if (!currentStage || index < 0 || index >= currentStage.fields.length) return;
-      currentStage.fields.splice(index, 1);
-      saveStages();
-      updateStagesPanel();
-    }
-
-    // 移除当前阶段的入口
-    function removeEntry() {
-      const currentStage = deepspider.stages[deepspider.currentStageIndex];
-      if (!currentStage) return;
-      currentStage.entry = null;
-      saveStages();
-      updateStagesPanel();
-    }
-
-    // 添加新阶段
-    function addStage() {
-      const name = 'stage_' + (deepspider.stages.length + 1);
-      deepspider.stages.push(createStage(name));
-      deepspider.currentStageIndex = deepspider.stages.length - 1;
-      saveStages();
-      updateStagesPanel();
-      addMessage('system', '✅ 已添加阶段: ' + name);
-    }
-
-    // 清空所有阶段
-    function clearAll() {
-      deepspider.stages = [createStage('list')];
-      deepspider.currentStageIndex = 0;
-      saveStages();
-      updateStagesPanel();
-    }
-
-    // 生成爬虫配置 - 显示配置弹窗
-    function generateConfig() {
-      showConfigModal();
-    }
-
-    // 显示配置弹窗
-    function showConfigModal() {
-      const modal = document.getElementById('deepspider-config-modal');
-      if (!modal) return;
-
-      // 更新阶段分页配置区域
-      const stagesConfigHtml = deepspider.stages.map((stage, i) => {
-        const hasPagination = stage.pagination !== null;
-        return '<div style="margin-bottom:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-          '<span style="color:#63b3ed;font-size:12px;font-weight:600;">' + stage.name + '</span>' +
-          '<span style="color:#8b949e;font-size:11px;">' + stage.fields.length + ' 字段' +
-          (stage.entry ? ' → ' + stage.entry.to_stage : '') + '</span></div>' +
-          '<div style="display:flex;gap:8px;align-items:center;">' +
-          '<label style="color:#8b949e;font-size:11px;white-space:nowrap;">分页:</label>' +
-          '<input type="checkbox" data-stage-pagination="' + i + '"' + (hasPagination ? ' checked' : '') + '>' +
-          '<input type="text" data-stage-xpath="' + i + '" placeholder="下一页XPath" ' +
-          'value="' + (stage.pagination?.next_page_xpath || '') + '" ' +
-          'style="flex:1;padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
-          'border-radius:4px;color:#c9d1d9;font-size:11px;' + (hasPagination ? '' : 'opacity:0.5;') + '">' +
-          '<input type="number" data-stage-max="' + i + '" placeholder="页数" ' +
-          'value="' + (stage.pagination?.max_page || 10) + '" ' +
-          'style="width:50px;padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
-          'border-radius:4px;color:#c9d1d9;font-size:11px;' + (hasPagination ? '' : 'opacity:0.5;') + '">' +
-          '</div></div>';
-      }).join('');
-
-      const configContent = modal.querySelector('div > div:last-child');
-      configContent.innerHTML =
-        '<div style="margin-bottom:16px;">' +
-        '<label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">抓取方式</label>' +
-        '<select id="deepspider-grab-method" style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.05);' +
-        'border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#c9d1d9;font-size:13px;">' +
-        '<option value="browser">浏览器渲染 (browser)</option>' +
-        '<option value="html">静态HTML (html)</option>' +
-        '<option value="api">API请求 (api)</option></select></div>' +
-        '<div style="margin-bottom:16px;">' +
-        '<label style="display:block;color:#8b949e;font-size:12px;margin-bottom:6px;">阶段配置</label>' +
-        stagesConfigHtml + '</div>' +
-        '<button id="deepspider-config-submit" style="width:100%;padding:12px;' +
-        'background:linear-gradient(135deg,#48bb78,#38a169);border:none;border-radius:8px;' +
-        'color:#fff;font-size:13px;font-weight:600;cursor:pointer;">生成爬虫</button>';
-
-      // 绑定分页复选框事件
-      configContent.querySelectorAll('[data-stage-pagination]').forEach(checkbox => {
-        checkbox.onchange = () => {
-          const idx = checkbox.dataset.stagePagination;
-          const xpathInput = configContent.querySelector('[data-stage-xpath="' + idx + '"]');
-          const maxInput = configContent.querySelector('[data-stage-max="' + idx + '"]');
-          xpathInput.style.opacity = checkbox.checked ? '1' : '0.5';
-          maxInput.style.opacity = checkbox.checked ? '1' : '0.5';
-        };
-      });
-
-      document.getElementById('deepspider-config-submit').onclick = submitConfig;
-      modal.classList.add('visible');
-    }
-
-    // 提交配置
-    function submitConfig() {
-      const modal = document.getElementById('deepspider-config-modal');
-      const grabMethod = document.getElementById('deepspider-grab-method')?.value || 'browser';
-
-      // 收集各阶段的分页配置
-      deepspider.stages.forEach((stage, i) => {
-        const checkbox = modal.querySelector('[data-stage-pagination="' + i + '"]');
-        const xpathInput = modal.querySelector('[data-stage-xpath="' + i + '"]');
-        const maxInput = modal.querySelector('[data-stage-max="' + i + '"]');
-
-        if (checkbox?.checked && xpathInput?.value) {
-          stage.pagination = {
-            next_page_xpath: xpathInput.value,
-            max_page: parseInt(maxInput?.value) || 10
-          };
-        } else {
-          stage.pagination = null;
-        }
-      });
-      saveStages();
-
-      // 构建阶段化配置
-      const config = {
-        url: location.href,
-        grab_method: grabMethod,
-        stages: deepspider.stages.map(s => ({
-          name: s.name,
-          fields: s.fields.map(f => ({
-            name: f.name,
-            xpath: f.xpath,
-            type: f.type
-          })),
-          entry: s.entry,
-          pagination: s.pagination
-        }))
-      };
-
-      modal?.classList.remove('visible');
+    reopenBtn.onclick = () => {
       panel.classList.add('visible');
+      reopenBtn.classList.remove('visible');
+    };
 
-      const totalFields = deepspider.stages.reduce((sum, s) => sum + s.fields.length, 0);
-      addMessage('user', '生成爬虫配置 (' + deepspider.stages.length + ' 阶段, ' + totalFields + ' 字段)');
-      addMessage('system', '正在生成配置...');
-
-      if (typeof __deepspider_send__ === 'function') {
-        __deepspider_send__(JSON.stringify({
-          __ds__: true,
-          type: 'generate-config',
-          config: config,
-          url: location.href
-        }));
-      }
-    }
+    // 退出选择按钮
+    document.getElementById('deepspider-exit-select').onclick = () => {
+      stopSelectMode();
+    };
 
     // 点击背景关闭模态框
     reportModal.addEventListener('click', (e) => {
       if (e.target === reportModal) {
-        reportModal.classList.remove('visible');
+        closeReportModal();
       }
     });
 
@@ -1158,30 +1008,105 @@ export function getAnalysisPanelScript() {
     infoBox.id = 'deepspider-info';
     document.body.appendChild(infoBox);
 
-    // ========== 面板拖动 ==========
+    // ========== 面板拖动 + 边缘缩放 ==========
     let isDragging = false;
+    let isResizing = false;
+    let resizeDir = '';
     let dragOffset = { x: 0, y: 0 };
+    let startRect = null;
+    let startMouse = { x: 0, y: 0 };
     const header = panel.querySelector('.deepspider-header');
+    const MIN_W = 320, MIN_H = 300;
 
+    // 拖动 header 移动面板
     header.addEventListener('mousedown', (e) => {
       if (e.target.tagName === 'BUTTON') return;
       isDragging = true;
-      dragOffset.x = e.clientX - panel.offsetLeft;
-      dragOffset.y = e.clientY - panel.offsetTop;
+      // 确保 panel 用 left/top 定位
+      const rect = panel.getBoundingClientRect();
+      panel.style.left = rect.left + 'px';
+      panel.style.top = rect.top + 'px';
+      panel.style.right = 'auto';
+      dragOffset.x = e.clientX - rect.left;
+      dragOffset.y = e.clientY - rect.top;
+      panel.classList.add('resizing');
+      e.preventDefault();
+    });
+
+    // 边缘手柄 mousedown → 开始缩放
+    panel.querySelectorAll('.deepspider-resize-handle').forEach(handle => {
+      handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        resizeDir = handle.className.replace('deepspider-resize-handle ', '');
+        const rect = panel.getBoundingClientRect();
+        startRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+        startMouse = { x: e.clientX, y: e.clientY };
+        // 切换到 left/top 定位
+        panel.style.left = rect.left + 'px';
+        panel.style.top = rect.top + 'px';
+        panel.style.right = 'auto';
+        panel.classList.add('resizing');
+        e.preventDefault();
+        e.stopPropagation();
+      });
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      panel.style.left = (e.clientX - dragOffset.x) + 'px';
-      panel.style.top = (e.clientY - dragOffset.y) + 'px';
-      panel.style.right = 'auto';
+      if (isDragging) {
+        panel.style.left = (e.clientX - dragOffset.x) + 'px';
+        panel.style.top = (e.clientY - dragOffset.y) + 'px';
+        return;
+      }
+      if (!isResizing) return;
+
+      const dx = e.clientX - startMouse.x;
+      const dy = e.clientY - startMouse.y;
+      const dir = resizeDir;
+      let { left, top, width, height } = startRect;
+
+      // 水平
+      if (dir.includes('right')) {
+        width = Math.max(MIN_W, startRect.width + dx);
+      } else if (dir.includes('left')) {
+        const newW = Math.max(MIN_W, startRect.width - dx);
+        left = startRect.left + (startRect.width - newW);
+        width = newW;
+      }
+      // 垂直
+      if (dir.includes('bottom')) {
+        height = Math.max(MIN_H, startRect.height + dy);
+      } else if (dir.includes('top') && dir !== 'top-left' && dir !== 'top-right') {
+        // 纯 top
+        const newH = Math.max(MIN_H, startRect.height - dy);
+        top = startRect.top + (startRect.height - newH);
+        height = newH;
+      }
+      if (dir === 'top-left' || dir === 'top-right') {
+        const newH = Math.max(MIN_H, startRect.height - dy);
+        top = startRect.top + (startRect.height - newH);
+        height = newH;
+      }
+
+      panel.style.left = left + 'px';
+      panel.style.top = top + 'px';
+      panel.style.width = width + 'px';
+      panel.style.height = height + 'px';
     });
 
-    document.addEventListener('mouseup', () => { isDragging = false; });
+    document.addEventListener('mouseup', () => {
+      if (isDragging || isResizing) {
+        panel.classList.remove('resizing');
+      }
+      isDragging = false;
+      isResizing = false;
+      resizeDir = '';
+      startRect = null;
+    });
 
     // ========== 关闭按钮 ==========
     document.getElementById('deepspider-btn-close').onclick = () => {
       panel.classList.remove('visible');
+      reopenBtn.classList.add('visible');
     };
 
     // ========== 最小化按钮 ==========
@@ -1231,6 +1156,7 @@ export function getAnalysisPanelScript() {
       document.addEventListener('keydown', onSelectKey, true);
       // 通知所有 iframe 进入选择模式
       broadcastToIframes({ type: 'deepspider-start-select' });
+      document.getElementById('deepspider-select-banner').classList.add('visible');
     }
 
     function stopSelectMode() {
@@ -1245,6 +1171,7 @@ export function getAnalysisPanelScript() {
       document.removeEventListener('keydown', onSelectKey, true);
       // 通知所有 iframe 退出选择模式
       broadcastToIframes({ type: 'deepspider-stop-select' });
+      document.getElementById('deepspider-select-banner').classList.remove('visible');
     }
 
     function onSelectMove(e) {
@@ -1304,41 +1231,140 @@ export function getAnalysisPanelScript() {
     // ========== 消息渲染 ==========
     const messagesEl = document.getElementById('deepspider-messages');
 
-    function addMessage(role, content, complete = true) {
-      // assistant 消息默认未完成（等待流式输出结束）
-      const isComplete = role === 'assistant' ? complete : true;
-      deepspider.chatMessages.push({ __ds__: true, role, content, time: Date.now(), complete: isComplete });
+    function addStructuredMessage(type, data) {
+      const role = type === 'user' ? 'user' : type === 'system' ? 'system' : 'assistant';
+      deepspider.chatMessages.push({ __ds__: true, role, type, data, time: Date.now() });
       saveMessages();
       renderMessages();
+    }
+
+    function addMessage(role, content) {
+      const type = role === 'system' ? 'system' : role === 'user' ? 'user' : 'text';
+      addStructuredMessage(type, { content });
+    }
+
+    function getEmptyStateHtml() {
+      return '<div class="deepspider-empty">' +
+        '<div class="deepspider-empty-icon">🔍</div>' +
+        '<div style="font-size:14px;color:#c9d1d9;margin-bottom:16px;">开始分析</div>' +
+        '<div style="text-align:left;display:inline-block;">' +
+        '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:flex-start;">' +
+        '<span style="color:#63b3ed;font-weight:600;">1.</span>' +
+        '<span>在网站上操作（登录、翻页等），系统自动记录数据</span></div>' +
+        '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:flex-start;">' +
+        '<span style="color:#63b3ed;font-weight:600;">2.</span>' +
+        '<span>点击 <b style="color:#63b3ed;">⦿</b> 选择目标数据元素</span></div>' +
+        '<div style="display:flex;gap:8px;align-items:flex-start;">' +
+        '<span style="color:#63b3ed;font-weight:600;">3.</span>' +
+        '<span>选择操作或在下方提问</span></div>' +
+        '</div></div>';
     }
 
     function renderMessages() {
       const msgs = deepspider.chatMessages;
       if (msgs.length === 0) {
-        messagesEl.innerHTML = \`
-          <div class="deepspider-empty">
-            <div class="deepspider-empty-icon">🔍</div>
-            点击上方 ⦿ 按钮选择页面元素<br>或在下方输入问题开始分析
-          </div>
-        \`;
+        messagesEl.innerHTML = getEmptyStateHtml();
       } else {
-        messagesEl.innerHTML = msgs.map(m => {
-          let content;
-          // 兼容旧消息：没有 complete 字段视为已完成
-          const isComplete = m.complete !== false;
-          if (m.role === 'assistant') {
-            content = isComplete ? parseMarkdown(m.content) : escapeHtml(m.content);
-          } else {
-            content = escapeHtml(m.content);
-          }
-          const streamingClass = (m.role === 'assistant' && !isComplete) ? ' streaming' : '';
-          return '<div class="deepspider-msg deepspider-msg-' + m.role + streamingClass + '">' + content + '</div>';
-        }).join('');
-        // 在 DOM 上处理文件路径链接化
+        messagesEl.innerHTML = msgs.map(m => renderSingleMessage(m)).join('');
         linkifyFilePaths(messagesEl);
         bindFilePathClicks(messagesEl);
+        bindChoiceClicks(messagesEl);
+        bindConfirmClicks(messagesEl);
       }
       messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function renderSingleMessage(m) {
+      switch (m.type) {
+        case 'text':
+          return '<div class="deepspider-msg deepspider-msg-assistant">' + parseMarkdown(m.data.content) + '</div>';
+        case 'system':
+          return '<div class="deepspider-msg deepspider-msg-system">' + escapeHtml(m.data.content) + '</div>';
+        case 'user':
+          return '<div class="deepspider-msg deepspider-msg-user">' + escapeHtml(m.data.content) + '</div>';
+        case 'choices':
+          return renderChoicesMessage(m);
+        case 'confirm':
+          return renderConfirmMessage(m);
+        default:
+          return '<div class="deepspider-msg deepspider-msg-system">' + escapeHtml(JSON.stringify(m.data)) + '</div>';
+      }
+    }
+
+    function renderChoicesMessage(m) {
+      const d = m.data;
+      const answered = m.answered;
+      let html = '<div class="deepspider-msg deepspider-msg-assistant">';
+      html += '<div class="deepspider-choices-question">' + escapeHtml(d.question) + '</div>';
+      html += '<div class="deepspider-choices-grid">';
+      d.options.forEach(opt => {
+        const selected = answered === opt.id ? ' selected' : '';
+        const disabled = answered ? ' style="pointer-events:none;opacity:0.6;"' : '';
+        html += '<div class="deepspider-choice-btn' + selected + '" data-choice-id="' + escapeHtml(opt.id) + '"' + disabled + '>';
+        html += '<div class="deepspider-choice-label">' + escapeHtml(opt.label) + '</div>';
+        if (opt.description) html += '<div class="deepspider-choice-desc">' + escapeHtml(opt.description) + '</div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+      return html;
+    }
+
+    function renderConfirmMessage(m) {
+      const d = m.data;
+      const answered = m.answered !== undefined;
+      let html = '<div class="deepspider-msg deepspider-msg-assistant">';
+      html += '<div class="deepspider-choices-question">' + escapeHtml(d.question) + '</div>';
+      if (!answered) {
+        html += '<div class="deepspider-confirm-btns">';
+        html += '<button class="deepspider-confirm-btn deepspider-confirm-yes" data-confirm="true">' + escapeHtml(d.confirmText || '确认') + '</button>';
+        html += '<button class="deepspider-confirm-btn deepspider-confirm-no" data-confirm="false">' + escapeHtml(d.cancelText || '取消') + '</button>';
+        html += '</div>';
+      } else {
+        html += '<div style="color:#8b949e;font-size:12px;margin-top:6px;">' + (m.answered ? '✅ 已确认' : '❌ 已取消') + '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function bindChoiceClicks(container) {
+      container.querySelectorAll('.deepspider-choice-btn:not([style*="pointer-events"])').forEach(btn => {
+        btn.onclick = () => {
+          const choiceId = btn.dataset.choiceId;
+          const msgs = deepspider.chatMessages;
+          let chosenLabel = choiceId;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'choices' && !msgs[i].answered) {
+              msgs[i].answered = choiceId;
+              const opt = msgs[i].data.options.find(o => o.id === choiceId);
+              if (opt) chosenLabel = opt.label;
+              break;
+            }
+          }
+          addStructuredMessage('user', { content: chosenLabel });
+          if (typeof __deepspider_send__ === 'function') {
+            __deepspider_send__(JSON.stringify({ __ds__: true, type: 'choice', value: chosenLabel }));
+          }
+        };
+      });
+    }
+
+    function bindConfirmClicks(container) {
+      container.querySelectorAll('[data-confirm]').forEach(btn => {
+        btn.onclick = () => {
+          const confirmed = btn.dataset.confirm === 'true';
+          const msgs = deepspider.chatMessages;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'confirm' && msgs[i].answered === undefined) {
+              msgs[i].answered = confirmed;
+              break;
+            }
+          }
+          addStructuredMessage('user', { content: confirmed ? '确认' : '取消' });
+          if (typeof __deepspider_send__ === 'function') {
+            __deepspider_send__(JSON.stringify({ __ds__: true, type: 'confirm-result', confirmed }));
+          }
+        };
+      });
     }
 
     function escapeHtml(str) {
@@ -1443,7 +1469,6 @@ export function getAnalysisPanelScript() {
 
     // ========== 对话输入 ==========
     const chatInput = document.getElementById('deepspider-chat-input');
-    const analyzeBtn = document.getElementById('deepspider-btn-analyze');
     const sendMsgBtn = document.getElementById('deepspider-btn-send-msg');
 
     // ========== 已选元素管理 ==========
@@ -1514,16 +1539,27 @@ export function getAnalysisPanelScript() {
     function updateActionButtons() {
       const hasElements = deepspider.selectedElements.length > 0;
       const hasText = chatInput.value.trim().length > 0;
-
-      analyzeBtn.disabled = !hasElements;
+      // 快捷操作：有选中元素时显示
+      const quickActions = document.getElementById('deepspider-quick-actions');
+      if (hasElements) quickActions.classList.add('visible');
+      else quickActions.classList.remove('visible');
       sendMsgBtn.disabled = !hasText && !hasElements;
     }
 
     // 监听输入框变化
-    chatInput.oninput = updateActionButtons;
+    chatInput.oninput = () => {
+      updateActionButtons();
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 110) + 'px';
+    };
 
     // 绑定按钮事件
-    analyzeBtn.onclick = sendAnalysisWithElements;
+    document.querySelectorAll('.deepspider-quick-btn').forEach(btn => {
+      btn.onclick = () => {
+        const action = btn.dataset.action;
+        sendQuickAction(action);
+      };
+    });
     sendMsgBtn.onclick = sendChat;
     chatInput.onkeydown = (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
@@ -1542,6 +1578,7 @@ export function getAnalysisPanelScript() {
       // 纯文字对话
       if (!text) return;
       chatInput.value = '';
+      chatInput.style.height = 'auto';
       addMessage('user', text);
       if (typeof __deepspider_send__ === 'function') {
         __deepspider_send__(JSON.stringify({ __ds__: true, type: 'chat', text }));
@@ -1572,35 +1609,41 @@ export function getAnalysisPanelScript() {
       }
 
       chatInput.value = '';
+      chatInput.style.height = 'auto';
       clearSelectedElements();
     }
 
-    // 发送完整分析（带已选元素）
-    function sendAnalysisWithElements() {
+    // 发送快捷操作（带已选元素）
+    function sendQuickAction(action) {
       const elements = deepspider.selectedElements;
       if (elements.length === 0) return;
 
       const text = chatInput.value.trim();
-      const elementsText = elements.map(el => el.text.slice(0, 50)).join(', ');
-      const displayMsg = (text ? text + ' - ' : '完整分析: ') + elementsText.slice(0, 80);
+      const labels = {
+        trace: '🔍 追踪数据来源',
+        decrypt: '🔓 分析加密参数',
+        full: '🚀 完整分析并生成爬虫',
+        extract: '📋 提取页面结构',
+      };
+      const elementsText = elements.map(el => el.text.slice(0, 30)).join(', ');
+      const displayMsg = labels[action] + ': ' + elementsText.slice(0, 60);
 
       panel.classList.add('visible');
       addMessage('user', displayMsg);
-      addMessage('system', '分析中...');
 
       if (typeof __deepspider_send__ === 'function') {
         __deepspider_send__(JSON.stringify({
           __ds__: true,
           type: 'analysis',
-          analysisType: 'full',
+          action: action,
           elements: elements,
           text: text,
           url: location.href
         }));
       }
 
-      // 清空已选元素和输入框
       chatInput.value = '';
+      chatInput.style.height = 'auto';
       clearSelectedElements();
     }
 
@@ -1616,48 +1659,12 @@ export function getAnalysisPanelScript() {
       }
     });
 
-    // ========== 追加到最后一条消息（流式输出优化） ==========
-    function appendToLastMessage(role, text) {
-      const msgs = deepspider.chatMessages;
-      // 查找最后一条同角色的未完成消息
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === role && !msgs[i].complete) {
-          msgs[i].content += text;
-          // 流式输出时直接操作 DOM，不重新渲染
-          const msgElements = messagesEl.querySelectorAll('.deepspider-msg-' + role);
-          const lastMsgEl = msgElements[msgElements.length - 1];
-          if (lastMsgEl) {
-            lastMsgEl.textContent = msgs[i].content;
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          }
-          return true;
-        }
-      }
-      // 没找到则创建新的未完成消息
-      addMessage(role, text, false);
-      return true;
-    }
-
-    // 完成流式输出后调用，标记完成并渲染 Markdown
-    function finalizeMessage(role) {
-      const msgs = deepspider.chatMessages;
-      // 找到最后一条未完成的消息，标记为完成
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === role && !msgs[i].complete) {
-          msgs[i].complete = true;
-          break;
-        }
-      }
-      saveMessages();
-      renderMessages();
-    }
-
     // ========== 更新最后一条消息（替换内容） ==========
     function updateLastMessage(role, content) {
       const msgs = deepspider.chatMessages;
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === role) {
-          msgs[i].content = content;
+          msgs[i].data = { content };
           saveMessages();
           renderMessages();
           return true;
@@ -1675,15 +1682,18 @@ export function getAnalysisPanelScript() {
     const reportContentEl = document.getElementById('deepspider-report-content');
     const reportCloseBtn = document.getElementById('deepspider-report-close');
 
-    // 关闭报告模态框
-    reportCloseBtn.onclick = () => {
+    // 关闭报告模态框（统一入口）
+    function closeReportModal() {
       reportModal.classList.remove('visible');
-    };
+      reportBtn.classList.add('viewed');
+    }
+
+    reportCloseBtn.onclick = closeReportModal;
 
     // ESC 键关闭模态框
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && reportModal.classList.contains('visible')) {
-        reportModal.classList.remove('visible');
+        closeReportModal();
       }
     });
 
@@ -1804,11 +1814,10 @@ export function getAnalysisPanelScript() {
       minimizeBtn.title = '最小化';
     }
 
-    deepspider.showPanel = () => panel.classList.add('visible');
-    deepspider.hidePanel = () => panel.classList.remove('visible');
+    deepspider.showPanel = () => { panel.classList.add('visible'); reopenBtn.classList.remove('visible'); };
+    deepspider.hidePanel = () => { panel.classList.remove('visible'); reopenBtn.classList.add('visible'); };
     deepspider.addMessage = addMessage;
-    deepspider.appendToLastMessage = appendToLastMessage;
-    deepspider.finalizeMessage = finalizeMessage;
+    deepspider.addStructuredMessage = addStructuredMessage;
     deepspider.updateLastMessage = updateLastMessage;
     deepspider.renderMessages = renderMessages;
     deepspider.clearMessages = () => { deepspider.chatMessages = []; saveMessages(); renderMessages(); };
@@ -1818,8 +1827,6 @@ export function getAnalysisPanelScript() {
     deepspider.setBusy = setBusy;
     deepspider.minimize = minimize;
     deepspider.maximize = maximize;
-    deepspider.getStages = () => deepspider.stages;
-    deepspider.clearStages = clearAll;
     deepspider.getSelectedElements = () => deepspider.selectedElements;
     deepspider.clearSelectedElements = clearSelectedElements;
 
@@ -1827,8 +1834,6 @@ export function getAnalysisPanelScript() {
     panel.classList.add('visible');
     // 渲染恢复的消息
     renderMessages();
-    // 恢复阶段面板
-    updateStagesPanel();
     // 恢复已选元素标签
     renderSelectedTags();
     updateActionButtons();

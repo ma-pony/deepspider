@@ -1,8 +1,9 @@
 /**
  * DeepSpider - 流式输出处理器
- * 处理 Agent 的流式事件
+ * 处理 Agent 的流式事件，支持 interrupt HITL 交互
  */
 
+import { Command } from '@langchain/langgraph';
 import { isApiServiceError, isToolSchemaError } from '../errors/ErrorClassifier.js';
 import { RetryManager, sleep } from './RetryManager.js';
 
@@ -26,6 +27,7 @@ export class StreamHandler {
     this.riskTools = riskTools;
     this.debug = debug;
     this.retryManager = new RetryManager();
+    this.fullResponse = '';
   }
 
   /**
@@ -37,8 +39,8 @@ export class StreamHandler {
     let eventCount = 0;
     let lastToolCall = null;
 
-    // 重置面板状态
-    this.panelBridge.reset();
+    // 重置状态
+    this.fullResponse = '';
     await this.panelBridge.setBusy(true);
 
     this.debug(`chatStream: 开始处理, 输入长度=${input.length}`);
@@ -83,8 +85,12 @@ export class StreamHandler {
       clearInterval(heartbeat);
       console.log(`\n[完成] 共处理 ${eventCount} 个事件`);
 
-      await this.panelBridge.flushPanelText();
-      await this.panelBridge.finalizeMessage('assistant');
+      // 发送剩余累积文本
+      await this._flushFullResponse();
+
+      // 检测 interrupt 并渲染到面板
+      await this._checkAndRenderInterrupt();
+
       await this.panelBridge.setBusy(false);
 
       this.debug(`chatStream: 完成, 响应长度=${finalResponse.length}`);
@@ -96,13 +102,69 @@ export class StreamHandler {
   }
 
   /**
-   * 从检查点恢复流式对话
+   * 用 Command({ resume }) 恢复被 interrupt 暂停的 graph
+   */
+  async resumeInterrupt(value) {
+    let finalResponse = '';
+    let lastEventTime = Date.now();
+    let eventCount = 0;
+
+    this.fullResponse = '';
+    await this.panelBridge.setBusy(true);
+    this.debug(`resumeInterrupt: 恢复 interrupt, value=${value}`);
+
+    const heartbeat = setInterval(() => {
+      const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
+      if (elapsed > 30) {
+        console.log(`\n[心跳] 恢复中，已等待 ${elapsed}s`);
+      }
+    }, 30000);
+
+    try {
+      const eventStream = await this.agent.streamEvents(
+        new Command({ resume: value }),
+        { ...this.config, version: 'v2' }
+      );
+
+      for await (const event of eventStream) {
+        lastEventTime = Date.now();
+        eventCount++;
+        await this._handleStreamEvent(event);
+
+        if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
+          const output = event.data?.output;
+          if (output?.content) {
+            finalResponse = output.content;
+          }
+        }
+      }
+
+      clearInterval(heartbeat);
+
+      await this._flushFullResponse();
+      await this._checkAndRenderInterrupt();
+      await this.panelBridge.setBusy(false);
+
+      console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
+      return finalResponse || '[无响应]';
+    } catch (error) {
+      clearInterval(heartbeat);
+      await this.panelBridge.setBusy(false);
+      const errMsg = error.message || String(error);
+      console.error(`\n[恢复失败] ${errMsg}`);
+      return `恢复失败: ${errMsg}`;
+    }
+  }
+
+  /**
+   * 从检查点恢复流式对话（错误重试用）
    */
   async chatStreamResume(retryCount = 0) {
     let finalResponse = '';
     let lastEventTime = Date.now();
     let eventCount = 0;
 
+    this.fullResponse = '';
     await this.panelBridge.setBusy(true);
     this.debug(`chatStreamResume: 从检查点恢复, retryCount=${retryCount}`);
 
@@ -133,8 +195,11 @@ export class StreamHandler {
       }
 
       clearInterval(heartbeat);
-      await this.panelBridge.flushPanelText();
+
+      await this._flushFullResponse();
+      await this._checkAndRenderInterrupt();
       await this.panelBridge.setBusy(false);
+
       console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
       return finalResponse || '[无响应]';
     } catch (error) {
@@ -151,6 +216,62 @@ export class StreamHandler {
       }
 
       return `恢复失败: ${errMsg}`;
+    }
+  }
+
+  /**
+   * 发送剩余累积文本到面板
+   */
+  async _flushFullResponse() {
+    if (this.fullResponse?.trim()) {
+      await this.panelBridge.sendToPanel('assistant', this.fullResponse);
+    }
+    this.fullResponse = '';
+  }
+
+  /**
+   * 检测 graph interrupt 状态，将 interrupt payload 渲染为面板结构化消息
+   *
+   * interrupt payload 协议：
+   *   { type: 'choices', question, options: [{id, label, description?}] }
+   *   { type: 'confirm', question, confirmText?, cancelText? }
+   */
+  async _checkAndRenderInterrupt() {
+    try {
+      const state = await this.agent.getState(this.config);
+      this.debug(`_checkAndRenderInterrupt: state.next=${JSON.stringify(state?.next)}, tasks=${state?.tasks?.length ?? 'undefined'}`);
+
+      if (!state?.tasks) {
+        this.debug('_checkAndRenderInterrupt: state.tasks 为空，尝试检查 next');
+        // 某些 LangGraph 版本用 next 为空数组表示 interrupt
+        // 如果 next 不为空，说明 graph 正常结束，无 interrupt
+        return false;
+      }
+
+      let found = false;
+      for (const task of state.tasks) {
+        this.debug(`_checkAndRenderInterrupt: task id=${task.id}, interrupts=${task.interrupts?.length ?? 0}`);
+        if (!task.interrupts?.length) continue;
+        for (const intr of task.interrupts) {
+          const payload = intr.value;
+          this.debug(`_checkAndRenderInterrupt: interrupt payload=${JSON.stringify(payload)?.slice(0, 200)}`);
+          if (!payload?.type) continue;
+
+          console.log(`\n[交互] 等待用户 ${payload.type === 'choices' ? '选择' : '确认'}...`);
+
+          if (payload.type === 'choices' || payload.type === 'confirm') {
+            // 删除面板中 interrupt 工具调用前 LLM 输出的冗余描述文字
+            await this.panelBridge.removeLastAssistantMessage();
+            await this.panelBridge.sendMessage(payload.type, payload);
+            found = true;
+          }
+        }
+      }
+      return found;
+    } catch (e) {
+      this.debug('_checkAndRenderInterrupt 失败:', e.message);
+      console.log(`[DEBUG] _checkAndRenderInterrupt error: ${e.message}`);
+      return false;
     }
   }
 
@@ -197,15 +318,20 @@ export class StreamHandler {
         let chunk = data?.chunk?.content;
         if (chunk && typeof chunk === 'string') {
           chunk = cleanDSML(chunk);
+          // CLI 侧仍流式输出
           process.stdout.write(chunk);
-          await this.panelBridge.appendToPanel(chunk);
+          // 面板侧只累积，不推送
+          this.fullResponse = (this.fullResponse || '') + chunk;
         }
         break;
 
       case 'on_tool_start':
-        this.debug('handleStreamEvent: 工具开始，先刷新缓冲区');
-        await this.panelBridge.flushPanelText();
-        this.panelBridge.hasStartedAssistantMsg = false;
+        // 工具调用前，先把已累积的 LLM 文字发送到面板
+        if (this.fullResponse?.trim()) {
+          await this.panelBridge.sendToPanel('assistant', this.fullResponse);
+          this.fullResponse = '';
+        }
+        this.debug('handleStreamEvent: 工具开始');
         const input = data?.input || {};
         const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
         const preview = inputStr.length > 100 ? inputStr.slice(0, 100) + '...' : inputStr;
