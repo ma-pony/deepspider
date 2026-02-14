@@ -15,13 +15,17 @@ export class EnvCollector {
    * @param {object} options - 采集选项
    */
   async collect(path, options = {}) {
-    const { depth = 1, includeProto = false, useCache = true } = options;
+    const { depth = 1, includeProto = false, useCache = true, timeout = 5000 } = options;
 
     if (useCache && this.cache.has(path)) {
       return this.cache.get(path);
     }
 
-    const result = await this.page.evaluate(({ path, depth, includeProto: _includeProto }) => {
+    // 使用 Promise.race 添加超时保护
+    const evaluatePromise = this.page.evaluate(({ path, depth, includeProto: _includeProto }) => {
+      // 用于检测循环引用的 WeakSet
+      const seen = new WeakSet();
+
       function getByPath(obj, path) {
         return path.split('.').reduce((o, k) => o && o[k], obj);
       }
@@ -40,29 +44,55 @@ export class EnvCollector {
           return { type, value: val };
         }
 
+        // 检测循环引用
+        if (seen.has(val)) {
+          return { type: 'object', value: '[Circular]', circular: true };
+        }
+
         if (currentDepth >= maxDepth) {
           return { type: 'object', value: '[Object]', truncated: true };
         }
 
+        seen.add(val);
+
         if (Array.isArray(val)) {
           return {
             type: 'array',
-            value: val.map(v => serialize(v, currentDepth + 1, maxDepth))
+            length: val.length,
+            value: val.slice(0, 20).map(v => serialize(v, currentDepth + 1, maxDepth))
           };
         }
 
         const result = { type: 'object', properties: {} };
-        const keys = Object.getOwnPropertyNames(val);
+        let keys;
+        try {
+          keys = Object.getOwnPropertyNames(val);
+        } catch (e) {
+          return { type: 'object', value: '[Error accessing keys]', error: e.message };
+        }
 
-        for (const key of keys.slice(0, 50)) {
+        for (const key of keys.slice(0, 30)) {
           try {
             const desc = Object.getOwnPropertyDescriptor(val, key);
+            if (!desc) continue;
+
+            // 安全处理：避免触发有副作用的 getter
             if (desc.get) {
+              // 对于 getter，只记录描述符信息，不执行 getter
               result.properties[key] = {
-                ...serialize(val[key], currentDepth + 1, maxDepth),
-                hasGetter: true
+                type: 'getter',
+                hasGetter: true,
+                enumerable: desc.enumerable,
+                configurable: desc.configurable
+              };
+            } else if (desc.set && desc.value === undefined) {
+              // 只有 setter 没有 getter
+              result.properties[key] = {
+                type: 'setter',
+                hasSetter: true
               };
             } else {
+              // 普通值
               result.properties[key] = serialize(desc.value, currentDepth + 1, maxDepth);
             }
           } catch (e) {
@@ -89,15 +119,19 @@ export class EnvCollector {
 
         let descriptor = null;
         if (parent) {
-          const desc = Object.getOwnPropertyDescriptor(parent, propName);
-          if (desc) {
-            descriptor = {
-              configurable: desc.configurable,
-              enumerable: desc.enumerable,
-              writable: desc.writable,
-              hasGetter: !!desc.get,
-              hasSetter: !!desc.set
-            };
+          try {
+            const desc = Object.getOwnPropertyDescriptor(parent, propName);
+            if (desc) {
+              descriptor = {
+                configurable: desc.configurable,
+                enumerable: desc.enumerable,
+                writable: desc.writable,
+                hasGetter: !!desc.get,
+                hasSetter: !!desc.set
+              };
+            }
+          } catch (e) {
+            // 忽略描述符读取错误
           }
         }
 
@@ -112,7 +146,19 @@ export class EnvCollector {
       }
     }, { path, depth, includeProto });
 
-    if (result.success && useCache) {
+    // 添加超时
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('采集超时')), timeout)
+    );
+
+    let result;
+    try {
+      result = await Promise.race([evaluatePromise, timeoutPromise]);
+    } catch (e) {
+      result = { success: false, error: e.message };
+    }
+
+    if (result?.success && useCache) {
       this.cache.set(path, result);
     }
 
