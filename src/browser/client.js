@@ -25,6 +25,9 @@ export class BrowserClient extends EventEmitter {
     this.hookScript = null;
     this.onMessage = null;
     this._isCleaningUp = false;
+    // CDP session 健康检查节流
+    this._cdpLastCheck = 0;
+    this._cdpCheckInterval = 5000; // 5秒内不重复检查
   }
 
   /**
@@ -193,11 +196,18 @@ export class BrowserClient extends EventEmitter {
   async getCDPSession() {
     if (!this.page) return this.cdpSession;
 
-    // page 未变且 session 存在 → 复用前检查 session 是否仍然有效
+    // page 未变且 session 存在 → 复用
     if (this.cdpSession && this._cdpSessionPage === this.page) {
+      // 节流：避免频繁健康检查
+      const now = Date.now();
+      if (now - this._cdpLastCheck < this._cdpCheckInterval) {
+        return this.cdpSession;
+      }
+
       try {
         // 通过简单的 Runtime.evaluate 验证 session 是否还活着
         await this.cdpSession.send('Runtime.evaluate', { expression: '1' });
+        this._cdpLastCheck = now;
         return this.cdpSession;
       } catch (e) {
         // session 已失效，需要重新创建
@@ -220,6 +230,7 @@ export class BrowserClient extends EventEmitter {
     try {
       this.cdpSession = await this.page.context().newCDPSession(this.page);
       this._cdpSessionPage = this.page;
+      this._cdpLastCheck = Date.now();
       console.log('[BrowserClient] CDP session 已创建');
     } catch (e) {
       console.error('[BrowserClient] 创建 CDP session 失败:', e.message);

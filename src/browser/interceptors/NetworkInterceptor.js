@@ -125,8 +125,9 @@ export class NetworkInterceptor {
 
       if (this.isBinaryContent(contentType)) {
         // 二进制内容：存储元数据而非原始内容
+        // base64 长度计算：每 4 个字符 = 3 字节，考虑 padding
         const binarySize = base64Encoded
-          ? Math.floor(body.length * 0.75)  // base64 大致解码后大小
+          ? Math.floor(body.length * 0.75) - (body.match(/=*$/)?.[0].length || 0)
           : body.length;
         responseBody = `[Binary: ${contentType}, ${binarySize} bytes]`;
       } else {

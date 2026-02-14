@@ -137,19 +137,55 @@ export class DataStore {
   }
 
   /**
-   * 获取站点锁
+   * 获取站点锁（带超时和队列）
    */
-  async acquireLock(site) {
-    while (this.siteLocks.get(site)) {
-      await this.siteLocks.get(site);
+  async acquireLock(site, timeout = 30000) {
+    // 初始化该站点的锁队列
+    if (!this.siteLocks.has(site)) {
+      this.siteLocks.set(site, { locked: false, queue: [] });
     }
-    let resolveLock;
-    const lockPromise = new Promise(resolve => { resolveLock = resolve; });
-    this.siteLocks.set(site, lockPromise);
-    return () => {
-      this.siteLocks.delete(site);
-      resolveLock();
-    };
+
+    const lockState = this.siteLocks.get(site);
+
+    // 如果当前未锁定，直接获取锁
+    if (!lockState.locked) {
+      lockState.locked = true;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        lockState.locked = false;
+        // 唤醒队列中的下一个
+        const next = lockState.queue.shift();
+        if (next) next.resolve();
+      };
+    }
+
+    // 当前已锁定，加入等待队列
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        // 从队列中移除
+        const idx = lockState.queue.findIndex(item => item.resolve === resolve);
+        if (idx > -1) lockState.queue.splice(idx, 1);
+        reject(new Error(`获取站点 ${site} 的锁超时`));
+      }, timeout);
+
+      lockState.queue.push({
+        resolve: () => {
+          clearTimeout(timer);
+          lockState.locked = true;
+          let released = false;
+          resolve(() => {
+            if (released) return;
+            released = true;
+            lockState.locked = false;
+            // 唤醒队列中的下一个
+            const next = lockState.queue.shift();
+            if (next) next.resolve();
+          });
+        }
+      });
+    });
   }
 
   /**
