@@ -5,6 +5,8 @@
 
 > 智能爬虫工程平台 - 基于 DeepAgents + Patchright 的 AI 爬虫 Agent
 
+[English](README_EN.md)
+
 从 JS 逆向到完整爬虫脚本的一站式 AI Agent 解决方案。
 
 ## 特性
