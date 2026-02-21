@@ -240,6 +240,48 @@ toolRetryMiddleware({
 
 **原因**: Flex column 布局中，`overflow: hidden` 的容器不会让内容溢出显示，而是直接裁切。当底部多个 `flex-shrink: 0` 区域动态展开（如快捷按钮、已选标签），唯一能收缩的 messages 区域如果有 `min-height` 硬编码，就无法让出空间，导致底部按钮被裁切不可见。
 
+### 12. Middleware 中的 LLM 调用无超时
+
+```javascript
+// ❌ 禁止：summarizationMiddleware 使用默认 LLM 实例，无超时
+summarizationMiddleware({ model: llm, trigger: { tokens: 170000 } })
+
+// ✅ 为摘要创建独立 LLM 实例，设置超时
+const summaryLlm = createModel({ model, apiKey, baseUrl });
+summaryLlm.timeout = 60000; // 60s
+
+summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 } })
+```
+
+**原因**: `summarizationMiddleware` 的 `beforeModel` 钩子在长对话时调用 `model.invoke()` 压缩历史。如果 API 慢/限流，这个调用无超时会永远挂住，表现为 `streamEvents()` 的 `eventCount` 冻结（如停在 `write_todos` 工具后）。用户看到心跳日志但 agent 完全不动。
+
+**症状**: 心跳日志显示 `已等待 1400s, 事件数=4697, 最后工具=write_todos`，事件数不再增长。
+
+### 13. CDP Runtime.evaluate 在断点暂停时无超时
+
+```javascript
+// ❌ 禁止：PanelBridge 的 Runtime.evaluate 无超时，断点暂停时永远挂住
+async evaluateInPage(code) {
+  const result = await cdp.send('Runtime.evaluate', { expression: code });
+  return result.result?.value;
+}
+
+// ✅ 加超时保护
+async evaluateInPage(code) {
+  const result = await Promise.race([
+    cdp.send('Runtime.evaluate', { expression: code, returnByValue: true }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('evaluateInPage timeout (debugger paused?)')), 3000)
+    ),
+  ]);
+  return result.result?.value;
+}
+```
+
+**原因**: 当浏览器命中断点时，页面 JS 执行暂停。`StreamHandler` 在每个 `on_tool_start` 时调用 `PanelBridge.sendToPanel()` 推送 `[调用] xxx` 消息，这会触发 `Runtime.evaluate`。由于页面暂停，这个调用永远无法返回，导致后续工具（如 `resume_execution`）根本没机会执行——死锁。
+
+**症状**: 心跳日志显示 `已等待 3000s, 事件数=5300, 最后工具=get_call_stack`，断点命中后 agent 卡死。
+
 ---
 
 ## Required Patterns
@@ -352,6 +394,9 @@ pnpm test
 - [ ] 模板字符串中的 Markdown 反引号已转义（`\``）
 - [ ] 注入宿主页面的 UI 组件使用 `!important` 做 CSS 颜色隔离
 - [ ] Flex 布局中动态展开区域不会导致兄弟元素被裁切
+- [ ] Middleware 中的 LLM 调用有超时保护（如 summarizationMiddleware）
+- [ ] CDP Runtime.evaluate 有超时保护（断点暂停时不会死锁）
+- [ ] Zod schema 不使用 `z.any().nullable()`（生成无效 JSON Schema）
 
 ---
 
