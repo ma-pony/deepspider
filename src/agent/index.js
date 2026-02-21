@@ -64,6 +64,10 @@ export function createDeepSpiderAgent(options = {}) {
   // 创建 LLM 模型实例
   const llm = createModel({ model, apiKey, baseUrl });
 
+  // 摘要专用 LLM：加 timeout 防止长对话摘要时卡死（summarizationMiddleware 的 model.invoke 无内置超时）
+  const summaryLlm = createModel({ model, apiKey, baseUrl });
+  summaryLlm.timeout = 60000; // 60s
+
   // 后端配置：使用文件系统持久化
   const backend = enableMemory
     ? new FilesystemBackend({ rootDir: './.deepspider-agent' })
@@ -84,7 +88,7 @@ export function createDeepSpiderAgent(options = {}) {
   const subagentDefaultMiddleware = [
     todoListMiddleware(),
     createFilesystemMiddleware({ backend }),
-    summarizationMiddleware({ model: llm, trigger: { tokens: 170000 }, keep: { messages: 6 } }),
+    summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 }, keep: { messages: 6 } }),
     anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
     createPatchToolCallsMiddleware(),
   ];
@@ -107,7 +111,7 @@ export function createDeepSpiderAgent(options = {}) {
         generalPurposeAgent: false,
         defaultInterruptOn: interruptOn,
       }),
-      summarizationMiddleware({ model: llm, trigger: { tokens: 170000 }, keep: { messages: 6 } }),
+      summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 }, keep: { messages: 6 } }),
       anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
       createPatchToolCallsMiddleware(),
       // === HITL（如果启用）===
