@@ -18,10 +18,16 @@ export class PanelBridge {
     if (!cdp) return null;
 
     try {
-      const result = await cdp.send('Runtime.evaluate', {
-        expression: code,
-        returnByValue: true,
-      });
+      // 3s 超时：断点暂停时 Runtime.evaluate 会永远挂住，必须限时
+      const result = await Promise.race([
+        cdp.send('Runtime.evaluate', {
+          expression: code,
+          returnByValue: true,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('evaluateInPage timeout (debugger paused?)')), 3000)
+        ),
+      ]);
       return result.result?.value;
     } catch (e) {
       this.debug('evaluateInPage 失败:', e.message);
