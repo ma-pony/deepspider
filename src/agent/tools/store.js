@@ -30,7 +30,7 @@ export const saveToStore = tool(
       type: z.enum(['env-module', 'crypto-pattern', 'obfuscation']).describe('类型'),
       name: z.string().describe('名称'),
       code: z.string().describe('代码'),
-      metadata: z.record(z.string(), z.unknown()).optional().describe('元数据'),
+      metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe('元数据'),
     }),
   }
 );

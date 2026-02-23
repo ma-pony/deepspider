@@ -19,6 +19,7 @@ import { ensureConfig } from './setup.js';
 import { getConfigValues } from '../config/settings.js';
 import { PATHS, ensureDir } from '../config/paths.js';
 import { StreamHandler, PanelBridge } from './core/index.js';
+import { createCheckpointer, generateThreadId, createSession, listSessions, touchSession, cleanExpiredSessions } from './sessions.js';
 
 let rl = null;
 let browser = null;
@@ -28,14 +29,15 @@ let DEBUG = false;
 let debugFn = () => {};
 let agent = null;
 let agentConfig = null;
+let currentThreadId = null;
+let isResuming = false;
 
 /**
  * 从文件显示报告（由中间件回调触发）
  */
 async function showReportFromFile(mdFilePath) {
-  const page = browser?.getPage?.();
-  if (!page) {
-    console.log('[report] 错误: 无法获取 page');
+  if (!browser) {
+    console.log('[report] 错误: 无浏览器实例');
     return;
   }
 
@@ -71,8 +73,8 @@ function getActionPrompt(action) {
 /**
  * 处理浏览器消息（通过 CDP binding 接收）
  */
-async function handleBrowserMessage(data, page) {
-  debugFn(`handleBrowserMessage: 收到消息, type=${data.type}, page=${!!page}`);
+async function handleBrowserMessage(data) {
+  debugFn(`handleBrowserMessage: 收到消息, type=${data.type}`);
 
   const browserReadyPrefix = '[浏览器已就绪] ';
 
@@ -144,12 +146,27 @@ ${elementsDesc}`;
     console.log('\n');
     process.stdout.write('> ');
     return;
+  } else if (data.type === 'resume') {
+    if (isResuming) return;
+    isResuming = true;
+    console.log('\n[恢复] 用户选择恢复 session: ' + data.threadId);
+    currentThreadId = data.threadId;
+    agentConfig.configurable.thread_id = data.threadId;
+    try {
+      await streamHandler.chatStreamResume();
+    } finally {
+      isResuming = false;
+    }
+    console.log('\n');
+    process.stdout.write('> ');
+    return;
   } else {
     return;
   }
 
   console.log('\n[浏览器] ' + (data.type === 'analysis' ? '分析请求' : data.type === 'generate-config' ? '生成配置' : '对话'));
   await streamHandler.chatStream(userPrompt);
+  if (currentThreadId) touchSession(currentThreadId);
   console.log('\n');
   process.stdout.write('> ');
 }
@@ -168,6 +185,7 @@ function prompt() {
     }
 
     await streamHandler.chatStream(input);
+    if (currentThreadId) touchSession(currentThreadId);
     console.log('\n');
     prompt();
   });
@@ -179,6 +197,7 @@ async function init() {
   targetUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
   DEBUG = process.env.DEBUG === 'true' || args.includes('--debug');
   const PERSIST = args.includes('--persist');
+  const RESUME = args.includes('--resume');
   debugFn = (...a) => { if (DEBUG) console.log('[DEBUG]', ...a); };
 
   debugFn('init: 启动');
@@ -204,10 +223,33 @@ async function init() {
     await showReportFromFile(mdFilePath);
   }
 
-  agent = createDeepSpiderAgent({ onReportReady });
+  // 持久化 checkpointer + session 管理
+  const checkpointer = createCheckpointer();
+  cleanExpiredSessions();
+  let domain = targetUrl ? new URL(targetUrl).hostname : null;
+  let threadId;
+  let autoResume = false;
 
+  if (RESUME && domain) {
+    const existing = listSessions(domain);
+    if (existing.length > 0) {
+      threadId = existing[0].thread_id;
+      autoResume = true;
+      console.log(`[恢复] 找到上次 session: ${threadId}`);
+      console.log(`[恢复] 上次活跃: ${new Date(existing[0].updated_at).toLocaleString()}, 消息数: ${existing[0].message_count}`);
+    }
+  }
+
+  if (!threadId) {
+    threadId = domain ? generateThreadId(domain) : `deepspider-${Date.now()}`;
+    if (domain) createSession(threadId, domain, targetUrl);
+  }
+
+  agent = createDeepSpiderAgent({ onReportReady, checkpointer });
+
+  currentThreadId = threadId;
   agentConfig = {
-    configurable: { thread_id: `deepspider-${Date.now()}` },
+    configurable: { thread_id: threadId },
     recursionLimit: 5000,
     callbacks: loggerCallbacks,
   };
@@ -244,6 +286,31 @@ async function init() {
       debugFn('init: 浏览器就绪');
       console.log('浏览器已就绪，数据自动记录中');
       console.log('点击面板选择按钮(⦿)选择数据进行分析\n');
+
+      // 恢复逻辑
+      if (autoResume) {
+        console.log('[恢复] 从上次中断处继续...\n');
+        await streamHandler.chatStreamResume();
+        console.log('\n');
+      } else if (domain) {
+        const existing = listSessions(domain).filter(s => s.thread_id !== threadId && s.message_count > 0);
+        if (existing.length > 0) {
+          const ready = await panelBridge.waitForPanel();
+          if (ready) {
+            const s = existing[0];
+            const ago = Math.round((Date.now() - s.updated_at) / 60000);
+            const timeStr = ago < 60 ? `${ago}分钟前` : `${Math.round(ago / 60)}小时前`;
+            await panelBridge.sendMessage('resume-available', {
+              threadId: s.thread_id,
+              domain: s.domain,
+              messageCount: s.message_count,
+              timeAgo: timeStr,
+            });
+          } else {
+            debugFn('init: 面板未就绪，跳过恢复横幅');
+          }
+        }
+      }
     } catch (error) {
       console.error('启动浏览器失败:', error.message);
       debugFn('init: 浏览器启动失败 -', error.stack);

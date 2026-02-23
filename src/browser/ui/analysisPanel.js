@@ -657,6 +657,22 @@ export function getAnalysisPanelScript() {
       .deepspider-confirm-no {
         background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #8b949e;
       }
+      /* 恢复 session 横幅 */
+      .deepspider-resume-banner {
+        background: rgba(99, 179, 237, 0.08); border: 1px solid rgba(99, 179, 237, 0.2);
+        border-radius: 10px; padding: 12px 14px; margin: 4px 0;
+      }
+      .deepspider-resume-btn {
+        width: 100%; padding: 8px; border-radius: 8px; border: none;
+        background: linear-gradient(135deg, #63b3ed, #4299e1); color: #fff;
+        font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+      }
+      .deepspider-resume-btn:hover { opacity: 0.85; }
+      .deepspider-resume-dismiss {
+        width: 100%; padding: 6px; border: none; background: none;
+        color: #8b949e; font-size: 11px; cursor: pointer; margin-top: 4px;
+      }
+      .deepspider-resume-dismiss:hover { color: #c9d1d9; }
       .deepspider-msg-system {
         background: transparent;
         text-align: center;
@@ -1270,6 +1286,7 @@ export function getAnalysisPanelScript() {
         bindFilePathClicks(messagesEl);
         bindChoiceClicks(messagesEl);
         bindConfirmClicks(messagesEl);
+        bindResumeClicks(messagesEl);
       }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
@@ -1286,6 +1303,8 @@ export function getAnalysisPanelScript() {
           return renderChoicesMessage(m);
         case 'confirm':
           return renderConfirmMessage(m);
+        case 'resume-available':
+          return renderResumeMessage(m);
         default:
           return '<div class="deepspider-msg deepspider-msg-system">' + escapeHtml(JSON.stringify(m.data)) + '</div>';
       }
@@ -1326,6 +1345,18 @@ export function getAnalysisPanelScript() {
       return html;
     }
 
+    function renderResumeMessage(m) {
+      if (m.answered) return '';
+      const d = m.data;
+      return '<div class="deepspider-resume-banner">' +
+        '<div style="margin-bottom:6px;">检测到上次未完成的分析</div>' +
+        '<div style="font-size:11px;color:#8b949e;margin-bottom:8px;">' +
+          escapeHtml(d.domain) + ' · ' + escapeHtml(d.timeAgo) + ' · ' + escapeHtml(String(d.messageCount)) + '条消息</div>' +
+        '<button class="deepspider-resume-btn" data-resume-thread="' + escapeHtml(d.threadId) + '">恢复上次分析</button>' +
+        '<button class="deepspider-resume-dismiss" data-resume-dismiss="true">忽略</button>' +
+        '</div>';
+    }
+
     function bindChoiceClicks(container) {
       container.querySelectorAll('.deepspider-choice-btn:not([style*="pointer-events"])').forEach(btn => {
         btn.onclick = () => {
@@ -1363,6 +1394,31 @@ export function getAnalysisPanelScript() {
           if (typeof __deepspider_send__ === 'function') {
             __deepspider_send__(JSON.stringify({ __ds__: true, type: 'confirm-result', confirmed }));
           }
+        };
+      });
+    }
+
+    function bindResumeClicks(container) {
+      container.querySelectorAll('.deepspider-resume-btn').forEach(btn => {
+        btn.onclick = () => {
+          const threadId = btn.dataset.resumeThread;
+          const msgs = deepspider.chatMessages;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'resume-available') { msgs[i].answered = true; break; }
+          }
+          addMessage('system', '正在恢复上次分析...');
+          if (typeof __deepspider_send__ === 'function') {
+            __deepspider_send__(JSON.stringify({ __ds__: true, type: 'resume', threadId }));
+          }
+        };
+      });
+      container.querySelectorAll('.deepspider-resume-dismiss').forEach(btn => {
+        btn.onclick = () => {
+          const msgs = deepspider.chatMessages;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'resume-available') { msgs[i].answered = true; break; }
+          }
+          renderMessages();
         };
       });
     }

@@ -8,7 +8,7 @@ import 'dotenv/config';
 import { StateBackend, FilesystemBackend, createFilesystemMiddleware, createPatchToolCallsMiddleware } from 'deepagents';
 import { createAgent, toolRetryMiddleware, summarizationMiddleware, anthropicPromptCachingMiddleware, todoListMiddleware, humanInTheLoopMiddleware } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
-import { MemorySaver } from '@langchain/langgraph';
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 
 import { coreTools } from './tools/index.js';
 import { allSubagents } from './subagents/index.js';
@@ -59,6 +59,7 @@ export function createDeepSpiderAgent(options = {}) {
     enableMemory = true,
     enableInterrupt = false,
     onReportReady = null,  // 报告就绪回调
+    checkpointer,
   } = options;
 
   // 创建 LLM 模型实例
@@ -73,8 +74,7 @@ export function createDeepSpiderAgent(options = {}) {
     ? new FilesystemBackend({ rootDir: './.deepspider-agent' })
     : new StateBackend();
 
-  // Checkpointer：保存对话状态，支持断点恢复
-  const checkpointer = new MemorySaver();
+  const resolvedCheckpointer = checkpointer ?? SqliteSaver.fromConnString(':memory:');
 
   // 人机交互配置
   const interruptOn = enableInterrupt
@@ -130,11 +130,11 @@ export function createDeepSpiderAgent(options = {}) {
       createValidationWorkflowMiddleware(),
       createReportMiddleware({ onReportReady }),
     ],
-    checkpointer,
+    checkpointer: resolvedCheckpointer,
   });
 }
 
-// 默认导出
+// 默认导出（内存模式，兼容 MCP 等非 CLI 场景）
 export const agent = createDeepSpiderAgent();
 
 export default agent;

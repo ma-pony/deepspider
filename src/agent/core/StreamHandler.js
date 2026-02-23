@@ -168,6 +168,23 @@ export class StreamHandler {
     await this.panelBridge.setBusy(true);
     this.debug(`chatStreamResume: 从检查点恢复, retryCount=${retryCount}`);
 
+    // 恢复前：检查 checkpoint 是否有实际消息
+    if (retryCount === 0) {
+      try {
+        const state = await this.agent.getState(this.config);
+        const messages = state?.values?.messages;
+        if (!messages?.length) {
+          console.log('[恢复] checkpoint 无历史消息，跳过恢复');
+          await this.panelBridge.sendToPanel('system', '该会话无历史记录，请重新开始分析');
+          await this.panelBridge.setBusy(false);
+          return '[无历史消息]';
+        }
+        await this._restoreHistoryToPanel(messages);
+      } catch (e) {
+        this.debug('chatStreamResume: getState 失败:', e.message);
+      }
+    }
+
     const heartbeat = setInterval(() => {
       const elapsed = Math.round((Date.now() - lastEventTime) / 1000);
       if (elapsed > 30) {
@@ -216,6 +233,37 @@ export class StreamHandler {
       }
 
       return `恢复失败: ${errMsg}`;
+    }
+  }
+
+  /**
+   * 从 checkpoint 恢复历史消息到前端面板
+   */
+  async _restoreHistoryToPanel(messages) {
+    try {
+      if (!messages?.length) return;
+      this.debug(`_restoreHistoryToPanel: ${messages.length} 条历史消息`);
+
+      const batch = [];
+      for (const msg of messages) {
+        const type = msg._getType?.() || msg.constructor?.name;
+        const content = Array.isArray(msg.content)
+          ? msg.content.filter(c => c.type === 'text').map(c => c.text).join('')
+          : (typeof msg.content === 'string' ? msg.content : '');
+        if (!content.trim()) continue;
+
+        if (type === 'human') {
+          batch.push({ type: 'user', data: { content } });
+        } else if (type === 'ai') {
+          batch.push({ type: 'text', data: { content } });
+        } else if (type === 'tool') {
+          const summary = content.length > 200 ? content.slice(0, 200) + '...' : content;
+          batch.push({ type: 'system', data: { content: `[工具结果] ${summary}` } });
+        }
+      }
+      await this.panelBridge.sendBatch(batch);
+    } catch (e) {
+      this.debug('_restoreHistoryToPanel 失败:', e.message);
     }
   }
 

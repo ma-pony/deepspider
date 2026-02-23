@@ -99,7 +99,21 @@ entry: z.object({}).catchall(z.string()).nullable()
 
 ## Forbidden Patterns
 
-### 1. 缺少 describe
+### 1. 禁止 `z.any()` 和 `z.unknown()`
+
+工具 schema 中**禁止使用 `z.any()` 和 `z.unknown()`**，它们在 Zod v4 转 JSON Schema 时生成无效定义。
+
+替代方案：
+
+| 禁止 | 替代 | 场景 |
+|------|------|------|
+| `z.unknown()` | `z.string()` / `z.number()` / `z.union([...])` | 明确类型 |
+| `z.any()` | `z.union([z.string(), z.number(), z.boolean()])` | 需要多类型 |
+| `z.record(z.string(), z.unknown())` | `z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))` | 动态 KV |
+
+原则：所有 schema 字段必须有明确的类型边界，让 LLM 能生成合法的 JSON。
+
+### 2. 缺少 describe
 
 ```javascript
 // ❌ 错误

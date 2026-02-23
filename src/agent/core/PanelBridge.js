@@ -36,13 +36,33 @@ export class PanelBridge {
   }
 
   /**
+   * 等待面板 JS 初始化完成
+   */
+  async waitForPanel(timeoutMs = 5000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const ready = await this.evaluateInPage('!!window.__deepspider__?.addStructuredMessage');
+      if (ready) return true;
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return false;
+  }
+
+  /**
+   * 批量发送消息到面板（单次 CDP 调用）
+   */
+  async sendBatch(messages) {
+    if (!messages?.length) return;
+    const escaped = JSON.stringify(messages);
+    await this.evaluateInPage(
+      `(function(msgs){var ds=window.__deepspider__;if(!ds)return;msgs.forEach(function(m){ds.addStructuredMessage?.(m.type,m.data);})})(${escaped})`
+    );
+  }
+
+  /**
    * 发送结构化消息到前端面板
    */
   async sendMessage(type, data) {
-    const browser = this.getBrowser();
-    const page = browser?.getPage?.();
-    if (!page) return;
-
     try {
       const escapedType = JSON.stringify(type);
       const escapedData = JSON.stringify(data);
