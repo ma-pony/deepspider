@@ -13,6 +13,31 @@ function cleanDSML(text) {
   return text ? text.replace(DSML_PATTERN, '') : text;
 }
 
+// 流式事件停滞超时（单个事件间隔上限）
+const STALL_TIMEOUT_MS = 150000; // 150s — 超过此时间无新事件则中断流
+
+/**
+ * 包装异步迭代器，每个 next() 加独立超时
+ * 防止 LLM API 或 middleware 无响应时 for-await 永久挂起
+ */
+async function* withStallTimeout(asyncIterator, timeoutMs = STALL_TIMEOUT_MS) {
+  while (true) {
+    let timer;
+    const result = await Promise.race([
+      asyncIterator.next(),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Stream timeout: no events for ${Math.round(timeoutMs / 1000)}s`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+    clearTimeout(timer);
+    if (result.done) break;
+    yield result.value;
+  }
+}
+
 // 人工介入配置
 const INTERVENTION_CONFIG = {
   idleTimeoutMs: 120000,  // 2分钟无响应触发提示
@@ -63,7 +88,7 @@ export class StreamHandler {
       );
 
       this.debug('chatStream: 开始遍历事件');
-      for await (const event of eventStream) {
+      for await (const event of withStallTimeout(eventStream)) {
         lastEventTime = Date.now();
         eventCount++;
 
@@ -73,10 +98,12 @@ export class StreamHandler {
 
         await this._handleStreamEvent(event);
 
-        if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
+        if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = output.content;
+            finalResponse = typeof output.content === 'string'
+              ? output.content
+              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
             this.debug(`chatStream: 收到最终响应, 长度=${finalResponse.length}`);
           }
         }
@@ -86,10 +113,15 @@ export class StreamHandler {
       console.log(`\n[完成] 共处理 ${eventCount} 个事件`);
 
       // 发送剩余累积文本
-      await this._flushFullResponse();
+      const flushed = await this._flushFullResponse();
 
       // 检测 interrupt 并渲染到面板
-      await this._checkAndRenderInterrupt();
+      const hasInterrupt = await this._checkAndRenderInterrupt();
+
+      // 兜底：如果没有文本输出也没有 interrupt，发送完成通知
+      if (!flushed && !hasInterrupt && eventCount > 0 && lastToolCall) {
+        await this.panelBridge.sendToPanel('system', '✅ 任务完成');
+      }
 
       await this.panelBridge.setBusy(false);
 
@@ -126,23 +158,31 @@ export class StreamHandler {
         { ...this.config, version: 'v2' }
       );
 
-      for await (const event of eventStream) {
+      for await (const event of withStallTimeout(eventStream)) {
         lastEventTime = Date.now();
         eventCount++;
         await this._handleStreamEvent(event);
 
-        if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
+        if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = output.content;
+            finalResponse = typeof output.content === 'string'
+              ? output.content
+              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
           }
         }
       }
 
       clearInterval(heartbeat);
 
-      await this._flushFullResponse();
-      await this._checkAndRenderInterrupt();
+      const flushed = await this._flushFullResponse();
+      const hasInterrupt = await this._checkAndRenderInterrupt();
+
+      // 兜底：如果没有文本输出也没有 interrupt，发送完成通知
+      if (!flushed && !hasInterrupt && eventCount > 0) {
+        await this.panelBridge.sendToPanel('system', '✅ 任务完成');
+      }
+
       await this.panelBridge.setBusy(false);
 
       console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
@@ -198,23 +238,30 @@ export class StreamHandler {
         { ...this.config, version: 'v2' }
       );
 
-      for await (const event of eventStream) {
+      for await (const event of withStallTimeout(eventStream)) {
         lastEventTime = Date.now();
         eventCount++;
         await this._handleStreamEvent(event);
 
-        if (event.event === 'on_chat_model_end' && event.name === 'ChatOpenAI') {
+        if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = output.content;
+            finalResponse = typeof output.content === 'string'
+              ? output.content
+              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
           }
         }
       }
 
       clearInterval(heartbeat);
 
-      await this._flushFullResponse();
-      await this._checkAndRenderInterrupt();
+      const flushed2 = await this._flushFullResponse();
+      const hasInterrupt2 = await this._checkAndRenderInterrupt();
+
+      if (!flushed2 && !hasInterrupt2 && eventCount > 0) {
+        await this.panelBridge.sendToPanel('system', '✅ 任务完成');
+      }
+
       await this.panelBridge.setBusy(false);
 
       console.log(`\n[恢复完成] 共处理 ${eventCount} 个事件`);
@@ -269,12 +316,16 @@ export class StreamHandler {
 
   /**
    * 发送剩余累积文本到面板
+   * 返回 true 如果有文本被发送
    */
   async _flushFullResponse() {
     if (this.fullResponse?.trim()) {
       await this.panelBridge.sendToPanel('assistant', this.fullResponse);
+      this.fullResponse = '';
+      return true;
     }
     this.fullResponse = '';
+    return false;
   }
 
   /**

@@ -206,7 +206,11 @@ export class BrowserClient extends EventEmitter {
 
       try {
         // 通过简单的 Runtime.evaluate 验证 session 是否还活着
-        await this.cdpSession.send('Runtime.evaluate', { expression: '1' });
+        // 必须加超时：页面 loading/断点暂停时 Runtime.evaluate 会永远挂住
+        await Promise.race([
+          this.cdpSession.send('Runtime.evaluate', { expression: '1' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('CDP health check timeout')), 3000)),
+        ]);
         this._cdpLastCheck = now;
         return this.cdpSession;
       } catch {

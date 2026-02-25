@@ -1305,6 +1305,8 @@ export function getAnalysisPanelScript() {
           return renderConfirmMessage(m);
         case 'resume-available':
           return renderResumeMessage(m);
+        case 'file-saved':
+          return renderFileSavedMessage(m);
         default:
           return '<div class="deepspider-msg deepspider-msg-system">' + escapeHtml(JSON.stringify(m.data)) + '</div>';
       }
@@ -1355,6 +1357,20 @@ export function getAnalysisPanelScript() {
         '<button class="deepspider-resume-btn" data-resume-thread="' + escapeHtml(d.threadId) + '">恢复上次分析</button>' +
         '<button class="deepspider-resume-dismiss" data-resume-dismiss="true">忽略</button>' +
         '</div>';
+    }
+
+    function renderFileSavedMessage(m) {
+      var d = m.data;
+      var icon = d.type === 'py' ? '🐍' : d.type === 'report' ? '📊' : '📄';
+      var label = d.type === 'py' ? 'Python 脚本' : d.type === 'report' ? '分析报告' : '文件';
+      return '<div class="deepspider-msg deepspider-msg-system" style="background:#1a2332;border-left:3px solid #388bfd;padding:8px 12px;">' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
+        '<span>' + icon + '</span>' +
+        '<span style="color:#58a6ff;">' + escapeHtml(label) + '已保存</span>' +
+        '</div>' +
+        '<div class="deepspider-file-path" style="font-size:11px;color:#8b949e;margin-top:4px;cursor:pointer;" data-file-path="' + escapeHtml(d.path) + '">' +
+        escapeHtml(d.path) +
+        '</div></div>';
     }
 
     function bindChoiceClicks(container) {

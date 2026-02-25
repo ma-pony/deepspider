@@ -18,15 +18,20 @@ async function safeCDP(browser) {
 }
 
 /**
- * 通过 CDP 执行 JS
+ * 通过 CDP 执行 JS（带超时保护）
  */
-async function cdpEvaluate(browser, expression, returnByValue = true) {
+async function cdpEvaluate(browser, expression, returnByValue = true, timeout = 5000) {
   const cdp = await safeCDP(browser);
-  const result = await cdp.send('Runtime.evaluate', {
-    expression,
-    returnByValue,
-    awaitPromise: true,
-  });
+  const result = await Promise.race([
+    cdp.send('Runtime.evaluate', {
+      expression,
+      returnByValue,
+      awaitPromise: true,
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('cdpEvaluate timeout (page loading/paused?)')), timeout)
+    ),
+  ]);
   if (result.exceptionDetails) {
     throw new Error(result.exceptionDetails.text || 'CDP evaluate error');
   }

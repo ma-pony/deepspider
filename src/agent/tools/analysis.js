@@ -7,16 +7,26 @@ import { tool } from '@langchain/core/tools';
 import { getBrowserClient } from '../../browser/index.js';
 
 /**
- * 通过 CDP 执行 JS（复用 session）
+ * 通过 CDP 执行 JS（复用 session，带超时保护）
  */
-async function evaluateViaCDP(client, expression) {
+async function evaluateViaCDP(client, expression, timeout = 5000) {
   const cdp = await client.getCDPSession();
   if (!cdp) return null;
-  const result = await cdp.send('Runtime.evaluate', {
-    expression,
-    returnByValue: true,
-  });
-  return result.result?.value;
+  try {
+    const result = await Promise.race([
+      cdp.send('Runtime.evaluate', {
+        expression,
+        returnByValue: true,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CDP evaluate timeout')), timeout)
+      ),
+    ]);
+    return result.result?.value;
+  } catch (e) {
+    console.error('[analysis:evaluateViaCDP] 超时或错误:', e.message);
+    return null;
+  }
 }
 
 /**

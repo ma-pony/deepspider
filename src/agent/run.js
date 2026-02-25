@@ -49,10 +49,15 @@ async function showReportFromFile(mdFilePath) {
     const escaped = JSON.stringify(htmlContent);
     const cdp = await browser?.getCDPSession?.();
     if (cdp) {
-      await cdp.send('Runtime.evaluate', {
-        expression: `window.__deepspider__?.showReport?.(${escaped}, true)`,
-        returnByValue: true,
-      });
+      await Promise.race([
+        cdp.send('Runtime.evaluate', {
+          expression: `window.__deepspider__?.showReport?.(${escaped}, true)`,
+          returnByValue: true,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('showReport timeout')), 5000)
+        ),
+      ]);
     }
     console.log('[report] 已显示分析报告');
   } catch (e) {
@@ -228,6 +233,16 @@ async function init() {
     await showReportFromFile(mdFilePath);
   }
 
+  // panelBridge 引用，在后面初始化后赋值
+  let sharedPanelBridge = null;
+
+  async function onFileSaved({ path, type }) {
+    console.log(`[report] 文件已保存: ${path} (${type})`);
+    if (!sharedPanelBridge) return;
+    const shortPath = path.replace(process.env.HOME || '', '~');
+    await sharedPanelBridge.sendMessage('file-saved', { path: shortPath, type });
+  }
+
   // 持久化 checkpointer + session 管理
   const checkpointer = createCheckpointer();
   cleanExpiredSessions();
@@ -250,7 +265,7 @@ async function init() {
     if (domain) createSession(threadId, domain, targetUrl);
   }
 
-  agent = createDeepSpiderAgent({ onReportReady, checkpointer });
+  agent = createDeepSpiderAgent({ onReportReady, onFileSaved, checkpointer });
 
   currentThreadId = threadId;
   agentConfig = {
@@ -261,6 +276,7 @@ async function init() {
 
   // 初始化流处理器
   const panelBridge = new PanelBridge(() => browser, debugFn);
+  sharedPanelBridge = panelBridge;
   streamHandler = new StreamHandler({
     agent,
     config: agentConfig,
