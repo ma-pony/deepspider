@@ -303,3 +303,56 @@ When implementing features that span layers:
 2. **Choose Constraint Type**: Critical? → Hard constraint (mechanism). Advisory? → Soft constraint (prompt).
 3. **Verify at Boundary**: Test at layer boundaries, not just within layers.
 4. **Document Assumptions**: Document which layer provides which guarantee.
+
+---
+
+## Case: Prompt 层与 Middleware 层的三层协作
+
+**Symptom**: 子代理行为不一致——有时遵守"3 次重试上限"，有时无限循环。
+
+**Root Cause**: 约束只在 prompt 层实现，没有 middleware 兜底。
+
+**Layer Analysis**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 1: Prompt（软约束）                                    │
+│  - "同一操作最多重试 3 次"                                     │
+│  - LLM 可能误计数或忽略                                       │
+│  - 适合：行为引导、决策建议、思考提示                            │
+└─────────────────────────────────────────────────────────────┘
+                              ↕
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 2: Skill（知识参考）                                    │
+│  - 领域知识、经验速查表、常见坑                                 │
+│  - 不控制行为，只提供信息                                      │
+│  - 适合：加密算法特征、脱困策略、参数调优经验                     │
+└─────────────────────────────────────────────────────────────┘
+                              ↕
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 3: Middleware（硬约束）                                 │
+│  - toolCallLimitMiddleware: 物理阻止超限调用                   │
+│  - createFilterToolsMiddleware: 隐藏不该用的工具               │
+│  - 适合：必须执行的限制、状态管理、安全边界                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Design Principle**: 三层协作，各司其职：
+
+| 需求 | 放在哪层 | 示例 |
+|------|----------|------|
+| "遇到异常先思考" | Prompt | Think/Reflect 场景列表 |
+| "AES-CFB 的 segment_size=128" | Skill | js2python/SKILL.md |
+| "工具调用不超过 80 次" | Middleware | toolCallLimitMiddleware |
+| "优先用已捕获数据" | Prompt | 信息优先级 |
+| "滑块轨迹参数 300-800ms" | Skill | captcha/SKILL.md |
+| "子代理不能用 launch_browser" | Middleware | filterToolsMiddleware |
+
+**Lesson**: 判断约束放在哪层的决策树：
+
+```
+这个约束被违反会怎样？
+├── 严重后果（安全/资源/死循环）→ Middleware（硬约束）
+├── 质量下降但不致命 → Prompt（软约束）
+└── 不是约束，是知识 → Skill（参考信息）
+```

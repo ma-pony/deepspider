@@ -381,6 +381,102 @@ pnpm test
 
 ---
 
+## Prompt Design Patterns
+
+> 从 30+ AI 产品（Manus、Devin、Cursor、Windsurf、Claude Code 等）的 system prompt 分析中提炼的设计规范。
+
+### Pattern 1: Agent Loop 结构化
+
+**Problem**: Agent 跳步执行，验证未通过就继续推进，导致错误累积。
+
+**Solution**: 在 system prompt 中定义明确的工作循环：
+
+```
+分析 → 规划 → 执行 → 验证 → 反思
+  ↑                              ↓
+  └──────── 未通过则回到 ────────┘
+```
+
+**Why**: Manus、Google Antigravity 等产品都采用显式的 PLANNING → EXECUTION → VERIFICATION 三阶段模式。结构化循环让 LLM 知道"现在该做什么"，减少跳步和遗漏。
+
+### Pattern 2: Think/Reflect 强制暂停
+
+**Problem**: Agent 遇到异常时默默继续，不分析原因就重试。
+
+**Solution**: 定义必须暂停思考的场景列表：
+
+```
+- 执行结果与预期不符时
+- 连续 2 次工具调用失败时
+- 需要在多个方案中选择时
+- 即将执行不可逆操作时
+```
+
+**Why**: Devin 定义了 10 个必须使用 Think 工具的场景。显式列出触发条件比"遇到问题要思考"更有效。
+
+### Pattern 3: 信息优先级
+
+**Problem**: Agent 凭模型推断下结论，不验证就当事实。
+
+**Solution**: 定义信息可信度层级：
+
+```
+已捕获数据 > 用户提供信息 > 工具实时获取 > 模型推断
+```
+
+**Why**: Perplexity 和 Manus 都有明确的信息优先级（authoritative data > web search > model knowledge）。在爬虫场景中，已拦截的请求/响应是最可靠的数据源。
+
+### Pattern 4: 循环检测与脱困
+
+**Problem**: Agent 无限重试同一个失败操作。
+
+**Solution**: 硬性限制重试次数 + 提供脱困策略：
+
+```
+同一操作最多 3 次 → 分析失败模式 → 替代方案 → 求助用户
+```
+
+**Why**: Cursor、Same.dev、Windsurf 都限制重试循环为 3 次。关键是提供具体的脱困策略（换关键词、换工具、换思路），而不只是说"不要重试"。
+
+### Don't: Prompt 中放代码模板
+
+**Problem**: 在 system prompt 中放大段代码模板，占用 token 但 LLM 不需要模板就能写代码。
+
+```
+# ❌ 在 prompt 中放完整 Python 类模板
+class Crawler:
+    def __init__(self): ...
+    def encrypt(self, data): ...
+    def fetch(self, params): ...
+```
+
+**Why it's bad**: 浪费 token 预算，LLM 有足够的代码生成能力。模板还可能限制 LLM 的灵活性。
+
+**Instead**: 只描述输出要求（"完整可运行的 .py 文件"、"包含 if __name__"），让 LLM 根据实际场景生成。
+
+### Don't: 只用 Prompt 做硬约束
+
+**Problem**: 用 prompt 说"禁止超过 80 次工具调用"，但 LLM 可能忽略。
+
+**Why it's bad**: Prompt 是软约束，LLM 可能误计数或直接忽略。
+
+**Instead**: 关键约束用 middleware 机制实现（wrapToolCall 阻止），prompt 只做辅助提醒。详见 [Cross-Layer Thinking Guide](../guides/cross-layer-thinking-guide.md)。
+
+### Common Mistake: Skill 知识与 Prompt 指令混淆
+
+**Symptom**: Skill 文件中写行为指令（"你必须先做X再做Y"），或 prompt 中写领域知识（加密算法特征表）。
+
+**Cause**: 没有区分"知识"和"指令"的边界。
+
+**Fix**:
+- **Skill (SKILL.md)**: 领域知识、经验参考、速查表、常见坑 — 供 agent 查阅
+- **Prompt (systemPrompt)**: 行为指令、工作流程、禁止行为、决策规则 — 控制 agent 行为
+- **Middleware**: 硬约束、物理阻止、状态管理 — 不依赖 LLM 遵守
+
+**Prevention**: 写内容前先问"这是知识还是指令？"，放到对应的层。
+
+---
+
 ## Code Review Checklist
 
 - [ ] 工具名称使用 snake_case
@@ -397,6 +493,9 @@ pnpm test
 - [ ] Middleware 中的 LLM 调用有超时保护（如 summarizationMiddleware）
 - [ ] CDP Runtime.evaluate 有超时保护（断点暂停时不会死锁）
 - [ ] Zod schema 不使用 `z.any().nullable()`（生成无效 JSON Schema）
+- [ ] Prompt 中的硬约束有对应的 middleware 机制兜底
+- [ ] 子代理 prompt 包含能力边界声明（明确不能做什么）
+- [ ] Skill 文件只包含领域知识，不包含行为指令
 
 ---
 
