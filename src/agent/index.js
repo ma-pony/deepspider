@@ -18,6 +18,8 @@ import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
 import { createToolGuardMiddleware } from './middleware/toolGuard.js';
 import { createValidationWorkflowMiddleware } from './middleware/validationWorkflow.js';
+import { createMemoryFlushMiddleware } from './middleware/memoryFlush.js';
+import { createToolAvailabilityMiddleware } from './middleware/toolAvailability.js';
 
 // createDeepAgent 内部拼接的 BASE_PROMPT
 const BASE_PROMPT = 'In order to complete the objective that the user asks of you, you have access to a number of standard tools.';
@@ -153,6 +155,9 @@ export function createDeepSpiderAgent(options = {}) {
         generalPurposeAgent: false,
         defaultInterruptOn: interruptOn,
       }),
+      // === 预警 + 拦截（在 summarization 之前）===
+      createMemoryFlushMiddleware(),
+      createToolAvailabilityMiddleware(),
       summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 }, keep: { messages: 6 } }),
       anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
       createPatchToolCallsMiddleware(),

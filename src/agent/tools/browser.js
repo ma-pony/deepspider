@@ -9,11 +9,19 @@ import { getBrowser } from '../../browser/index.js';
 import { getScreenshotPath } from './utils.js';
 
 /**
+ * 安全获取 CDP session，断开时返回友好错误而非 TypeError
+ */
+async function safeCDP(browser) {
+  const cdp = await browser.getCDPSession();
+  if (!cdp) throw new Error('CDP session 不可用，浏览器可能已关闭或断开连接');
+  return cdp;
+}
+
+/**
  * 通过 CDP 执行 JS
  */
 async function cdpEvaluate(browser, expression, returnByValue = true) {
-  const cdp = await browser.getCDPSession();
-  if (!cdp) throw new Error('CDP session not available');
+  const cdp = await safeCDP(browser);
   const result = await cdp.send('Runtime.evaluate', {
     expression,
     returnByValue,
@@ -112,7 +120,7 @@ export const waitForSelector = tool(
 export const reloadPage = tool(
   async () => {
     const browser = await getBrowser();
-    const cdp = await browser.getCDPSession();
+    const cdp = await safeCDP(browser);
     await cdp.send('Page.reload');
     const url = await cdpEvaluate(browser, 'location.href');
     return JSON.stringify({ success: true, url });
@@ -130,7 +138,7 @@ export const reloadPage = tool(
 export const goBack = tool(
   async () => {
     const browser = await getBrowser();
-    const cdp = await browser.getCDPSession();
+    const cdp = await safeCDP(browser);
     const history = await cdp.send('Page.getNavigationHistory');
     if (history.currentIndex > 0) {
       const entry = history.entries[history.currentIndex - 1];
@@ -152,7 +160,7 @@ export const goBack = tool(
 export const goForward = tool(
   async () => {
     const browser = await getBrowser();
-    const cdp = await browser.getCDPSession();
+    const cdp = await safeCDP(browser);
     const history = await cdp.send('Page.getNavigationHistory');
     if (history.currentIndex < history.entries.length - 1) {
       const entry = history.entries[history.currentIndex + 1];
@@ -174,7 +182,7 @@ export const goForward = tool(
 export const scrollPage = tool(
   async ({ direction, distance }) => {
     const browser = await getBrowser();
-    const cdp = await browser.getCDPSession();
+    const cdp = await safeCDP(browser);
     const deltaY = direction === 'up' ? -distance : distance;
     await cdp.send('Input.dispatchMouseEvent', {
       type: 'mouseWheel', x: 100, y: 100, deltaX: 0, deltaY
@@ -350,7 +358,7 @@ export const getElementHtml = tool(
 export const getCookies = tool(
   async ({ domain, format }) => {
     const browser = await getBrowser();
-    const cdp = await browser.getCDPSession();
+    const cdp = await safeCDP(browser);
 
     // 获取当前页面 URL 用于过滤
     const currentUrl = await cdpEvaluate(browser, 'location.href');

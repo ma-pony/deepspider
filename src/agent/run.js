@@ -184,7 +184,12 @@ function prompt() {
       return;
     }
 
-    await streamHandler.chatStream(input);
+    let enrichedInput = input;
+    if (browser) {
+      const url = browser.getPage()?.url?.() || targetUrl || '';
+      enrichedInput = `[浏览器已就绪] 当前页面: ${url}\n\n${input}`;
+    }
+    await streamHandler.chatStream(enrichedInput);
     if (currentThreadId) touchSession(currentThreadId);
     console.log('\n');
     prompt();

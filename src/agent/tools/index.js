@@ -54,7 +54,7 @@ import { profileTools } from './profile.js';
 import { runtimeTools } from './runtime.js';
 import { debugTools } from './debug.js';
 import { captureTools } from './capture.js';
-import { browserTools } from './browser.js';
+import { browserTools, clickElement, scrollPage, fillInput, getInteractiveElements, getPageInfo, hoverElement, pressKey } from './browser.js';
 import { reportTools } from './report.js';
 import { webcrackTools } from './webcrack.js';
 import { preprocessTools } from './preprocess.js';
@@ -147,4 +147,6 @@ export const coreTools = [
   ...scratchpadTools,
   // 爬虫代码生成（带 HITL 确认）
   ...crawlerGeneratorTools,
+  // 页面交互（自主数据搜寻：滚动加载、点击触发请求）
+  clickElement, scrollPage, fillInput, getInteractiveElements, getPageInfo, hoverElement, pressKey,
 ];
