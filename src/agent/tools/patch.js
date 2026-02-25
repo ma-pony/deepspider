@@ -21,7 +21,7 @@ export const generatePatch = tool(
     description: '为缺失的环境属性生成补丁代码。',
     schema: z.object({
       property: z.string().describe('缺失的属性路径，如 navigator.userAgent'),
-      context: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe('上下文信息'),
+      context: z.object({}).passthrough().optional().describe('上下文信息'),
     }),
   }
 );

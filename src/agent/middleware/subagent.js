@@ -175,7 +175,10 @@ function createEnhancedTaskTool(options) {
       schema: z.object({
         description: z.string().describe('The task to execute with the selected agent'),
         subagent_type: z.string().describe(`Name of the agent to use. Available: ${availableTypes}`),
-        context: z.record(z.string(), z.string()).optional().describe('Structured key-value context to pass to the subagent (e.g. site, requestId, targetParam)'),
+        // NOTE: 不用 z.record() 因为 Zod v4 toJSONSchema 会生成 propertyNames，
+        // 而 Anthropic API 不支持 propertyNames 关键字
+        // 改用 z.object({}) + additionalProperties 模式
+        context: z.object({}).passthrough().optional().describe('Structured key-value context to pass to the subagent (e.g. site, requestId, targetParam)'),
       }),
     },
   );

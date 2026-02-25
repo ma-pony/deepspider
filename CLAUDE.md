@@ -270,7 +270,9 @@ const myTool = tool(
 
 ### Zod Schema 约束
 
-工具 schema 中**禁止使用 `z.any()` 和 `z.unknown()`**，因为它们在 Zod v4 转 JSON Schema 时会生成无效定义，导致 LLM tool call 校验失败。
+工具 schema 中**禁止使用 `z.any()`、`z.unknown()` 和 `z.record()`**，因为：
+- `z.any()` / `z.unknown()`：Zod v4 转 JSON Schema 时生成无效定义
+- `z.record()`：Zod v4 转 JSON Schema 时生成 `propertyNames` 关键字，Anthropic API 不支持
 
 替代方案：
 
@@ -278,9 +280,9 @@ const myTool = tool(
 |------|------|------|
 | `z.unknown()` | `z.string()` / `z.number()` / `z.union([...])` | 明确类型 |
 | `z.any()` | `z.union([z.string(), z.number(), z.boolean()])` | 需要多类型 |
-| `z.record(z.string(), z.unknown())` | `z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))` | 动态 KV |
+| `z.record(z.string(), z.string())` | `z.object({}).passthrough()` | 动态 KV |
 
-原则：所有 schema 字段必须有明确的类型边界，让 LLM 能生成合法的 JSON。
+原则：所有 schema 字段必须有明确的类型边界，且生成的 JSON Schema 不能包含 Anthropic API 不支持的关键字（如 `propertyNames`）。
 
 ### DeepAgent 创建
 

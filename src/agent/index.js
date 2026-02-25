@@ -7,7 +7,7 @@
 import 'dotenv/config';
 import { StateBackend, FilesystemBackend, createFilesystemMiddleware, createPatchToolCallsMiddleware } from 'deepagents';
 import { createAgent, toolRetryMiddleware, summarizationMiddleware, anthropicPromptCachingMiddleware, todoListMiddleware, humanInTheLoopMiddleware } from 'langchain';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatAnthropic } from '@langchain/anthropic';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 
 import { coreTools } from './tools/index.js';
@@ -30,8 +30,47 @@ const config = {
 };
 
 /**
+ * 递归移除 JSON Schema 中 Anthropic API 不支持的关键字
+ * Zod v4 的 toJSONSchema 会生成 $schema 和 propertyNames，Anthropic 拒绝
+ * additionalProperties: {} 空对象也不被接受，改成 true
+ */
+function stripUnsupportedSchemaKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(stripUnsupportedSchemaKeys);
+  const res = {};
+  for (const k in obj) {
+    if (k === '$schema' || k === 'propertyNames') continue;
+    // additionalProperties: {} → true (空对象等于"任意类型"，但Anthropic不接受空对象)
+    if (k === 'additionalProperties' && obj[k] !== null && typeof obj[k] === 'object' && Object.keys(obj[k]).length === 0) {
+      res[k] = true;
+      continue;
+    }
+    res[k] = stripUnsupportedSchemaKeys(obj[k]);
+  }
+  return res;
+}
+
+/**
+ * 自定义 fetch：拦截 LLM API 请求，strip 工具 schema 中 Zod v4 生成的不兼容字段
+ * 保留作为安全网，防止 $schema / propertyNames / additionalProperties:{} 泄漏到 API
+ */
+const _origFetch = globalThis.fetch;
+globalThis.fetch = async function(url, opts) {
+  if (opts?.body && typeof opts.body === 'string' && opts.body.includes('"tools"')) {
+    try {
+      const body = JSON.parse(opts.body);
+      if (body.tools) {
+        body.tools = stripUnsupportedSchemaKeys(body.tools);
+        opts = { ...opts, body: JSON.stringify(body) };
+      }
+    } catch { /* ignore parse errors on non-LLM requests */ }
+  }
+  return _origFetch(url, opts);
+};
+
+/**
  * 创建 LLM 模型实例
- * 使用 ChatOpenAI 兼容 OpenAI 格式的任意供应商
+ * 使用 ChatAnthropic 发送原生 Anthropic 格式，避免代理的 OpenAI→Anthropic 转换引入 schema 错误
  */
 function createModel(options = {}) {
   const {
@@ -40,10 +79,13 @@ function createModel(options = {}) {
     baseUrl = config.baseUrl,
   } = options;
 
-  return new ChatOpenAI({
+  // ChatAnthropic 的 baseURL 不含 /v1（SDK 自动拼接）
+  const anthropicBaseUrl = baseUrl?.replace(/\/v1\/?$/, '') || undefined;
+
+  return new ChatAnthropic({
     model,
-    apiKey,
-    configuration: baseUrl ? { baseURL: baseUrl } : undefined,
+    anthropicApiKey: apiKey,
+    anthropicApiUrl: anthropicBaseUrl,
     temperature: 0,
   });
 }
