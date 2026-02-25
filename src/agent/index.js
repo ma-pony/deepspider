@@ -17,6 +17,7 @@ import { createReportMiddleware } from './middleware/report.js';
 import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
 import { createToolGuardMiddleware } from './middleware/toolGuard.js';
+import { createToolCallLimitMiddleware } from './subagents/factory.js';
 import { createValidationWorkflowMiddleware } from './middleware/validationWorkflow.js';
 import { createMemoryFlushMiddleware } from './middleware/memoryFlush.js';
 import { createToolAvailabilityMiddleware } from './middleware/toolAvailability.js';
@@ -103,15 +104,20 @@ export function createDeepSpiderAgent(options = {}) {
     enableMemory = true,
     enableInterrupt = false,
     onReportReady = null,  // 报告就绪回调
+    onFileSaved = null,    // 文件保存通知回调
     checkpointer,
   } = options;
 
-  // 创建 LLM 模型实例
+  // 创建 LLM 模型实例（加 timeout 防止 API 无响应时 streamEvents 永久挂起）
   const llm = createModel({ model, apiKey, baseUrl });
+  llm.timeout = 120000; // 120s — 主 LLM 超时
 
-  // 摘要专用 LLM：加 timeout 防止长对话摘要时卡死（summarizationMiddleware 的 model.invoke 无内置超时）
+  // 摘要专用 LLM：故意不设 timeout
+  // 原因：summarizationMiddleware 的 createSummary 有 try-catch，超时会返回错误字符串，
+  // 但 beforeModel 仍会用这个错误字符串替换所有原始消息（REMOVE_ALL_MESSAGES），导致数据丢失。
+  // 安全网由 StreamHandler.withStallTimeout (150s) 提供 — 它在 BeforeModelNode 完成前触发，
+  // 不会写入 checkpoint，原始数据得以保留。
   const summaryLlm = createModel({ model, apiKey, baseUrl });
-  summaryLlm.timeout = 60000; // 60s
 
   // 后端配置：使用文件系统持久化
   const backend = enableMemory
@@ -173,9 +179,10 @@ export function createDeepSpiderAgent(options = {}) {
         },
       }),
       createToolGuardMiddleware(),
+      createToolCallLimitMiddleware(200),
       createFilterToolsMiddleware(),
       createValidationWorkflowMiddleware(),
-      createReportMiddleware({ onReportReady }),
+      createReportMiddleware({ onReportReady, onFileSaved }),
     ],
     checkpointer: resolvedCheckpointer,
   });

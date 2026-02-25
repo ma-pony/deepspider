@@ -53,7 +53,7 @@ export const SUBAGENT_DISCIPLINE_PROMPT = `
  * 注意：callCount 通过闭包持有，假设同一子代理不会被并行调用。
  * deepagents 当前是串行调度子代理，如果未来支持并行需改为 per-invocation 计数。
  */
-function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
+export function createToolCallLimitMiddleware(runLimit = SUBAGENT_RUN_LIMIT) {
   let callCount = 0;
 
   return createMiddleware({
