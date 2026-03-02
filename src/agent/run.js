@@ -13,6 +13,7 @@ import { createDeepSpiderAgent } from './index.js';
 import { fullAnalysisPrompt, tracePrompt, decryptPrompt, extractPrompt } from './prompts/system.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
+import { getDataStore } from '../store/DataStore.js';
 import { createLogger } from './logger.js';
 import { browserTools } from './tools/browser.js';
 import { ensureConfig } from './setup.js';
@@ -76,6 +77,25 @@ function getActionPrompt(action) {
 }
 
 /**
+ * 生成轻量浏览器状态摘要（注入 prompt，帮助主 agent 判断和委派）
+ * 只含计数信息，不含实际数据
+ */
+function getBrowserStateSummary() {
+  try {
+    const store = getDataStore();
+    const sites = store.getSiteList();
+    if (!sites.length) return '';
+
+    const lines = sites.map(s =>
+      `  - ${s.hostname}: ${s.responseCount} 条请求, ${s.scriptCount} 个脚本`
+    );
+    return `\n已捕获数据:\n${lines.join('\n')}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * 处理浏览器消息（通过 CDP binding 接收）
  */
 async function handleBrowserMessage(data) {
@@ -109,16 +129,21 @@ ${JSON.stringify(config.fields, null, 2)}
 
 请先用 query_store 查询已有的加密代码，然后整合生成配置和脚本。`;
   } else if (data.type === 'chat') {
+    const pageUrl = browser?.getPage()?.url?.() || targetUrl || '';
+    const urlLine = pageUrl ? `当前页面: ${pageUrl}\n` : '';
+    const stateSummary = getBrowserStateSummary();
     if (data.elements && data.elements.length > 0) {
       const elementsDesc = data.elements.map((el, i) =>
         `${i + 1}. "${el.text?.slice(0, 100) || ''}"\n   XPath: ${el.xpath}`
       ).join('\n');
-      userPrompt = `${browserReadyPrefix}${data.text}
+      userPrompt = `${browserReadyPrefix}${urlLine}${stateSummary}
+
+${data.text}
 
 用户选中的元素：
 ${elementsDesc}`;
     } else {
-      userPrompt = `${browserReadyPrefix}${data.text}`;
+      userPrompt = `${browserReadyPrefix}${urlLine}${stateSummary}\n\n${data.text}`;
     }
   } else if (data.type === 'open-file') {
     let filePath = data.path;
