@@ -56,6 +56,20 @@ export class StreamHandler {
   }
 
   /**
+   * 从 on_chat_model_end 提取最终响应
+   * 优先使用流式累积的 fullResponse，兜底使用 end 事件内容
+   */
+  _extractFinalResponse(output) {
+    if (!output?.content) return null;
+    const streamContent = this.fullResponse;
+    const endContent = typeof output.content === 'string'
+      ? output.content
+      : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
+    // 使用较长的一方（通常流式累积的内容更完整）
+    return streamContent.length >= endContent.length ? streamContent : endContent;
+  }
+
+  /**
    * 流式对话 - 显示思考过程（带重试）
    */
   async chatStream(input, retryCount = 0) {
@@ -99,17 +113,10 @@ export class StreamHandler {
         await this._handleStreamEvent(event);
 
         if (event.event === 'on_chat_model_end') {
-          const output = event.data?.output;
-          if (output?.content) {
-            // 优先使用流式累积的 fullResponse（与前端展示一致）
-            // 如果流事件没有触发（某些中间件场景），则使用 on_chat_model_end 的内容
-            const streamContent = this.fullResponse;
-            const endContent = typeof output.content === 'string'
-              ? output.content
-              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
-            // 使用较长的一方（通常流式累积的内容更完整）
-            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
-            this.debug(`chatStream: 最终响应, stream=${streamContent.length}, end=${endContent.length}, 使用=${finalResponse.length}`);
+          const extracted = this._extractFinalResponse(event.data?.output);
+          if (extracted) {
+            finalResponse = extracted;
+            this.debug(`chatStream: 最终响应, 长度=${finalResponse.length}`);
           }
         }
       }
@@ -170,13 +177,8 @@ export class StreamHandler {
 
         if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
-          if (output?.content) {
-            const streamContent = this.fullResponse;
-            const endContent = typeof output.content === 'string'
-              ? output.content
-              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
-            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
-          }
+          const extracted = this._extractFinalResponse(output);
+          if (extracted) finalResponse = extracted;
         }
       }
 
@@ -252,13 +254,8 @@ export class StreamHandler {
 
         if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
-          if (output?.content) {
-            const streamContent = this.fullResponse;
-            const endContent = typeof output.content === 'string'
-              ? output.content
-              : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
-            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
-          }
+          const extracted = this._extractFinalResponse(output);
+          if (extracted) finalResponse = extracted;
         }
       }
 

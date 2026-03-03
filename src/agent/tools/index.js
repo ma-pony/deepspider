@@ -38,10 +38,9 @@ export { antiDetectTools } from './anti-detect.js';
 export { crawlerTools } from './crawler.js';
 export { crawlerGeneratorTools, generateCrawlerWithConfirm, delegateCrawlerGeneration } from './crawlerGenerator.js';
 export { nodejsTools, runNodeCode } from './nodejs.js';
+export { pythonTools, executePythonCode } from './python.js';
 export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig } from './hookManager.js';
 export { scratchpadTools, saveMemo, loadMemo, listMemo } from './scratchpad.js';
-// pythonTools 只在 js2python 子代理中使用，不导出到主工具集
-
 // 所有工具
 import { sandboxTools } from './sandbox.js';
 import { analyzerTools } from './analyzer.js';
@@ -76,6 +75,7 @@ import { antiDetectTools } from './anti-detect.js';
 import { crawlerTools } from './crawler.js';
 import { crawlerGeneratorTools } from './crawlerGenerator.js';
 import { nodejsTools } from './nodejs.js';
+import { executePythonCode } from './python.js';
 import { hookManagerTools } from './hookManager.js';
 import { scratchpadTools } from './scratchpad.js';
 
@@ -143,6 +143,8 @@ export const coreTools = [
   ...evolveTools,
   // Node.js 执行（委托前快速验证假设）- 已添加网络请求防护
   ...nodejsTools,
+  // Python 执行（用于加密验证、数据处理等任务）
+  executePythonCode,
   // 工作记忆
   ...scratchpadTools,
   // 爬虫代码生成（带 HITL 确认）
