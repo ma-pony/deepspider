@@ -32,8 +32,8 @@ JS 的 sm-crypto 与 Python 的 gmssl 模式对应关系：
 
 | 模式 | sm-crypto (JS) | gmssl (Python) |
 |------|----------------|----------------|
-| C1C2C3 | mode=0 | mode=0 / mode=False |
-| C1C3C2 | mode=1 | mode=1 / mode=True |
+| C1C2C3 | mode=0 | mode=0 (默认) |
+| C1C3C2 | mode=1 | mode=1 |
 
 **正确转换**：
 ```python
