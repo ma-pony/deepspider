@@ -28,20 +28,20 @@ description: |
 ## 国密 SM2 转换
 
 ### 模式对齐（C1C2C3 vs C1C3C2）
-JS 的 sm-crypto 与 Python 的 gmssl 默认模式相反：
+JS 的 sm-crypto 与 Python 的 gmssl 模式对应关系：
 
-| 库 | 默认值 | 说明 |
-|----|--------|------|
-| sm-crypto (JS) | mode=1 | C1C3C2 模式 |
-| gmssl (Python) | mode=0 / mode=True | C1C2C3 模式 |
+| 模式 | sm-crypto (JS) | gmssl (Python) |
+|------|----------------|----------------|
+| C1C2C3 | mode=0 | mode=0 / mode=False |
+| C1C3C2 | mode=1 | mode=1 / mode=True |
 
 **正确转换**：
 ```python
 from gmssl import sm2
 
 # JS: sm2.doEncrypt(plain, pubKey, 1)  # mode=1, C1C3C2
-# Python 需要设置 mode=False 才能兼容
-sm2_crypt = sm2.CryptSM2(public_key=pub_key, private_key="", mode=False)
+# Python 也需要设置 mode=1 才能兼容
+sm2_crypt = sm2.CryptSM2(public_key=pub_key, private_key="", mode=1)
 cipher = sm2_crypt.encrypt(plain_bytes)
 ```
 
