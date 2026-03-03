@@ -5,10 +5,50 @@
 ## 用法
 
 ```
-/evolve:merge <skill-name>
+/evolve:merge           # 扫描所有 skills，交互式选择
+/evolve:merge all       # 批量处理所有待合并 skills
+/evolve:merge <skill>   # 处理指定 skill
 ```
 
-## 执行步骤
+## 执行前：全局检查（自动）
+
+执行 `/evolve:merge` 时，系统**自动扫描**所有 skills 的 evolved.md：
+
+```bash
+# 扫描脚本（供参考）
+for skill in src/agent/skills/*/; do
+  evolved="$skill/evolved.md"
+  if [ -f "$evolved" ]; then
+    total=$(grep "^total:" "$evolved" | head -1 | cut -d: -f2 | tr -d ' ')
+    last_merged=$(grep "^last_merged:" "$evolved" | head -1 | cut -d: -f2 | tr -d ' ')
+    echo "$(basename $skill): $total 条, 上次合并: $last_merged"
+  fi
+done
+```
+
+**输出示例：**
+
+```
+发现以下 skills 有未合并经验：
+
+  [1] static-analysis    5 条  (上次合并: 2026-03-03)  ← 当前
+  [2] js2python          3 条  (上次合并: 2026-02-02)  ⚠️ 30天未更新
+  [3] general            1 条  (从未合并)
+
+请选择：
+- 输入数字 (1-3) 处理单个 skill
+- 输入 "all" 批量处理所有
+- 输入 "skip" 跳过本次
+>
+```
+
+**提示规则：**
+- `⚠️ 已过期`：超过 7 天未合并
+- `从未合并`：last_merged 为 null
+
+---
+
+## 单 Skill 处理步骤
 
 ### 1. 读取动态经验
 
@@ -55,10 +95,22 @@ cat src/agent/skills/<skill-name>/evolved.md
 
 ### 4. 清理 evolved.md
 
-- 保留已合并的核心经验标记
-- 清空近期发现
-- 更新 last_merged 日期
-- 重置 total 计数
+```yaml
+---
+total: 0                    # 重置计数
+last_merged: 2026-03-03     # 更新为今天日期
+---
+
+## 核心经验
+
+<!-- 经过验证的高价值经验 -->
+<!-- [已合并] 经验标题 → SKILL.md 章节 -->
+<!-- [已合并] 经验标题 → SKILL.md 章节 -->
+
+## 近期发现
+
+<!-- 最近发现，FIFO 滚动，最多保留 10 条 -->
+```
 
 ### 5. 提交变更
 
@@ -66,6 +118,69 @@ cat src/agent/skills/<skill-name>/evolved.md
 git add src/agent/skills/<skill-name>/
 git commit -m "docs: merge evolved experiences to <skill-name>"
 ```
+
+---
+
+## 批量处理（all 模式）
+
+当选择 `all` 时，按优先级顺序处理：
+
+1. **按 total 排序**：total 高的优先（经验积压多）
+2. **跨领域检查**：如果发现相同标签的经验分布在多个 skills，提示用户
+
+```
+检测到 SM2 相关经验分布在多个 skills：
+  - static-analysis: SM2 密钥提取
+  - js2python: SM2 模式转换
+  建议一并处理以保持知识连贯性
+```
+
+---
+
+## 自动化检查（方案 4）
+
+### 提交前检查
+
+在 `.husky/pre-commit` 或 CI 中添加：
+
+```bash
+#!/bin/bash
+# evolve-check.sh
+
+OVERDUE_SKILLS=""
+for skill in src/agent/skills/*/; do
+  evolved="$skill/evolved.md"
+  if [ -f "$evolved" ]; then
+    total=$(grep "^total:" "$evolved" | head -1 | cut -d: -f2 | tr -d ' ')
+    last_merged=$(grep "^last_merged:" "$evolved" | head -1 | cut -d: -f2 | tr -d ' ')
+
+    # 检查：total > 5 或超过 7 天未合并
+    if [ "$total" -gt 5 ] 2>/dev/null || \
+       ([ "$last_merged" != "null" ] && [ -n "$last_merged" ] && \
+        [ $(($(date +%s) - $(date -d "$last_merged" +%s))) -gt 604800 ]); then
+      OVERDUE_SKILLS="$OVERDUE_SKILLS\n  - $(basename $skill): $total 条 (上次: $last_merged)"
+    fi
+  fi
+done
+
+if [ -n "$OVERDUE_SKILLS" ]; then
+  echo "⚠️  以下 skills 有经验待合并，建议执行 /evolve:merge：$OVERDUE_SKILLS"
+  exit 0  # 不阻塞提交，仅提醒
+fi
+```
+
+### 定期提醒
+
+在 CLAUDE.md 中添加定期检查任务：
+
+```markdown
+## 定期维护任务
+
+- [ ] 每周执行 `/evolve:merge` 检查经验积压
+- [ ] 每月回顾 evolved.md 的 total 计数
+```
+
+---
 
 ## 可用的 skill 名称
 

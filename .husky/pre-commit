@@ -1,1 +1,4 @@
 npx lint-staged
+
+# Check for overdue evolved experiences
+bash scripts/evolve-check.sh

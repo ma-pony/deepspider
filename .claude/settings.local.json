@@ -133,7 +133,8 @@
       "WebFetch(domain:www.mmntm.net)",
       "WebFetch(domain:trilogyai.substack.com)",
       "WebFetch(domain:www.moely.ai)",
-      "WebFetch(domain:www.pingcap.com)"
+      "WebFetch(domain:www.pingcap.com)",
+      "Bash(bash:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
