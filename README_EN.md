@@ -48,7 +48,7 @@ On first run, you'll be prompted to configure the LLM API.
 
 ### Configuration
 
-DeepSpider requires an LLM API to run. Any OpenAI-compatible provider is supported.
+DeepSpider supports Anthropic-compatible API providers. Claude API is recommended for best results.
 
 | Config Key | Environment Variable | Description |
 |------------|---------------------|-------------|
@@ -62,30 +62,20 @@ Priority: Environment variables > Config file (`~/.deepspider/config/settings.js
 **Option 1: CLI commands (recommended)**
 
 ```bash
-deepspider config set apiKey sk-xxx
-deepspider config set baseUrl https://api.openai.com/v1
-deepspider config set model gpt-4o
+deepspider config set apiKey sk-ant-api03-xxx
+deepspider config set baseUrl https://api.anthropic.com
+deepspider config set model claude-opus-4-6
 ```
 
 **Option 2: Environment variables**
 
 ```bash
-export DEEPSPIDER_API_KEY=sk-xxx
-export DEEPSPIDER_BASE_URL=https://api.openai.com/v1
-export DEEPSPIDER_MODEL=gpt-4o
+export DEEPSPIDER_API_KEY=sk-ant-api03-xxx
+export DEEPSPIDER_BASE_URL=https://api.anthropic.com
+export DEEPSPIDER_MODEL=claude-opus-4-6
 ```
 
-**Common provider examples**:
-
-```bash
-# OpenAI
-deepspider config set baseUrl https://api.openai.com/v1
-deepspider config set model gpt-4o
-
-# DeepSeek
-deepspider config set baseUrl https://api.deepseek.com/v1
-deepspider config set model deepseek-chat
-```
+> **Note**: Other Anthropic-compatible API providers are also supported.
 
 ### Usage
 
