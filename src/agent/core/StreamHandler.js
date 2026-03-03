@@ -101,10 +101,15 @@ export class StreamHandler {
         if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = typeof output.content === 'string'
+            // 优先使用流式累积的 fullResponse（与前端展示一致）
+            // 如果流事件没有触发（某些中间件场景），则使用 on_chat_model_end 的内容
+            const streamContent = this.fullResponse;
+            const endContent = typeof output.content === 'string'
               ? output.content
               : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
-            this.debug(`chatStream: 收到最终响应, 长度=${finalResponse.length}`);
+            // 使用较长的一方（通常流式累积的内容更完整）
+            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
+            this.debug(`chatStream: 最终响应, stream=${streamContent.length}, end=${endContent.length}, 使用=${finalResponse.length}`);
           }
         }
       }
@@ -166,9 +171,11 @@ export class StreamHandler {
         if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = typeof output.content === 'string'
+            const streamContent = this.fullResponse;
+            const endContent = typeof output.content === 'string'
               ? output.content
               : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
+            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
           }
         }
       }
@@ -246,9 +253,11 @@ export class StreamHandler {
         if (event.event === 'on_chat_model_end') {
           const output = event.data?.output;
           if (output?.content) {
-            finalResponse = typeof output.content === 'string'
+            const streamContent = this.fullResponse;
+            const endContent = typeof output.content === 'string'
               ? output.content
               : output.content.filter(c => c.type === 'text').map(c => c.text).join('');
+            finalResponse = streamContent.length >= endContent.length ? streamContent : endContent;
           }
         }
       }
@@ -415,12 +424,23 @@ export class StreamHandler {
     switch (eventType) {
       case 'on_chat_model_stream':
         let chunk = data?.chunk?.content;
-        if (chunk && typeof chunk === 'string') {
-          chunk = cleanDSML(chunk);
+        // 处理多种内容格式：字符串或数组
+        let textChunk = '';
+        if (typeof chunk === 'string') {
+          textChunk = chunk;
+        } else if (Array.isArray(chunk)) {
+          // 数组格式：提取所有 text 类型的内容
+          textChunk = chunk.filter(c => c.type === 'text').map(c => c.text).join('');
+        } else if (chunk?.text) {
+          // 对象格式：提取 text 字段
+          textChunk = chunk.text;
+        }
+        if (textChunk) {
+          textChunk = cleanDSML(textChunk);
           // CLI 侧仍流式输出
-          process.stdout.write(chunk);
+          process.stdout.write(textChunk);
           // 面板侧只累积，不推送
-          this.fullResponse = (this.fullResponse || '') + chunk;
+          this.fullResponse = (this.fullResponse || '') + textChunk;
         }
         break;
 
