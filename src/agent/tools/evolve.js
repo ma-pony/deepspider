@@ -79,9 +79,10 @@ last_merged: null
 
 /**
  * evolve_skill 工具
+ * 使用结构化格式记录经验，符合 evolved.md 模板规范
  */
 export const evolveSkill = tool(
-  async ({ skill, title, scenario, insight, isCore }) => {
+  async ({ skill, title, scenario, conclusion, technicalDetails, correctExample, incorrectExample, why, extensions, isCore }) => {
     const skillInfo = getSkillPath(skill);
     if (!skillInfo) {
       return JSON.stringify({
@@ -109,11 +110,44 @@ export const evolveSkill = tool(
 
     const data = parseEvolvedMd(content);
 
-    // 生成新条目
+    // 生成新条目（结构化格式）
     const date = new Date().toISOString().split('T')[0];
-    const entry = `### [${date}] ${title}
-**场景**: ${scenario}
-**经验**: ${insight}`;
+    let entry = `### [${date}] ${title}
+
+**一句话结论**: ${conclusion}
+
+**场景**: ${scenario}`;
+
+    // 技术细节（表格形式）
+    if (technicalDetails && Object.keys(technicalDetails).length > 0) {
+      entry += '\n\n**技术细节**:\n| 项目 | 值/说明 |\n|------|---------|';
+      for (const [key, value] of Object.entries(technicalDetails)) {
+        entry += `\n| ${key} | ${value} |`;
+      }
+    }
+
+    // 正确做法
+    if (correctExample) {
+      entry += `\n\n**正确做法**:\n\`\`\`python\n${correctExample}\n\`\`\``;
+    }
+
+    // 错误陷阱
+    if (incorrectExample) {
+      entry += `\n\n**错误陷阱** ⚠️:\n\`\`\`python\n${incorrectExample}\n\`\`\``;
+    }
+
+    // 原因解释
+    if (why) {
+      entry += `\n\n**为什么**: ${why}`;
+    }
+
+    // 举一反三
+    if (extensions && extensions.length > 0) {
+      entry += '\n\n**举一反三**:';
+      for (const item of extensions) {
+        entry += `\n- ${item}`;
+      }
+    }
 
     if (isCore) {
       // 追加到核心经验
@@ -153,13 +187,18 @@ export const evolveSkill = tool(
   },
   {
     name: 'evolve_skill',
-    description: '记录分析过程中学到的经验。支持现有 skill 或 new:<name> 创建新 skill',
+    description: '记录分析过程中学到的经验。使用结构化格式（一句话结论、技术细节、正确/错误示例、陷阱标记）',
     schema: z.object({
       skill: z.string().describe('目标 skill: static-analysis, dynamic-analysis, sandbox, env, js2python, crawler, captcha, anti-detect, report, general，或 new:<name> 创建新 skill'),
       title: z.string().describe('经验标题，简短描述'),
       scenario: z.string().describe('具体场景/案例'),
-      insight: z.string().describe('一句话总结经验'),
-      isCore: z.boolean().default(false).describe('是否为核心经验'),
+      conclusion: z.string().describe('一句话核心结论（merge时必须提取到SKILL.md最前面）'),
+      technicalDetails: z.record(z.string(), z.string()).optional().describe('技术细节表格，如 {"参数类型": "int", "默认值": "0", "取值范围": "0或1"}'),
+      correctExample: z.string().optional().describe('正确代码示例'),
+      incorrectExample: z.string().optional().describe('错误代码示例（带陷阱标记）'),
+      why: z.string().optional().describe('解释根本原因'),
+      extensions: z.array(z.string()).optional().describe('类似场景列表（举一反三）'),
+      isCore: z.boolean().default(false).describe('是否为核心经验（已验证的高价值经验）'),
     }),
   }
 );
