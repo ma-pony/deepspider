@@ -134,7 +134,8 @@
       "WebFetch(domain:trilogyai.substack.com)",
       "WebFetch(domain:www.moely.ai)",
       "WebFetch(domain:www.pingcap.com)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(npm version:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

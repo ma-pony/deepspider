@@ -1,5 +1,5 @@
 ---
-total: 1
+total: 3
 last_merged: 2026-03-03
 ---
 
@@ -35,6 +35,63 @@ const publicKey = key.substring(0, 64); // 缺少04前缀和y坐标
 ```
 
 **为什么**: SM2算法使用非压缩格式的公钥表示，04表示非压缩点，后面跟着x和y坐标
+
+### [2026-03-03] 国密SM2算法逆向分析
+
+**一句话结论**: 当遇到国密SM2加密时，可以使用sm-crypto库进行还原，公钥通常以04开头(非压缩格式)
+
+**场景**: 安徽省信用信息公共服务平台使用SM2国密算法进行请求签名加密
+
+**技术细节**:
+| 项目 | 值/说明 |
+|------|---------|
+| 算法类型 | SM2国密加密 |
+| 加密格式 | |sha1_hash|activeTitle|timestamp| |
+| 公钥格式 | 04 + 128位十六进制字符串 |
+| 依赖库 | sm-crypto |
+| 哈希算法 | SHA1 |
+
+**正确做法**:
+```python
+const smCrypto = require('sm-crypto');
+const publicKey = '04' + '3e02a48...';
+const encrypted = smCrypto.sm2.doEncrypt(data, publicKey, 1);
+```
+
+**为什么**: 国密算法是中国标准，使用专门的sm-crypto库比通用加密库更可靠
+
+**举一反三**:
+- 国密SM3/SM4算法
+- SM2签名验证
+- CryptoJS与sm-crypto对比
+
+### [2026-03-03] 安徽省信用信息公示平台SM2 Sign分析
+
+**一句话结论**: 列表页和详情页的sign生成逻辑不同：列表页使用浏览器指纹SHA1+Base64+SM2加密；详情页使用serverId+columnId拼接后SHA1+Base64+SM2加密。两者使用相同的SM2公钥和C1C3C2模式。
+
+**场景**: 分析credit.ah.gov.cn网站的sign参数加密，发现列表页和详情页使用不同的加密逻辑
+
+**技术细节**:
+| 项目 | 值/说明 |
+|------|---------|
+| sign前缀 | 04 |
+| sign长度 | 306字符 |
+| 公钥 | 04e7780d97a923e7fa1e2d8c4f1f0c54006aabca7f95b6aaa339ab03c6130edde50bf676ce8781f3f82fa8a5b85385b0bb28e381dda21e7fd4cb17d6d910e8d389 |
+| 加密算法 | SM2 C1C3C2 |
+| 哈希算法 | SHA1 |
+| 编码方式 | Base64 |
+
+**正确做法**:
+```python
+详情页：data = serverId + columnId → SHA1 → Base64 → SM2加密
+列表页：data = SHA1(fingerprint) → Base64 → SM2加密
+```
+
+**为什么**: 网站不同接口可能使用不同的加密数据源，需要分别分析每个接口的sign生成逻辑，不能假设所有接口使用相同的算法
+
+**举一反三**:
+- 其他政府网站可能也有类似的区分
+- SM2加密在政务系统中广泛使用
 
 ## 近期发现
 
