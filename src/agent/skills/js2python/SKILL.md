@@ -25,6 +25,46 @@ description: |
 
 **CFB 模式 segment_size：** CryptoJS AES-CFB 默认 CFB128，PyCryptodome 默认 CFB8。必须指定 `segment_size=128`。
 
+## 国密 SM2 转换
+
+### 模式对齐（C1C2C3 vs C1C3C2）
+JS 的 sm-crypto 与 Python 的 gmssl 默认模式相反：
+
+| 库 | 默认值 | 说明 |
+|----|--------|------|
+| sm-crypto (JS) | mode=1 | C1C3C2 模式 |
+| gmssl (Python) | mode=0 / mode=True | C1C2C3 模式 |
+
+**正确转换**：
+```python
+from gmssl import sm2
+
+# JS: sm2.doEncrypt(plain, pubKey, 1)  # mode=1, C1C3C2
+# Python 需要设置 mode=False 才能兼容
+sm2_crypt = sm2.CryptSM2(public_key=pub_key, private_key="", mode=False)
+cipher = sm2_crypt.encrypt(plain_bytes)
+```
+
+### 明文编码差异
+**陷阱**：sm-crypto 的 `doEncrypt` 接收 **hex 字符串**，Python gmssl 接收 **bytes**
+
+```python
+# JS: sm2.doEncrypt(sha1Hex, pubKey, 1)
+# sha1Hex 是 hex 字符串如 "a1b2c3..."
+
+# Python 错误做法
+plain_bytes = bytes.fromhex(sha1_hex)  # ❌
+
+# Python 正确做法
+plain_bytes = sha1_hex.encode()  # ✅ 直接编码字符串
+```
+
+### SM2 加密随机性
+SM2 加密结果每次不同（内置随机数），这是正常现象。验证时应：
+1. 解密验证是否能还原原文
+2. 对比密文长度和格式（04 开头 hex）
+3. 多次执行确认稳定性
+
 ## 降级策略
 
 纯 Python 失败 3 次 → 改用 execjs 直接执行 JS。

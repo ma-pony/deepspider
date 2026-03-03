@@ -55,3 +55,36 @@ description: |
 - 加密结果：如果有 IV/随机数，固定后再比较
 - 时间戳相关：Hook Date.now() 返回固定值
 - 多次执行：确认结果稳定性（排除随机因素）
+
+## Python 加密代码验证
+
+### JS-to-Python 交叉验证流程
+当把 JS 加密转换为 Python 后，验证正确性：
+
+```python
+# 1. 分析算法参数
+# - 密钥长度、IV、模式、填充方式
+
+# 2. 交叉验证（推荐 Web Crypto API 或 NodeJS）
+# 用原始 JS 生成测试用例，对比 Python 输出
+
+# 3. 边界测试
+ test_cases = [
+    "",                    # 空字符串
+    "abc",                 # 普通 ASCII
+    "中文测试",             # 中文
+    "!@#$%^&*()",         # 特殊字符
+    "a" * 1000,           # 长文本
+]
+```
+
+### AES-CFB 验证要点
+```python
+from Crypto.Cipher import AES
+import base64
+
+# 与 Web Crypto API 对比时确认：
+# - segment_size=128（不是 8）
+# - CFB 模式不需要填充
+# - 密钥和 IV 截取 16 字节
+```
