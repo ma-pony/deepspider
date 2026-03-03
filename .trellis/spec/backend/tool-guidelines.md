@@ -143,7 +143,37 @@ return result;
 return JSON.stringify(result, null, 2);
 ```
 
-### 4. 文件路径类工具未清理用户输入
+### 4. 工具存在 ≠ Agent 可用
+
+```javascript
+// ❌ 错误：工具存在但未注册到 Agent
+// src/agent/tools/python.js 定义了 run_python_code
+export const executePythonCode = tool(...);
+
+// 但 index.js 未导出到 coreTools
+export const coreTools = [
+  ...nodejsTools,  // 只有 JS 执行
+  // executePythonCode 缺失！
+];
+
+// → Agent 会说"无法直接运行Python"，虽然工具代码存在
+
+// ✅ 正确：确保工具注册到目标 Agent
+export const coreTools = [
+  ...nodejsTools,
+  executePythonCode,  // 添加 Python 执行能力
+];
+```
+
+**诊断信号**:
+- Agent 说"由于无法做 X，用 Y 模拟..."但 Y 不是最优方案
+- Agent 声称缺少某个能力，但代码中工具定义存在
+
+**原因**: 工具定义和工具注册是两回事。LLM 只能看到传入 `tools` 数组的工具，与代码文件是否存在无关。
+
+**示例**: `src/agent/tools/index.js` 中的 `coreTools` vs `allTools` 区分
+
+---
 
 ```javascript
 // ❌ 危险：key 直接拼接路径，存在路径穿越

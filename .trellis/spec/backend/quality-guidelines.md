@@ -496,6 +496,8 @@ class Crawler:
 - [ ] Prompt 中的硬约束有对应的 middleware 机制兜底
 - [ ] 子代理 prompt 包含能力边界声明（明确不能做什么）
 - [ ] Skill 文件只包含领域知识，不包含行为指令
+- [ ] 新增工具时确认已注册到目标 Agent 的 tools 数组
+- [ ] 流式事件处理覆盖多种 chunk 格式（string/array/object）
 
 ---
 
@@ -529,7 +531,42 @@ function createStage(name) {
 stages.push(createStage('list'));
 ```
 
-### 3. 空值检查
+### 3. 流式事件只处理单一 chunk 格式
+
+```javascript
+// ❌ 禁止：只处理 string 格式的 chunk
+let chunk = data?.chunk?.content;
+if (chunk && typeof chunk === 'string') {
+  process.stdout.write(chunk);
+}
+
+// ✅ 处理多种 chunk 格式（LLM 可能返回不同格式）
+let chunk = data?.chunk?.content;
+let textChunk = '';
+if (typeof chunk === 'string') {
+  textChunk = chunk;
+} else if (Array.isArray(chunk)) {
+  // Anthropic 可能返回 array format: [{ type: 'text', text: '...' }]
+  textChunk = chunk.filter(c => c.type === 'text').map(c => c.text).join('');
+} else if (chunk?.text) {
+  // 对象格式: { text: '...' }
+  textChunk = chunk.text;
+}
+if (textChunk) {
+  process.stdout.write(textChunk);
+}
+```
+
+**原因**: LLM API 的流式响应格式可能变化：
+- 字符串格式: `"Hello"`
+- 数组格式: `[{ type: 'text', text: 'Hello' }]`
+- 对象格式: `{ text: 'Hello' }`
+
+只处理单一格式会导致前端不显示 AI 响应。
+
+**示例**: `src/agent/core/StreamHandler.js` 的 `_handleStreamEvent` 方法
+
+### 4. 重复代码提取为方法
 
 ```javascript
 // ❌ 禁止：假设对象存在

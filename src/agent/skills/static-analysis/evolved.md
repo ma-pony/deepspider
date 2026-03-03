@@ -1,5 +1,5 @@
 ---
-total: 3
+total: 4
 last_merged: 2026-03-03
 ---
 
@@ -92,6 +92,41 @@ const encrypted = smCrypto.sm2.doEncrypt(data, publicKey, 1);
 **举一反三**:
 - 其他政府网站可能也有类似的区分
 - SM2加密在政务系统中广泛使用
+
+### [2026-03-03] SM2国密算法Sign生成分析
+
+**一句话结论**: 网站使用SM2 C1C3C2模式加密JSON格式的明文生成sign参数，公钥硬编码在JS文件中
+
+**场景**: 安徽信用信息公示平台(credit.ah.gov.cn)的sign参数使用SM2国密算法生成
+
+**技术细节**:
+| 项目 | 值/说明 |
+|------|---------|
+| 算法 | SM2国密算法 |
+| 模式 | C1C3C2 |
+| 公钥位置 | 11bb74dd30984f2e9f22ec19f128ffbe.js |
+| 明文格式 | JSON: {queryId, activeTitle} |
+| sign长度 | 298-306位 |
+| C1长度 | 130字符(65字节) |
+| C3长度 | 64字符(32字节) |
+| C2长度 | 104-112字符(52-56字节) |
+
+**正确做法**:
+```python
+const sm2 = require('sm-crypto').sm2;\nconst PUBLIC_KEY = '0443e02a48ffb79f98e5bf5872e1e052f80d3300afe1688a565c0c860954a53e53f0b91869c3a2d8eb1d5cbc17f8ac6a423d78c32904443997b10afb8b527914e12d';\nconst sign = sm2.doEncrypt(JSON.stringify({queryId: '54474', activeTitle: '行政管理信息'}), PUBLIC_KEY, 1);
+```
+
+**错误陷阱** ⚠️:
+```python
+// 错误：直接使用activeTitle加密\nsm2.doEncrypt('行政管理信息', publicKey, 1);\n\n// 错误：使用错误的加密模式\nsm2.doEncrypt(plaintext, publicKey, 0); // 0=C1C2C3，实际使用1=C1C3C2
+```
+
+**为什么**: SM2是中国国家密码管理局发布的椭圆曲线公钥密码算法，相比RSA更安全且符合国内合规要求。网站将queryId和activeTitle组成JSON后加密，既保证了数据完整性又防止了篡改。
+
+**举一反三**:
+- 其他使用SM2加密的政府网站
+- 国密算法SM3/SM4的识别
+- C1C3C2 vs C1C2C3模式区分
 
 ## 近期发现
 
