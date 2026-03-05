@@ -135,7 +135,11 @@
       "WebFetch(domain:www.moely.ai)",
       "WebFetch(domain:www.pingcap.com)",
       "Bash(bash:*)",
-      "Bash(npm version:*)"
+      "Bash(npm version:*)",
+      "Bash(/tmp/features.txt:*)",
+      "Bash(/tmp/features_en.txt:*)",
+      "Bash(/tmp/cleanup_alltools.sh:*)",
+      "Bash(/tmp/update_coretools_comment.txt:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

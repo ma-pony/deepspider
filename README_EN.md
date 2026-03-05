@@ -11,13 +11,15 @@ An end-to-end AI Agent solution from JS reverse engineering to production-ready 
 
 ## Features
 
-- **Reverse Engineering**: Webpack unpacking, deobfuscation, encryption algorithm identification & tracing
+- **AI-Driven Architecture**: Directly understands JS source code without AST parsing or deobfuscation preprocessing
+- **HTTP Fast Request**: Lightweight HTTP mode with TLS fingerprint spoofing, no browser needed
+- **Reverse Engineering**: AI understands obfuscated code, identifies encryption algorithms, generates Python implementation
 - **Dynamic Debugging**: Real browser + CDP breakpoint debugging, Hook injection
-- **Code Conversion**: Automatic JS-to-Python encryption logic translation
 - **CAPTCHA Handling**: Slider, click-based, and image CAPTCHAs
 - **Anti-Detection**: Fingerprint spoofing, proxy rotation, risk control evasion
-- **Crawler Orchestration**: Intelligent scheduling, outputs runnable Python crawlers
+- **Crawler Orchestration**: AI generates complete runnable Python crawler projects
 - **Interactive Panel**: Built-in browser analysis panel with element selection and chat
+- **Real-time Progress**: Streaming output shows tool calls and analysis progress
 
 ## Quick Start
 
@@ -85,6 +87,9 @@ export DEEPSPIDER_MODEL=claude-opus-4-6
 # Start Agent - specify target website
 deepspider https://example.com
 
+# Fast HTTP request (lightweight, no browser needed)
+deepspider fetch https://example.com
+
 # Start Agent - persist browser data (one-time)
 deepspider --persist https://example.com
 
@@ -147,30 +152,37 @@ pnpm test
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   DeepSpider                        │
-│           (Crawler Orchestration - Smart Routing)   │
+│         (Main Agent - AI-Driven Smart Routing)      │
 └──────────────────────┬──────────────────────────────┘
                        │ On-demand invocation
        ┌───────────────┼───────────────┐
        ▼               ▼               ▼
 ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
 │reverse-agent│ │captcha-agent│ │anti-detect  │
-│ Reverse Eng │ │ CAPTCHA     │ │ Anti-detect │
-└──────┬──────┘ └─────────────┘ └─────────────┘
+│ AI analyzes │ │ CAPTCHA     │ │ Anti-detect │
+│ & generates │ │             │ │             │
+└─────────────┘ └─────────────┘ └─────────────┘
+       │
        ▼
 ┌─────────────┐
-│js2python    │
-│ Code Convert│
+│crawler-agent│
+│ AI generates│
 └─────────────┘
 ```
 
-### Sub-Agent System
+### Sub-Agent System (v2.0 - AI-Driven)
 
 | Sub-Agent | Responsibility | Core Tools |
 |-----------|---------------|------------|
-| crawler | Crawler orchestration: integrate modules, generate complete scripts | file, store, crawler |
-| reverse | Full reverse engineering: deobfuscation, breakpoint debugging, Hook, sandbox, environment patching | tracing, deobfuscate, debug, capture, sandbox, env |
-| js2python | JS-to-Python: encryption code conversion & verification | python, analyzer |
+| crawler | AI generates complete crawler projects | ai, file, store |
+| reverse | AI understands JS source and generates Python | ai, tracing, debug, capture, python |
 | captcha | CAPTCHA handling: OCR, slider, click-based | captcha_ocr, captcha_slide |
+| anti-detect | Anti-detection: fingerprint, proxy pool | proxy, fingerprint |
+
+**Architecture Advantages**:
+- Old: 10+ steps (AST parsing → deobfuscation → extraction → conversion → generation)
+- New: 3 steps (get source → AI analysis → validation)
+- AI directly understands obfuscated code without preprocessing
 | anti-detect | Anti-detection: fingerprint management, proxy pool | proxy, fingerprint |
 
 ## Project Structure

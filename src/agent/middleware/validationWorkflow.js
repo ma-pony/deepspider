@@ -15,16 +15,16 @@ const validationStateSchema = z.object({
 });
 
 /**
- * 检测是否调用了 js2python 子代理（算法验证）
+ * 检测是否调用了 reverse-agent（算法验证）
  */
 function isAlgorithmVerification(state) {
-  // 检查最近的 tool_calls 是否包含 task 且 subagent_type 为 js2python
+  // 检查最近的 tool_calls 是否包含 task 且 subagent_type 为 reverse
   const messages = state.messages || [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.type === 'ai' && msg.tool_calls) {
       for (const call of msg.tool_calls) {
-        if (call.name === 'task' && call.args?.subagent_type === 'js2python') {
+        if (call.name === 'task' && call.args?.subagent_type === 'reverse') {
           return true;
         }
       }
@@ -128,9 +128,9 @@ export function createValidationWorkflowMiddleware() {
               name: 'artifact_save',
               content: JSON.stringify({
                 success: false,
-                error: '保存 Python 代码前必须先完成算法验证。请委托 js2python 子代理验证加密/解密逻辑。',
+                error: '保存 Python 代码前必须先完成算法验证。请委托 reverse-agent 分析加密逻辑并生成 Python 代码。',
                 requiredStep: '算法验证',
-                hint: '使用 task 工具，指定 subagent_type: "js2python"',
+                hint: '使用 task 工具，指定 subagent_type: "reverse"',
               }),
               tool_call_id: request.toolCall?.id || 'blocked',
             };
@@ -145,7 +145,7 @@ export function createValidationWorkflowMiddleware() {
         if (stage !== 'passed') {
           // 构造阻止消息
           const missing = [];
-          if (!state.algorithmVerified) missing.push('算法验证（委托 js2python）');
+          if (!state.algorithmVerified) missing.push('算法验证（委托 reverse-agent）');
           if (!state.endToEndVerified) missing.push('端到端验证（sandbox_execute）');
           if (!state.savedPythonCode) missing.push('保存 Python 代码');
 

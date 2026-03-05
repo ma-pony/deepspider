@@ -5,7 +5,7 @@
  */
 
 import 'dotenv/config';
-import { StateBackend, FilesystemBackend, createFilesystemMiddleware, createPatchToolCallsMiddleware } from 'deepagents';
+import { StateBackend, FilesystemBackend, createFilesystemMiddleware, createPatchToolCallsMiddleware, createSkillsMiddleware } from 'deepagents';
 import { createAgent, toolRetryMiddleware, summarizationMiddleware, anthropicPromptCachingMiddleware, todoListMiddleware, humanInTheLoopMiddleware } from 'langchain';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -13,6 +13,7 @@ import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { coreTools } from './tools/index.js';
 import { allSubagents } from './subagents/index.js';
 import { systemPrompt } from './prompts/system.js';
+import { SKILLS, skillsBackend } from './skills/config.js';
 import { createReportMiddleware } from './middleware/report.js';
 import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
@@ -106,6 +107,7 @@ export function createDeepSpiderAgent(options = {}) {
     onReportReady = null,  // 报告就绪回调
     onFileSaved = null,    // 文件保存通知回调
     checkpointer,
+    callbacks = [],        // 流式输出回调
   } = options;
 
   // 创建 LLM 模型实例（加 timeout 防止 API 无响应时 streamEvents 永久挂起）
@@ -148,11 +150,16 @@ export function createDeepSpiderAgent(options = {}) {
     name: 'deepspider',
     model: llm,
     tools: coreTools,
+    callbacks,
     systemPrompt: `${systemPrompt}\n\n${BASE_PROMPT}`,
     middleware: [
       // === 框架内置 middleware ===
       todoListMiddleware(),
       createFilesystemMiddleware({ backend }),
+      createSkillsMiddleware({
+        backend: skillsBackend,
+        skills: [SKILLS.general, SKILLS.report],
+      }),
       createCustomSubAgentMiddleware({
         defaultModel: llm,
         defaultTools: coreTools,

@@ -22,7 +22,7 @@ function getSkillPath(skillName) {
     'dynamic-analysis': SKILLS.dynamic,
     'sandbox': SKILLS.sandbox,
     'env': SKILLS.env,
-    'js2python': SKILLS.js2python,
+    'js2python': SKILLS.js2python, // 已合并到 reverse-agent，保留作为经验参考
     'crawler': SKILLS.crawler,
     'captcha': SKILLS.captcha,
     'anti-detect': SKILLS.antiDetect,
@@ -87,7 +87,7 @@ export const evolveSkill = tool(
     if (!skillInfo) {
       return JSON.stringify({
         success: false,
-        error: `未知的 skill: ${skill}。可用: static-analysis, dynamic-analysis, sandbox, env, js2python, crawler, captcha, anti-detect, report, general。或使用 new:<name> 创建新 skill。`
+        error: `未知的 skill: ${skill}。可用: static-analysis, dynamic-analysis, sandbox, env, js2python (已合并到 reverse), crawler, captcha, anti-detect, report, general。或使用 new:<name> 创建新 skill。`
       });
     }
 
@@ -189,11 +189,11 @@ export const evolveSkill = tool(
     name: 'evolve_skill',
     description: '记录分析过程中学到的经验。使用结构化格式（一句话结论、技术细节、正确/错误示例、陷阱标记）',
     schema: z.object({
-      skill: z.string().describe('目标 skill: static-analysis, dynamic-analysis, sandbox, env, js2python, crawler, captcha, anti-detect, report, general，或 new:<name> 创建新 skill'),
+      skill: z.string().describe('目标 skill: static-analysis, dynamic-analysis, sandbox, env, js2python (已合并到 reverse), crawler, captcha, anti-detect, report, general，或 new:<name> 创建新 skill'),
       title: z.string().describe('经验标题，简短描述'),
       scenario: z.string().describe('具体场景/案例'),
       conclusion: z.string().describe('一句话核心结论（merge时必须提取到SKILL.md最前面）'),
-      technicalDetails: z.record(z.string(), z.string()).optional().describe('技术细节表格，如 {"参数类型": "int", "默认值": "0", "取值范围": "0或1"}'),
+      technicalDetails: z.object({}).passthrough().optional().describe('技术细节表格，如 {"参数类型": "int", "默认值": "0", "取值范围": "0或1"}'),
       correctExample: z.string().optional().describe('正确代码示例'),
       incorrectExample: z.string().optional().describe('错误代码示例（带陷阱标记）'),
       why: z.string().optional().describe('解释根本原因'),

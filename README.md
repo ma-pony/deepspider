@@ -11,14 +11,15 @@
 
 ## 特性
 
-- **逆向分析**: Webpack 解包、反混淆、加密算法识别与定位
+- **AI 驱动架构**: 直接理解 JS 源码，无需 AST 解析和反混淆预处理
+- **HTTP 快速请求**: 轻量级 HTTP 模式，TLS 指纹伪装，无需启动浏览器
+- **逆向分析**: AI 理解混淆代码，识别加密算法，生成 Python 实现
 - **动态调试**: 真实浏览器 + CDP 断点调试、Hook 注入
-- **代码转换**: JS 加密逻辑自动转 Python
 - **验证码处理**: 滑块、点选、图片验证码
 - **反检测**: 指纹伪装、代理轮换、风控规避
-- **爬虫编排**: 智能调度，输出可运行的 Python 爬虫
+- **爬虫编排**: AI 生成完整可运行的 Python 爬虫项目
 - **交互面板**: 浏览器内置分析面板，支持元素选择、对话交互
-
+- **实时进度**: 流式输出显示工具调用和分析进度
 ## 快速开始
 
 ### 安装
@@ -85,6 +86,9 @@ export DEEPSPIDER_MODEL=claude-opus-4-6
 # 启动 Agent - 指定目标网站
 deepspider https://example.com
 
+# 快速 HTTP 请求（轻量级，无需浏览器）
+deepspider fetch https://example.com
+
 # 启动 Agent - 持久化浏览器数据（一次性）
 deepspider --persist https://example.com
 
@@ -147,31 +151,37 @@ pnpm test
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   DeepSpider                        │
-│              (爬虫编排 - 智能调度)                   │
+│         (主 Agent - AI 驱动智能调度)                │
 └──────────────────────┬──────────────────────────────┘
                        │ 按需调用
        ┌───────────────┼───────────────┐
        ▼               ▼               ▼
 ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
 │reverse-agent│ │captcha-agent│ │anti-detect  │
-│ 逆向分析    │ │ 验证码处理  │ │ 反检测      │
-└──────┬──────┘ └─────────────┘ └─────────────┘
+│ AI 理解源码 │ │ 验证码处理  │ │ 反检测      │
+│ 生成 Python │ │             │ │             │
+└─────────────┘ └─────────────┘ └─────────────┘
+       │
        ▼
 ┌─────────────┐
-│js2python    │
-│ 代码转换    │
+│crawler-agent│
+│ AI 生成爬虫 │
 └─────────────┘
 ```
 
-### 子代理体系
+### 子代理体系（v2.0 - AI 驱动）
 
 | 子代理 | 职责 | 核心工具 |
 |--------|------|----------|
-| crawler | 爬虫编排：整合各模块、生成完整脚本 | file, store, crawler |
-| reverse | 逆向分析全流程：反混淆、断点调试、Hook、沙箱验证、补环境 | tracing, deobfuscate, debug, capture, sandbox, env |
-| js2python | JS转Python：加密代码转换、验证 | python, analyzer |
+| crawler | AI 生成完整爬虫项目 | ai, file, store |
+| reverse | AI 理解 JS 源码并生成 Python | ai, tracing, debug, capture, python |
 | captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
 | anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |
+
+**架构优势**：
+- 旧版：10+ 步骤（AST 解析 → 反混淆 → 提取 → 转换 → 生成）
+- 新版：3 步骤（获取源码 → AI 分析 → 验证）
+- AI 直接理解混淆代码，无需预处理
 
 ## 项目结构
 

@@ -11,12 +11,14 @@ deepspider v${getVersion()} - 智能爬虫工程平台
 用法:
   deepspider                        启动交互式 Agent
   deepspider <url>                  打开目标网站并启动 Agent
+  deepspider fetch <url>            快速 HTTP 请求（轻量级）
   deepspider config                 管理配置
   deepspider update                 检查更新
 
 选项:
   -v, --version                     显示版本号
   -h, --help                        显示帮助信息
+  --http                            强制使用 HTTP 模式（fetch 命令）
   --debug                           启用调试模式
 
 配置命令:
@@ -28,6 +30,7 @@ deepspider v${getVersion()} - 智能爬虫工程平台
 
 示例:
   deepspider https://example.com    分析目标网站
+  deepspider fetch https://httpbin.org/get
   deepspider config set apiKey sk-xxx
   deepspider config set model gpt-4o
 `.trim());

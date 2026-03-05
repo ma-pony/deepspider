@@ -7,7 +7,6 @@ import { createSubagent } from './factory.js';
 
 import { antiDetectTools } from '../tools/index.js';
 import { browserTools } from '../tools/browser.js';
-import { profileTools } from '../tools/profile.js';
 import { fileTools } from '../tools/file.js';
 
 export const antiDetectSubagent = createSubagent({
@@ -49,7 +48,6 @@ export const antiDetectSubagent = createSubagent({
   tools: [
     ...antiDetectTools,
     ...browserTools,
-    ...profileTools,
     ...fileTools,
   ],
   skills: ['antiDetect'],

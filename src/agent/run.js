@@ -10,6 +10,7 @@ import readline from 'readline';
 import { readFileSync } from 'fs';
 import { marked } from 'marked';
 import { createDeepSpiderAgent } from './index.js';
+import { createStreamCallbacks } from './callbacks/stream.js';
 import { fullAnalysisPrompt, tracePrompt, decryptPrompt, extractPrompt } from './prompts/system.js';
 import { getBrowser } from '../browser/index.js';
 import { markHookInjected } from './tools/runtime.js';
@@ -290,7 +291,7 @@ async function init() {
     if (domain) createSession(threadId, domain, targetUrl);
   }
 
-  agent = createDeepSpiderAgent({ onReportReady, onFileSaved, checkpointer });
+  agent = createDeepSpiderAgent({ onReportReady, onFileSaved, checkpointer, callbacks: createStreamCallbacks() });
 
   currentThreadId = threadId;
   agentConfig = {

@@ -9,6 +9,12 @@
 
 ## 功能
 
+### HTTP 快速请求
+- 轻量级 HTTP 模式（cycletls）
+- TLS 指纹伪装（Chrome/Firefox/Safari）
+- 自动反爬检测与降级
+- CLI 命令：deepspider fetch <url>
+
 ### 逆向分析
 - 真实浏览器动态分析 (Patchright + CDP)
 - Webpack/Browserify 解包 (webcrack)
@@ -96,17 +102,21 @@ deepspider/
 
 ## 架构
 
-### 子代理体系
+### 子代理体系（v2.0 - AI 驱动）
 
 | 子代理 | 职责 | 核心工具 |
 |--------|------|----------|
-| crawler | 爬虫编排：整合各模块、生成完整脚本 | file, store, crawler |
-| reverse | 逆向分析全流程：反混淆、断点调试、Hook、沙箱验证、补环境 | tracing, deobfuscate, debug, capture, sandbox, env |
-| js2python | JS转Python：加密代码转换、验证 | python, analyzer |
+| crawler | 爬虫编排：AI 生成完整爬虫脚本 | ai, file, store, crawler |
+| reverse | 逆向分析：AI 理解 JS 源码并生成 Python 代码 | ai, tracing, debug, capture, sandbox, python |
 | captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
 | anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |
 
-### 智能调度流程
+**架构变化**：
+- ❌ 删除 js2python 子代理（功能合并到 reverse）
+- ✅ reverse 现在直接使用 AI 工具理解源码并生成 Python
+- ✅ crawler 使用 AI 工具生成完整爬虫项目
+
+### 智能调度流程（v2.0 - AI 驱动）
 
 根据目标网站复杂度，按需调用子代理：
 
@@ -114,24 +124,28 @@ deepspider/
 用户：爬取目标网站
          ↓
 ┌─────────────────────────────────────┐
-│  crawler-agent 分析目标             │
+│  主 Agent 分析目标                  │
 │  判断网站复杂度，规划流程           │
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
 │  按需调用子代理                     │
 │                                     │
-│  Level 1 简单: reverse → js2python  │
+│  Level 1 简单: reverse (AI 分析)    │
 │  Level 2 中等: + captcha            │
-│  Level 3 复杂: + anti-detect + e2e  │
+│  Level 3 复杂: + anti-detect        │
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
-│  输出完整爬虫脚本                   │
+│  crawler 生成完整爬虫脚本           │
 │  简单: 单文件脚本                   │
 │  复杂: 完整项目结构                 │
 └─────────────────────────────────────┘
 ```
+
+**流程简化**：
+- 旧版：reverse → js2python → crawler（3步）
+- 新版：reverse → crawler（2步，AI 直接生成 Python）
 
 ### 浏览器交互流程
 
@@ -342,6 +356,7 @@ deepspider config set <key> <val> # 设置配置项
 deepspider config reset           # 重置配置文件
 deepspider config path            # 显示配置文件路径
 deepspider update                 # 检查更新
+deepspider fetch <url>            # 快速 HTTP 请求（轻量级）
 
 # Agent 模式（推荐）- 指定目标网站
 pnpm run agent https://example.com
