@@ -3,64 +3,39 @@
 [![npm version](https://img.shields.io/npm/v/deepspider.svg)](https://www.npmjs.com/package/deepspider)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> 智能爬虫工程平台 - 基于 DeepAgents + Patchright 的 AI 爬虫 Agent
+> AI 原生的智能反爬平台 - 把 3 天的逆向分析工作压缩到 10 分钟
 
 [English](README_EN.md)
 
-从 JS 逆向到完整爬虫脚本的一站式 AI Agent 解决方案。
+## 核心特性
 
-## 特性
+**AI First 架构** - AI 为核心，工具为辅助
+- 直接理解混淆代码（无需反混淆预处理）
+- 识别加密算法（无需 AST 解析）
+- 生成可运行代码（Python/JS）
+- 智能路由（规则→本地→云端，成本优化）
 
-- **AI 驱动架构**: 直接理解 JS 源码，无需 AST 解析和反混淆预处理
-- **HTTP 快速请求**: 轻量级 HTTP 模式，TLS 指纹伪装，无需启动浏览器
-- **逆向分析**: AI 理解混淆代码，识别加密算法，生成 Python 实现
-- **动态调试**: 真实浏览器 + CDP 断点调试、Hook 注入
-- **验证码处理**: 滑块、点选、图片验证码
-- **反检测**: 指纹伪装、代理轮换、风控规避
-- **爬虫编排**: AI 生成完整可运行的 Python 爬虫项目
-- **交互面板**: 浏览器内置分析面板，支持元素选择、对话交互
-- **实时进度**: 流式输出显示工具调用和分析进度
+**完整反爬能力**
+- 逆向分析：AI 理解 JS 源码，生成 Python 实现
+- 验证码处理：OCR、滑块、点选
+- 反检测：指纹伪装、代理轮换
+- 爬虫编排：AI 生成完整项目
+
+**真实浏览器 + CDP**
+- Patchright 反检测浏览器
+- CDP 深度集成（Hook、断点、拦截）
+- 浏览器内置分析面板
+- 实时数据采集（零 API 成本）
+
 ## 快速开始
 
 ### 安装
 
 ```bash
-# 方式一：npm 全局安装（推荐）
 npm install -g deepspider
-
-# 方式二：pnpm 全局安装
-pnpm approve-builds -g deepspider isolated-vm # 首次需要批准构建脚本
-pnpm install -g deepspider
-
-# 方式三：克隆仓库
-git clone https://github.com/ma-pony/deepspider.git
-cd deepspider
-pnpm install
-cp .env.example .env  # 配置环境变量
-pnpm run setup:crypto  # 安装 Python 加密库（可选）
 ```
 
-安装完成后，首次运行会提示配置 LLM API。
-
-> **注意**: 项目依赖 `isolated-vm` 原生模块，需要 C++ 编译环境：
-> - macOS: `xcode-select --install`
-> - Ubuntu: `sudo apt install build-essential`
-> - Windows: 安装 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-
 ### 配置
-
-DeepSpider 支持兼容 Anthropic 格式的 API 供应商。推荐使用 Claude API 以获得最佳效果。
-
-| 配置键 | 环境变量 | 说明 |
-|--------|----------|------|
-| `apiKey` | `DEEPSPIDER_API_KEY` | API 密钥 |
-| `baseUrl` | `DEEPSPIDER_BASE_URL` | API 地址 |
-| `model` | `DEEPSPIDER_MODEL` | 模型名称 |
-| `persistBrowserData` | `DEEPSPIDER_PERSIST_BROWSER` | 持久化浏览器数据（保持登录态） |
-
-优先级：环境变量 > 配置文件 (`~/.deepspider/config/settings.json`) > 默认值
-
-**方式一：CLI 命令（推荐）**
 
 ```bash
 deepspider config set apiKey sk-ant-api03-xxx
@@ -68,167 +43,59 @@ deepspider config set baseUrl https://api.anthropic.com
 deepspider config set model claude-opus-4-6
 ```
 
-**方式二：环境变量**
-
-```bash
-export DEEPSPIDER_API_KEY=sk-ant-api03-xxx
-export DEEPSPIDER_BASE_URL=https://api.anthropic.com
-export DEEPSPIDER_MODEL=claude-opus-4-6
-```
-
-> **提示**：也支持其他兼容 Anthropic 格式的 API 供应商。
-
 ### 使用
 
-#### 全局安装（npm/pnpm install -g）
-
 ```bash
-# 启动 Agent - 指定目标网站
+# 分析目标网站
 deepspider https://example.com
 
-# 快速 HTTP 请求（轻量级，无需浏览器）
-deepspider fetch https://example.com
-
-# 启动 Agent - 持久化浏览器数据（一次性）
-deepspider --persist https://example.com
-
-# 启动 Agent - 纯交互模式
-deepspider
-
-# 查看帮助
-deepspider --help
-
-# 管理配置
-deepspider config list            # 查看所有配置
-deepspider config set apiKey sk-xxx
-deepspider config set model gpt-4o
-
-# 持久化浏览器数据（需要登录的网站，下次启动自动恢复登录态）
-deepspider config set persistBrowserData true
-
-# 检查更新
-deepspider update
+# 快速 HTTP 请求（轻量级）
+deepspider fetch https://api.example.com
 ```
 
-#### 克隆仓库
-
-```bash
-# 配置（二选一）
-cp .env.example .env  # 编辑 .env 文件
-# 或使用 CLI 命令
-node bin/cli.js config set apiKey sk-xxx
-node bin/cli.js config set baseUrl https://api.openai.com/v1
-node bin/cli.js config set model gpt-4o
-
-# 安装 Python 依赖（可选，用于执行生成的 Python 代码）
-pnpm run setup:crypto
-
-# 启动 Agent
-pnpm run agent https://example.com
-
-# MCP 服务（供 Claude Code 等调用）
-pnpm run mcp
-
-# 运行测试
-pnpm test
-```
-
-### 使用流程
+## 使用流程
 
 1. **启动**: `deepspider https://target-site.com`
-2. **等待**: 浏览器打开，系统自动记录数据（不消耗 API）
-3. **操作**: 在网站上登录、翻页、触发目标请求
-4. **选择**: 点击面板的选择按钮 ⦿，进入选择模式
-5. **分析**: 点击目标数据元素，选择快捷操作：
-   - **追踪数据来源** — 定位选中数据的 API 接口
-   - **分析加密参数** — 识别并逆向加密参数
-   - **完整分析并生成爬虫** — 端到端：逆向、验证、生成代码
-   - **提取页面结构** — 分析 DOM 结构，生成选择器和字段配置
-6. **对话**: 在面板或 CLI 继续提问，深入分析
+2. **等待**: 浏览器打开，自动记录数据
+3. **操作**: 登录、翻页、触发目标请求
+4. **选择**: 点击面板 ⦿ 选择目标数据
+5. **分析**: 选择操作（追踪来源/分析加密/生成爬虫）
+6. **对话**: 继续提问，深入分析
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   DeepSpider                        │
-│         (主 Agent - AI 驱动智能调度)                │
-└──────────────────────┬──────────────────────────────┘
-                       │ 按需调用
-       ┌───────────────┼───────────────┐
-       ▼               ▼               ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│reverse-agent│ │captcha-agent│ │anti-detect  │
-│ AI 理解源码 │ │ 验证码处理  │ │ 反检测      │
-│ 生成 Python │ │             │ │             │
-└─────────────┘ └─────────────┘ └─────────────┘
-       │
-       ▼
-┌─────────────┐
-│crawler-agent│
-│ AI 生成爬虫 │
-└─────────────┘
+AI 原生架构（v2.0）
+
+主 Agent（AI 驱动）
+├── AI 理解层（核心 80%）
+│   ├── 直接理解混淆代码
+│   ├── 识别加密算法
+│   └── 生成 Python 代码
+├── 工具验证层（辅助 15%）
+│   ├── 数据采集（浏览器+CDP）
+│   ├── 动态验证（Hook+调试）
+│   └── 代码执行（沙箱验证）
+└── 能力扩展层（可选 5%）
+    ├── 验证码处理
+    ├── 反检测
+    └── 爬虫编排
 ```
 
-### 子代理体系（v2.0 - AI 驱动）
+## 成本优化
 
-| 子代理 | 职责 | 核心工具 |
-|--------|------|----------|
-| crawler | AI 生成完整爬虫项目 | ai, file, store |
-| reverse | AI 理解 JS 源码并生成 Python | ai, tracing, debug, capture, python |
-| captcha | 验证码处理：OCR、滑块、点选 | captcha_ocr, captcha_slide |
-| anti-detect | 反检测：指纹管理、代理池 | proxy, fingerprint |
+智能路由（4层）：
+- Level 0：规则引擎（免费，<100ms）- 50%
+- Level 1：本地模型（$0.01，<2s）- 30%
+- Level 2：云端辅助（$0.5，<10s）- 15%
+- Level 3：云端自主（$2，<60s）- 5%
 
-**架构优势**：
-- 旧版：10+ 步骤（AST 解析 → 反混淆 → 提取 → 转换 → 生成）
-- 新版：3 步骤（获取源码 → AI 分析 → 验证）
-- AI 直接理解混淆代码，无需预处理
-
-## 项目结构
-
-```
-deepspider/
-├── bin/cli.js               # CLI 入口（命令路由）
-├── src/
-│   ├── agent/               # DeepAgent 系统
-│   │   ├── tools/           # 工具集（90+）
-│   │   ├── subagents/       # 子代理
-│   │   ├── skills/          # 领域技能
-│   │   └── prompts/         # 系统提示
-│   ├── cli/                 # CLI 命令
-│   │   ├── config.js        # 配置 re-export
-│   │   └── commands/        # 子命令（version/help/config/update）
-│   ├── config/              # 核心配置
-│   │   ├── paths.js         # 路径常量
-│   │   └── settings.js      # 配置读写（环境变量/文件/默认值）
-│   ├── browser/             # 浏览器运行时
-│   │   ├── client.js        # Patchright 客户端
-│   │   ├── cdp.js           # CDP 会话管理
-│   │   ├── defaultHooks.js  # 默认注入的 Hook
-│   │   ├── interceptors/    # CDP 拦截器
-│   │   └── ui/              # 浏览器内 UI 面板
-│   ├── analyzer/            # 静态分析器
-│   ├── env/                 # 环境补丁模块
-│   ├── store/               # 数据存储
-│   └── mcp/                 # MCP 服务
-└── test/                    # 测试
-```
-
-## 核心技术
-
-- **DeepAgents**: 多代理协作框架
-- **Patchright**: 反检测浏览器自动化
-- **CDP**: Chrome DevTools Protocol 深度集成
-- **webcrack**: Webpack/Browserify 解包
-- **isolated-vm**: 安全沙箱执行
+平均成本：**< $0.3/次**
 
 ## 文档
 
 - [开发使用指南](docs/GUIDE.md)
 - [调试指南](docs/DEBUG.md)
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
 
 ## License
 
