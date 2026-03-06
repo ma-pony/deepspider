@@ -17,6 +17,7 @@ import { SKILLS, skillsBackend } from './skills/config.js';
 import { createReportMiddleware } from './middleware/report.js';
 import { createFilterToolsMiddleware } from './middleware/filterTools.js';
 import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
+import { createSubagentRecoveryMiddleware } from './middleware/subagentRecovery.js';
 import { createToolGuardMiddleware } from './middleware/toolGuard.js';
 import { createToolCallLimitMiddleware } from './subagents/factory.js';
 import { createValidationWorkflowMiddleware } from './middleware/validationWorkflow.js';
@@ -158,7 +159,7 @@ export function createDeepSpiderAgent(options = {}) {
       createFilesystemMiddleware({ backend }),
       createSkillsMiddleware({
         backend: skillsBackend,
-        skills: [SKILLS.general, SKILLS.report],
+        sources: [SKILLS.general, SKILLS.report],
       }),
       createCustomSubAgentMiddleware({
         defaultModel: llm,
@@ -168,6 +169,8 @@ export function createDeepSpiderAgent(options = {}) {
         generalPurposeAgent: false,
         defaultInterruptOn: interruptOn,
       }),
+      // === 子代理会话恢复 ===
+      createSubagentRecoveryMiddleware(),
       // === 预警 + 拦截（在 summarization 之前）===
       createMemoryFlushMiddleware(),
       createToolAvailabilityMiddleware(),

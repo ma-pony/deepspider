@@ -11,6 +11,7 @@ import { HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messag
 import { getCurrentTaskInput, Command } from '@langchain/langgraph';
 import { TASK_SYSTEM_PROMPT } from 'deepagents';
 import { z } from 'zod';
+import { sessionManager } from './subagentSessionManager.js';
 
 // 子代理 state 中需要排除的 key（与 deepagents 内部一致）
 const EXCLUDED_STATE_KEYS = [
@@ -37,11 +38,17 @@ function filterStateForSubagent(state) {
  */
 const TRUST_SIGNAL = `\n\n---\n⚠️ 子代理已完成任务。请直接使用子代理输出的文件和结论，不要重复执行 artifact_load / artifact_glob / ls 等文件读取操作来检查子代理已保存的文件。如果需要对生成的代码做端到端验证，那是你的职责，请正常执行。`;
 
-function returnCommandWithStateUpdate(result, toolCallId) {
+function returnCommandWithStateUpdate(result, toolCallId, threadId) {
   const stateUpdate = filterStateForSubagent(result);
   const messages = result.messages;
   const lastMessage = messages?.[messages.length - 1];
-  const content = (lastMessage?.content || 'Task completed') + TRUST_SIGNAL;
+  let content = (lastMessage?.content || 'Task completed') + TRUST_SIGNAL;
+
+  // 添加thread_id到返回内容，便于主Agent恢复会话
+  if (threadId) {
+    content += `\n\n[thread_id: ${threadId}]`;
+  }
+
   return new Command({
     update: {
       ...stateUpdate,
@@ -76,6 +83,9 @@ When using the Task tool, you must specify a subagent_type parameter to select w
 
 ## context 参数
 委托子代理时，使用 context 参数传递结构化上下文（key-value 对），如站点标识、请求 ID、目标参数名等。context 会注入到子代理的初始消息中，确保关键信息不丢失。
+
+## 会话恢复
+如果子代理任务超时或中断，可以使用返回的 thread_id 恢复会话：设置 resume=true 并传递相同的 thread_id。
   `.trim();
 }
 
@@ -140,7 +150,7 @@ function getSubagents(options) {
 }
 
 /**
- * 创建增强版 task tool：schema 增加 context 字段
+ * 创建增强版 task tool：schema 增加 context、thread_id、resume 字段
  */
 function createEnhancedTaskTool(options) {
   const { agents: subagentGraphs, descriptions: subagentDescriptions } = getSubagents(options);
@@ -148,15 +158,24 @@ function createEnhancedTaskTool(options) {
 
   return tool(
     async (input, config) => {
-      const { description, subagent_type, context } = input;
+      const { description, subagent_type, context, thread_id, resume } = input;
 
       if (!(subagent_type in subagentGraphs)) {
         const allowedTypes = Object.keys(subagentGraphs).map((k) => `\`${k}\``).join(', ');
         throw new Error(`Error: invoked agent of type ${subagent_type}, the only allowed types are ${allowedTypes}`);
       }
 
-      // 构造子代理的初始消息：description + context 块
+      // 生成或使用提供的thread_id
+      const threadId = thread_id || `${subagent_type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // 记录会话开始
+      sessionManager.startSession(threadId, subagent_type, description, context);
+
+      // 构造子代理的初始消息
       let content = description;
+      if (resume) {
+        content = `[恢复任务] ${description}`;
+      }
       if (context && Object.keys(context).length > 0) {
         content += `\n\n<context>\n${JSON.stringify(context)}\n</context>`;
       }
@@ -165,9 +184,29 @@ function createEnhancedTaskTool(options) {
       const subagentState = filterStateForSubagent(getCurrentTaskInput());
       subagentState.messages = [new HumanMessage({ content })];
 
-      const result = await subagent.invoke(subagentState, config);
-      if (!config.toolCall?.id) throw new Error('Tool call ID is required for subagent invocation');
-      return returnCommandWithStateUpdate(result, config.toolCall.id);
+      // 配置thread_id用于checkpoint
+      const subagentConfig = {
+        ...config,
+        configurable: {
+          ...config?.configurable,
+          thread_id: threadId,
+        }
+      };
+
+      try {
+        const result = await subagent.invoke(subagentState, subagentConfig);
+        if (!config.toolCall?.id) throw new Error('Tool call ID is required for subagent invocation');
+
+        // 标记会话完成
+        sessionManager.completeSession(threadId, result.messages?.[result.messages.length - 1]?.content);
+
+        // 返回结果时包含thread_id
+        return returnCommandWithStateUpdate(result, config.toolCall.id, threadId);
+      } catch (error) {
+        // 标记会话失败
+        sessionManager.failSession(threadId, error);
+        throw error;
+      }
     },
     {
       name: 'task',
@@ -175,10 +214,9 @@ function createEnhancedTaskTool(options) {
       schema: z.object({
         description: z.string().describe('The task to execute with the selected agent'),
         subagent_type: z.string().describe(`Name of the agent to use. Available: ${availableTypes}`),
-        // NOTE: 不用 z.record() 因为 Zod v4 toJSONSchema 会生成 propertyNames，
-        // 而 Anthropic API 不支持 propertyNames 关键字
-        // 改用 z.object({}) + additionalProperties 模式
         context: z.object({}).passthrough().optional().describe('Structured key-value context to pass to the subagent (e.g. site, requestId, targetParam)'),
+        thread_id: z.string().optional().describe('Thread ID for resuming a previous subagent session'),
+        resume: z.boolean().optional().describe('Set to true to resume a previous session using thread_id'),
       }),
     },
   );

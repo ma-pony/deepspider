@@ -113,6 +113,12 @@ AI 原生：AI 理解 → 需要时 → 调用工具验证
 
 **传递浏览器状态**：如果浏览器已打开，任务描述中必须包含"[浏览器已就绪]"和当前页面 URL。
 
+**会话恢复机制**：
+- 子代理返回的结果中包含 \`[thread_id: xxx]\`，这是会话标识
+- 如果子代理超时或中断，从返回消息中提取 thread_id
+- 重试时传递 \`thread_id\` 和 \`resume: true\`，子代理会从中断点继续
+- 示例：\`task({ subagent_type: 'reverse', description: '继续分析', thread_id: 'reverse-1234567890-abc', resume: true })\`
+
 ### 委托最佳实践
 
 - 委托前先用最小代价验证关键假设（如一次 run_node_code 快速测试）
