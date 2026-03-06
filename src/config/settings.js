@@ -17,10 +17,18 @@ export const DEFAULTS = {
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o',
   persistBrowserData: false,
+  aiProvider: 'anthropic',
+  aiModel: '',
+  aiFallbackProvider: '',
+  aiFallbackModel: '',
 };
 
 export const ENV_MAP = {
   apiKey: 'DEEPSPIDER_API_KEY',
+  aiProvider: 'DEEPSPIDER_AI_PROVIDER',
+  aiModel: 'DEEPSPIDER_AI_MODEL',
+  aiFallbackProvider: 'DEEPSPIDER_AI_FALLBACK_PROVIDER',
+  aiFallbackModel: 'DEEPSPIDER_AI_FALLBACK_MODEL',
   baseUrl: 'DEEPSPIDER_BASE_URL',
   model: 'DEEPSPIDER_MODEL',
   persistBrowserData: 'DEEPSPIDER_PERSIST_BROWSER',

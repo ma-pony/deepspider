@@ -139,7 +139,14 @@
       "Bash(/tmp/features.txt:*)",
       "Bash(/tmp/features_en.txt:*)",
       "Bash(/tmp/cleanup_alltools.sh:*)",
-      "Bash(/tmp/update_coretools_comment.txt:*)"
+      "Bash(/tmp/update_coretools_comment.txt:*)",
+      "Bash(docs/ROADMAP.md:*)",
+      "Bash(docs/IMPLEMENTATION.md:*)",
+      "Bash(.gitignore:*)",
+      "Bash(npx depcheck:*)",
+      "Bash(/tmp/ai_first_section.txt:*)",
+      "Bash(/tmp/ai_config_patch.js:*)",
+      "Bash(sed:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
