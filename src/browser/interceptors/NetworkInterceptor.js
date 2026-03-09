@@ -11,6 +11,7 @@ export class NetworkInterceptor {
     this.page = page;  // Playwright page 对象
     this.store = getDataStore();
     this.pendingRequests = new Map();
+    this.wsConnections = new Map();  // requestId -> ws url
   }
 
   /**
@@ -49,6 +50,31 @@ export class NetworkInterceptor {
     // 监听加载失败（清理 pendingRequests，防止内存泄漏）
     this.client.on('Network.loadingFailed', (params) => {
       this.pendingRequests.delete(params.requestId);
+    });
+
+    // WebSocket 连接跟踪
+    this.client.on('Network.webSocketCreated', (params) => {
+      this.wsConnections.set(params.requestId, params.url);
+    });
+
+    // WebSocket 连接关闭时清理
+    this.client.on('Network.webSocketClosed', (params) => {
+      this.wsConnections.delete(params.requestId);
+      // 清理节流记录
+      if (this._wsThrottles) {
+        this._wsThrottles.delete(`${params.requestId}_WS_RECV`);
+        this._wsThrottles.delete(`${params.requestId}_WS_SEND`);
+      }
+    });
+
+    // 接收到服务端帧
+    this.client.on('Network.webSocketFrameReceived', (params) => {
+      this.onWebSocketFrame(params, 'WS_RECV');
+    });
+
+    // 发送到服务端帧
+    this.client.on('Network.webSocketFrameSent', (params) => {
+      this.onWebSocketFrame(params, 'WS_SEND');
     });
 
     console.log('[NetworkInterceptor] 已启动');
@@ -159,6 +185,46 @@ export class NetworkInterceptor {
     }
 
     this.pendingRequests.delete(requestId);
+  }
+
+  /**
+   * 处理 WebSocket 帧（只保存文本帧，限制大小 50KB，带节流）
+   */
+  onWebSocketFrame(params, method) {
+    const { requestId, response, timestamp } = params;
+    const wsUrl = this.wsConnections.get(requestId);
+    if (!wsUrl) return;
+
+    // opcode 1 = 文本帧，其他为二进制/控制帧，跳过
+    if (response.opcode !== 1) return;
+
+    const payload = response.payloadData || '';
+
+    // 限制 50KB
+    const MAX_WS_SIZE = 50 * 1024;
+    if (payload.length > MAX_WS_SIZE) return;
+
+    // 节流：同一 WebSocket 连接每秒最多保存 2 帧，防止高频 WS 压垮存储
+    const throttleKey = `${requestId}_${method}`;
+    const now = Date.now();
+    const lastSave = this._wsThrottles?.get(throttleKey) || 0;
+    if (now - lastSave < 500) return;  // 500ms 间隔 = 每秒 2 帧
+    if (!this._wsThrottles) this._wsThrottles = new Map();
+    this._wsThrottles.set(throttleKey, now);
+
+    this.store.saveResponse({
+      url: wsUrl,
+      method,
+      status: 101,
+      requestHeaders: null,
+      requestBody: payload,  // 用 payload 参与 hash 计算，避免所有帧被去重为同一条
+      responseBody: payload,
+      timestamp: timestamp ? timestamp * 1000 : now,
+      pageUrl: this.getPageUrl(),
+      initiator: null,
+    }).catch(e => {
+      console.error('[NetworkInterceptor] WS 帧保存失败:', e.message);
+    });
   }
 
   /**

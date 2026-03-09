@@ -27,7 +27,7 @@ src/
 │   │   ├── index.js       # 模块导出
 │   │   ├── ErrorClassifier.js # 错误分类器
 │   │   └── SpiderError.js    # 结构化错误类型
-│   ├── tools/             # LangChain 工具集（90+）
+│   ├── tools/             # LangChain 工具集（42个核心工具）
 │   │   ├── index.js       # 工具导出汇总
 │   │   ├── analyzer.js    # AST 分析工具
 │   │   ├── deobfuscator.js # 反混淆工具
@@ -44,7 +44,7 @@ src/
 │   │   ├── dynamic-analysis/ # 动态分析经验
 │   │   ├── env/           # 补环境经验
 │   │   ├── sandbox/       # 沙箱执行经验
-│   │   └── js2python/     # JS转Python经验
+│   │   └── crawler/       # 爬虫编排经验
 │   ├── middleware/        # Agent 中间件
 │   └── prompts/           # 系统提示词
 ├── browser/               # 浏览器运行时

@@ -1,20 +1,21 @@
 /**
  * 理解加密逻辑工具
  */
-
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { analyzeEncryption } from '../../ai/encryption-analyzer.js';
 
 export const understandEncryption = tool(
   async ({ source, context = '' }) => {
+    const { hints } = await analyzeEncryption(source, context);
+
     return JSON.stringify({
       source: source.slice(0, 100000),
       context,
-      instruction: `分析加密逻辑：
-1. 识别使用的加密算法（MD5/SHA256/AES/RSA/HMAC等）
-2. 找出加密参数的来源（timestamp/nonce/固定key等）
-3. 分析完整的加密流程
-4. 生成等价的 Python 代码`
+      hints: hints.length ? hints : undefined,
+      instruction: hints.length
+        ? `代码中可能包含: ${hints.join(', ')}。请分析完整加密流程并生成 Python 实现。`
+        : `请分析以下代码的加密逻辑并生成 Python 实现。`,
     });
   },
   {

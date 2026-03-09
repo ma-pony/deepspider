@@ -183,7 +183,6 @@ pnpm test
 - Old: 10+ steps (AST parsing → deobfuscation → extraction → conversion → generation)
 - New: 3 steps (get source → AI analysis → validation)
 - AI directly understands obfuscated code without preprocessing
-| anti-detect | Anti-detection: fingerprint management, proxy pool | proxy, fingerprint |
 
 ## Project Structure
 
@@ -192,7 +191,7 @@ deepspider/
 ├── bin/cli.js               # CLI entry (command routing)
 ├── src/
 │   ├── agent/               # DeepAgent system
-│   │   ├── tools/           # Tool collection (90+)
+│   │   ├── tools/           # Tool collection (42)
 │   │   ├── subagents/       # Sub-agents
 │   │   ├── skills/          # Domain skills
 │   │   └── prompts/         # System prompts

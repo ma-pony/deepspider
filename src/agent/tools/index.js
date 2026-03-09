@@ -117,7 +117,7 @@ export const coreTools = [
   getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator,
   // 报告生成
   ...reportTools,
-  // 文件操作
+  // 文件操作（包含 read_file 用于读取 skills）
   ...fileTools,
   // 经验进化
   ...evolveTools,

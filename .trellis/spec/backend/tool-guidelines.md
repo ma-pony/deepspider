@@ -278,4 +278,4 @@ export const coreTools = [
 - **主 agent**: 调度决策（数据查询、文件操作、委托子代理）
 - **reverse-agent**: 逆向分析（Hook、断点、沙箱、AST）
 - **crawler-agent**: 页面交互（点击、填写、翻页）
-- **js2python**: 代码转换（JS 执行、Python 生成）
+- **reverse-agent**: 逆向分析 + Python 代码生成（AI 直接生成）

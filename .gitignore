@@ -27,7 +27,9 @@ logs/
 settings.local.json
 .npmrc
 
-# 战略规划文档（私密，不公开）
+
 docs/ROADMAP.md
 docs/IMPLEMENTATION.md
 docs/BUSINESS.md
+
+.deepspider-agent

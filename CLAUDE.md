@@ -19,7 +19,7 @@
 - 真实浏览器动态分析 (Patchright + CDP)
 - Webpack/Browserify 解包 (webcrack)
 - 混淆代码分析与反混淆
-- 加密算法识别 (CryptoJS/RSA Hook)
+- 加密算法识别 (CryptoJS/RSA/SM2/SM3/SM4 Hook)
 - 请求参数追踪
 - JS 转 Python 代码生成
 
@@ -51,7 +51,9 @@ deepspider/
 │   │   ├── index.js         # 主入口
 │   │   ├── run.js           # Agent 运行模块（延迟初始化）
 │   │   ├── setup.js         # 配置检测
-│   │   ├── tools/           # 工具集（90+）
+│   │   ├── tools/           # 工具集（42个核心工具）
+│   │   ├── ai/              # AI 分析模块（hints 提取 + LLM 委托）
+│   │   ├── rules/           # 加密模式正则库（hints 提取）
 │   │   ├── subagents/       # 子代理
 │   │   └── prompts/         # 系统提示
 │   ├── cli/                 # CLI 命令层

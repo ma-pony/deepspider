@@ -531,23 +531,64 @@ function getWebpackHooks() {
     console.log('[DeepSpider] JSEncrypt Hook 已启用 (来源: ' + source + ')');
   }
 
-  // Hook SM 国密对象
+  // Hook SM 国密对象（SM2/SM3/SM4）
   function hookSMCryptoObject(obj, source) {
     if (hookedObjects.has(obj)) return;
     hookedObjects.add(obj);
 
-    if (obj.doEncrypt) {
-      const origEnc = obj.doEncrypt;
-      obj.doEncrypt = deepspider.native(function(msg, pubKey) {
-        const entry = deepspider.log('crypto', {
-          algo: 'SM2.encrypt',
-          source: source,
-          msg: String(msg).slice(0, 100)
-        });
-        deepspider.linkCrypto(entry);
-        return origEnc.apply(this, arguments);
-      }, origEnc);
-    }
+    // SM2 加解密
+    ['doEncrypt', 'encrypt', 'sm2Encrypt', 'doDecrypt', 'decrypt', 'sm2Decrypt'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        var orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          var entry = deepspider.log('crypto', {
+            algo: 'SM2.' + method, source: source,
+            inputLen: arguments[0] ? String(arguments[0]).length : 0
+          });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    // SM2 签名
+    ['doSignature', 'doVerifySignature'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        var orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          var entry = deepspider.log('crypto', { algo: 'SM2.' + method, source: source });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    // SM3
+    ['sm3', 'sm3Hash'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        var orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          var entry = deepspider.log('crypto', { algo: 'SM3', source: source });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    // SM4
+    ['sm4Encrypt', 'sm4Decrypt'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        var orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          var entry = deepspider.log('crypto', { algo: 'SM4.' + method, source: source });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    // 嵌套子对象
+    ['sm2', 'sm3', 'sm4'].forEach(function(sub) {
+      if (obj[sub] && typeof obj[sub] === 'object') {
+        hookSMCryptoObject(obj[sub], source + '.' + sub);
+      }
+    });
     console.log('[DeepSpider] SM Crypto Hook 已启用 (来源: ' + source + ')');
   }
 
@@ -901,20 +942,85 @@ function getCryptoHooks() {
     console.log('[DeepSpider] RSA Hook 已启用');
   }
 
-  // Hook SM2
-  function hookSM2(sm2) {
-    if (sm2.__deepspider_hooked__) return;
-    sm2.__deepspider_hooked__ = true;
+  // Hook SM2/SM3/SM4 国密算法
+  function hookSMCrypto(obj) {
+    if (obj.__deepspider_hooked__) return;
+    obj.__deepspider_hooked__ = true;
 
-    if (sm2.doEncrypt) {
-      const origEnc = sm2.doEncrypt;
-      sm2.doEncrypt = deepspider.native(function(msg, pubKey) {
-        const entry = deepspider.log('crypto', { algo: 'SM2.encrypt', msg: String(msg).slice(0, 100) });
-        deepspider.linkCrypto(entry);
-        return origEnc.apply(this, arguments);
-      }, origEnc);
-      console.log('[DeepSpider] SM2 Hook 已启用');
-    }
+    // SM2 加解密 — 覆盖 doEncrypt/doDecrypt 和 encrypt/decrypt
+    ['doEncrypt', 'encrypt', 'sm2Encrypt'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        const orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', {
+            algo: 'SM2.' + method,
+            inputLen: arguments[0] ? String(arguments[0]).length : 0
+          });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    ['doDecrypt', 'decrypt', 'sm2Decrypt'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        const orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', {
+            algo: 'SM2.' + method,
+            inputLen: arguments[0] ? String(arguments[0]).length : 0
+          });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+    // SM2 签名/验签
+    ['doSignature', 'doVerifySignature', 'sm2Sign', 'sm2Verify'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        const orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', { algo: 'SM2.' + method });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+
+    // SM3 哈希
+    ['sm3', 'sm3Hash'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        const orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', {
+            algo: 'SM3',
+            inputLen: arguments[0] ? String(arguments[0]).length : 0
+          });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+
+    // SM4 加解密
+    ['sm4Encrypt', 'sm4Decrypt'].forEach(function(method) {
+      if (typeof obj[method] === 'function') {
+        const orig = obj[method];
+        obj[method] = deepspider.native(function() {
+          const entry = deepspider.log('crypto', { algo: 'SM4.' + method });
+          deepspider.linkCrypto(entry);
+          return orig.apply(this, arguments);
+        }, orig);
+      }
+    });
+
+    // 嵌套 sm2/sm3/sm4 子对象（如 smCrypto.sm2.doEncrypt）
+    ['sm2', 'sm3', 'sm4'].forEach(function(sub) {
+      if (obj[sub] && typeof obj[sub] === 'object' && !obj[sub].__deepspider_hooked__) {
+        hookSMCrypto(obj[sub]);
+      }
+    });
+
+    console.log('[DeepSpider] SM Crypto Hook 已启用');
   }
 
   // Hook node-forge
@@ -1002,7 +1108,11 @@ function getCryptoHooks() {
 
   watchGlobal('CryptoJS', hookCryptoJS);
   watchGlobal('JSEncrypt', hookJSEncrypt);
-  watchGlobal('sm2', hookSM2);
+  watchGlobal('sm2', hookSMCrypto);
+  watchGlobal('SM2', hookSMCrypto);
+  watchGlobal('smCrypto', hookSMCrypto);
+  watchGlobal('SMCrypto', hookSMCrypto);
+  watchGlobal('sm_crypto', hookSMCrypto);
   watchGlobal('forge', hookForge);
   watchGlobal('KJUR', hookJsrsasign);
 

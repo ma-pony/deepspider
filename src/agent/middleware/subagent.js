@@ -42,7 +42,12 @@ function returnCommandWithStateUpdate(result, toolCallId, threadId) {
   const stateUpdate = filterStateForSubagent(result);
   const messages = result.messages;
   const lastMessage = messages?.[messages.length - 1];
-  let content = (lastMessage?.content || 'Task completed') + TRUST_SIGNAL;
+  // content 可能是 string 或 content block 数组（如 Claude 的 [{type:'text',text:'...'}]）
+  let rawContent = lastMessage?.content || 'Task completed';
+  if (typeof rawContent !== 'string') {
+    try { rawContent = JSON.stringify(rawContent); } catch { rawContent = String(rawContent); }
+  }
+  let content = rawContent + TRUST_SIGNAL;
 
   // 添加thread_id到返回内容，便于主Agent恢复会话
   if (threadId) {

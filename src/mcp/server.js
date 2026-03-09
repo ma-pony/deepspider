@@ -11,7 +11,14 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { allTools } from '../agent/tools/index.js';
+import { coreTools } from '../agent/tools/index.js';
+
+/**
+ * MCP 安全策略：只暴露 coreTools（主 Agent 使用的工具子集）
+ * 不暴露 allTools，因为其中包含 sandbox_execute、run_node_code 等
+ * 可执行任意代码的内部工具，通过 MCP 暴露存在安全风险
+ */
+const mcpTools = coreTools;
 
 const server = new Server(
   { name: 'deepspider', version: '1.0.0' },
@@ -20,14 +27,14 @@ const server = new Server(
 
 // 构建工具映射
 const toolMap = new Map();
-for (const tool of allTools) {
+for (const tool of mcpTools) {
   toolMap.set(tool.name, tool);
 }
 
 // 列出所有工具
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: allTools.map((tool) => ({
+    tools: mcpTools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.schema._def ? zodToJsonSchema(tool.schema) : {},

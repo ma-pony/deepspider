@@ -83,12 +83,15 @@ export class ScriptInterceptor {
       try { this.onSource?.(scriptId, scriptSource); } catch { /* 订阅者异常不影响主流程 */ }
 
       // 限制大小，超大脚本只保存部分
-      const source = scriptSource.slice(0, 500000);
+      const SIZE_LIMIT = 2000000;
+      const truncated = scriptSource.length > SIZE_LIMIT;
+      const source = truncated ? scriptSource.slice(0, SIZE_LIMIT) : scriptSource;
 
       await this.store.saveScript({
         url,
         type: 'external',
         source,
+        truncated,
         timestamp: Date.now(),
         pageUrl: this.getPageUrl()  // 传递页面 URL
       });

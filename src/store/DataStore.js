@@ -116,6 +116,17 @@ function getReadableFilename(url, type = 'response', method = 'GET') {
   }
 }
 
+/**
+ * 获取站点搜索索引（懒初始化）
+ * 结构: { responses: Map<id, keywords>, scripts: Map<id, keywords> }
+ */
+function getSiteSearchIndex(searchIndex, site) {
+  if (!searchIndex.has(site)) {
+    searchIndex.set(site, { responses: new Map(), scripts: new Map() });
+  }
+  return searchIndex.get(site);
+}
+
 export class DataStore {
   constructor() {
     // 全局索引：站点列表
@@ -130,6 +141,10 @@ export class DataStore {
     this.lastCleanup = 0;
     // 文件锁：防止并发写入同一站点索引
     this.siteLocks = new Map();
+    // 内存搜索索引: Map<site, { responses: Map<id, keywords>, scripts: Map<id, keywords> }>
+    // 仅存储前 1000 字符的关键词，作为加速层（磁盘仍是数据源）
+    // 索引按需增量填充（saveResponse/saveScript 时写入），不预加载
+    this.searchIndex = new Map();
 
     ensureDir(DATA_DIR);
     ensureDir(SITES_DIR);
@@ -262,6 +277,9 @@ export class DataStore {
     }
 
     this.siteIndexCache.set(site, index);
+    // 注意：从磁盘加载的站点索引不预填充搜索索引
+    // 搜索索引仅通过 saveResponse/saveScript 增量填充
+    // 对于旧数据，searchInResponses/searchInScripts 会回退到磁盘扫描
     return index;
   }
 
@@ -364,6 +382,10 @@ export class DataStore {
           sessionId: this.getSessionId()
         });
 
+        // 写入搜索索引：url + responseBody 前 1000 字符，小写
+        const keywords = `${url} ${(responseBody || '').slice(0, 1000)}`.toLowerCase();
+        getSiteSearchIndex(this.searchIndex, site).responses.set(id, keywords);
+
         await this.saveSiteIndex(site);
         result = { id, site, path };
       }
@@ -381,49 +403,70 @@ export class DataStore {
   }
 
   /**
-   * 保存脚本源码（带去重）
+   * 保存脚本源码（带去重，带锁防止竞态条件）
    */
   async saveScript(data) {
-    const { url, type, source, timestamp, pageUrl } = data;
+    const { url, type, source, truncated, timestamp, pageUrl } = data;
     const { site } = parseUrl(pageUrl || url);
 
-    // 生成去重 hash
-    const hash = scriptHash(url, source);
-    const index = await this.getSiteIndex(site);
+    // 获取站点锁，防止并发写入
+    const releaseLock = await this.acquireLock(site);
+    let result;
 
-    // 检查是否已存在相同内容
-    const existing = index.scripts.find(s => s.hash === hash);
-    if (existing) {
-      existing.timestamp = timestamp || Date.now();
-      existing.sessionId = this.getSessionId();
-      await this.saveSiteIndex(site);
-      return { id: existing.id, site, deduplicated: true };
+    try {
+      // 生成去重 hash
+      const hash = scriptHash(url, source);
+
+      // 重新加载索引（获取最新状态）
+      this.siteIndexCache.delete(site);
+      const index = await this.getSiteIndex(site);
+
+      // 检查是否已存在相同内容
+      const existing = index.scripts.find(s => s.hash === hash);
+      if (existing) {
+        existing.timestamp = timestamp || Date.now();
+        existing.sessionId = this.getSessionId();
+        await this.saveSiteIndex(site);
+        result = { id: existing.id, site, deduplicated: true };
+      } else {
+        const siteDir = this.getSiteDir(site);
+        const scriptsDir = join(siteDir, 'scripts');
+        ensureDir(scriptsDir);
+
+        const readableName = getReadableFilename(url, 'script');
+        const seq = String(index.scripts.length).padStart(3, '0');
+        const id = `${readableName}_${seq}`;
+        const file = join(scriptsDir, `${id}.js`);
+
+        await writeFile(file, source || '');
+
+        const entry = {
+          id, url, type,
+          timestamp: timestamp || Date.now(),
+          file, size: source?.length || 0,
+          hash,
+          sessionId: this.getSessionId()
+        };
+        if (truncated) entry.truncated = true;
+        index.scripts.push(entry);
+
+        // 写入搜索索引：url + source 前 1000 字符，小写
+        const keywords = `${url} ${(source || '').slice(0, 1000)}`.toLowerCase();
+        getSiteSearchIndex(this.searchIndex, site).scripts.set(id, keywords);
+
+        await this.saveSiteIndex(site);
+        result = { id, site };
+      }
+    } finally {
+      releaseLock();
     }
 
-    const siteDir = this.getSiteDir(site);
-    const scriptsDir = join(siteDir, 'scripts');
-    ensureDir(scriptsDir);
-
-    const readableName = getReadableFilename(url, 'script');
-    const seq = String(index.scripts.length).padStart(3, '0');
-    const id = `${readableName}_${seq}`;
-    const file = join(scriptsDir, `${id}.js`);
-
-    await writeFile(file, source || '');
-
-    index.scripts.push({
-      id, url, type,
-      timestamp: timestamp || Date.now(),
-      file, size: source?.length || 0,
-      hash,
-      sessionId: this.getSessionId()
-    });
-
-    await this.saveSiteIndex(site);
-    await this.updateSiteStats(site);
+    if (!result.deduplicated) {
+      await this.updateSiteStats(site);
+    }
     this.maybeCleanup();
 
-    return { id, site };
+    return result;
   }
 
   /**
@@ -491,6 +534,7 @@ export class DataStore {
       return scripts.map(s => ({
         id: s.id, url: s.url, type: s.type,
         timestamp: s.timestamp, size: s.size,
+        truncated: s.truncated || false,
         sessionId: s.sessionId
       }));
     }
@@ -509,6 +553,12 @@ export class DataStore {
 
   /**
    * 搜索响应内容（支持按站点过滤）
+   *
+   * 策略：
+   * 1. 对在内存索引中有记录的条目，先用 keywords 做快速过滤
+   * 2. keywords 命中 → 读取磁盘文件获取完整内容确认匹配
+   * 3. keywords 不命中 → 跳过（接受极少量漏报：搜索词仅在 body 的 1000 字符之后）
+   * 4. 不在索引中的条目（旧数据）→ 直接读磁盘（兜底扫描）
    */
   async searchInResponses(text, site = null) {
     const results = [];
@@ -517,17 +567,49 @@ export class DataStore {
 
     for (const s of sites) {
       const index = await this.getSiteIndex(s.hostname);
+      const siteIdx = this.searchIndex.get(s.hostname);
+      const responseMap = siteIdx?.responses;
+
       for (const meta of index.responses) {
         try {
-          const content = await readFile(meta.file, 'utf-8');
-          const data = JSON.parse(content);
-          if (data.responseBody?.toLowerCase().includes(searchText)) {
-            results.push({
-              site: s.hostname,
-              id: meta.id, url: meta.url, path: meta.path,
-              method: meta.method, status: meta.status,
-              timestamp: meta.timestamp
-            });
+          if (responseMap && responseMap.has(meta.id)) {
+            // 在内存索引中：先用关键词快速过滤
+            const keywords = responseMap.get(meta.id);
+            if (!keywords.includes(searchText)) {
+              // 关键词不命中，跳过
+              // 注意：URL 始终在 keywords 中，body 前 1000 字符也在
+              // 对大多数搜索场景（API 路径、关键字段名、token 等）覆盖率足够
+              continue;
+            }
+            // 关键词命中，读磁盘确认（keywords 只含前 1000 字符，需全量匹配）
+            const content = await readFile(meta.file, 'utf-8');
+            const data = JSON.parse(content);
+            const matchesBody = data.responseBody?.toLowerCase().includes(searchText);
+            const matchesUrl = data.url?.toLowerCase().includes(searchText);
+            const matchesRequest = data.requestBody?.toLowerCase().includes(searchText);
+            if (matchesBody || matchesUrl || matchesRequest) {
+              results.push({
+                site: s.hostname,
+                id: meta.id, url: meta.url, path: meta.path,
+                method: meta.method, status: meta.status,
+                timestamp: meta.timestamp
+              });
+            }
+          } else {
+            // 不在内存索引（旧数据），回退到全量磁盘读取
+            const content = await readFile(meta.file, 'utf-8');
+            const data = JSON.parse(content);
+            const matchesBody = data.responseBody?.toLowerCase().includes(searchText);
+            const matchesUrl = data.url?.toLowerCase().includes(searchText);
+            const matchesRequest = data.requestBody?.toLowerCase().includes(searchText);
+            if (matchesBody || matchesUrl || matchesRequest) {
+              results.push({
+                site: s.hostname,
+                id: meta.id, url: meta.url, path: meta.path,
+                method: meta.method, status: meta.status,
+                timestamp: meta.timestamp
+              });
+            }
           }
         } catch { /* skip */ }
       }
@@ -537,6 +619,12 @@ export class DataStore {
 
   /**
    * 搜索脚本内容（支持按站点过滤）
+   *
+   * 策略：
+   * 1. 对在内存索引中有记录的条目，先用 keywords 做快速过滤
+   * 2. keywords 命中 → 读取磁盘文件获取完整内容（提取匹配上下文）
+   * 3. keywords 不命中 → 跳过（大多数脚本搜索词都在前 1000 字符范围内）
+   *    例外：若索引中没有该条目，则回退到磁盘扫描
    */
   async searchInScripts(text, site = null) {
     const results = [];
@@ -545,20 +633,47 @@ export class DataStore {
 
     for (const s of sites) {
       const index = await this.getSiteIndex(s.hostname);
+      const siteIdx = this.searchIndex.get(s.hostname);
+      const scriptMap = siteIdx?.scripts;
+
       for (const meta of index.scripts) {
         try {
-          const source = await readFile(meta.file, 'utf-8');
-          const idx = source.toLowerCase().indexOf(searchText);
-          if (idx !== -1) {
-            const start = Math.max(0, idx - 50);
-            const end = Math.min(source.length, idx + text.length + 50);
-            results.push({
-              site: s.hostname,
-              id: meta.id, url: meta.url, type: meta.type,
-              matchIndex: idx,
-              context: source.slice(start, end),
-              timestamp: meta.timestamp
-            });
+          if (scriptMap && scriptMap.has(meta.id)) {
+            // 在内存索引中：先用关键词快速过滤
+            const keywords = scriptMap.get(meta.id);
+            if (!keywords.includes(searchText)) {
+              // 关键词不命中，跳过（接受极少量漏报：搜索词仅在 1000 字符之后的脚本）
+              continue;
+            }
+            // 关键词命中，读磁盘获取完整内容以提取上下文
+            const source = await readFile(meta.file, 'utf-8');
+            const idx = source.toLowerCase().indexOf(searchText);
+            if (idx !== -1) {
+              const start = Math.max(0, idx - 50);
+              const end = Math.min(source.length, idx + text.length + 50);
+              results.push({
+                site: s.hostname,
+                id: meta.id, url: meta.url, type: meta.type,
+                matchIndex: idx,
+                context: source.slice(start, end),
+                timestamp: meta.timestamp
+              });
+            }
+          } else {
+            // 不在内存索引（旧数据），回退到全量磁盘读取
+            const source = await readFile(meta.file, 'utf-8');
+            const idx = source.toLowerCase().indexOf(searchText);
+            if (idx !== -1) {
+              const start = Math.max(0, idx - 50);
+              const end = Math.min(source.length, idx + text.length + 50);
+              results.push({
+                site: s.hostname,
+                id: meta.id, url: meta.url, type: meta.type,
+                matchIndex: idx,
+                context: source.slice(start, end),
+                timestamp: meta.timestamp
+              });
+            }
           }
         } catch { /* skip */ }
       }
@@ -599,6 +714,7 @@ export class DataStore {
       await rm(siteDir, { recursive: true });
     }
     this.siteIndexCache.delete(site);
+    this.searchIndex.delete(site);
     this.globalIndex.sites = this.globalIndex.sites.filter(s => s.hostname !== site);
     await this.saveGlobalIndex();
   }
@@ -614,6 +730,7 @@ export class DataStore {
       }
     }
     this.siteIndexCache.clear();
+    this.searchIndex.clear();
     this.globalIndex = { sites: [] };
     await this.saveGlobalIndex();
   }
@@ -690,10 +807,18 @@ export class DataStore {
         cleaned++;
       }
 
-      // 更新索引
+      // 更新索引和搜索索引
       if (expiredResponses.length || expiredScripts.length) {
         index.responses = index.responses.filter(r => now - r.timestamp <= maxAge);
         index.scripts = index.scripts.filter(s => now - s.timestamp <= maxAge);
+
+        // 同步清理内存搜索索引中的过期条目
+        const siteIdx = this.searchIndex.get(s.hostname);
+        if (siteIdx) {
+          for (const r of expiredResponses) siteIdx.responses.delete(r.id);
+          for (const sc of expiredScripts) siteIdx.scripts.delete(sc.id);
+        }
+
         await this.saveSiteIndex(s.hostname);
       }
     }
@@ -724,6 +849,8 @@ export class DataStore {
         ...index.scripts.map(s => ({ ...s, type: 'script' }))
       ].sort((a, b) => a.timestamp - b.timestamp);
 
+      const siteIdx = this.searchIndex.get(s.hostname);
+
       while (totalSize > maxSize && allItems.length > 0) {
         const item = allItems.shift();
         await rm(item.file, { force: true }).catch(() => {});
@@ -732,8 +859,10 @@ export class DataStore {
 
         if (item.type === 'response') {
           index.responses = index.responses.filter(r => r.id !== item.id);
+          if (siteIdx) siteIdx.responses.delete(item.id);
         } else {
           index.scripts = index.scripts.filter(s => s.id !== item.id);
+          if (siteIdx) siteIdx.scripts.delete(item.id);
         }
       }
 

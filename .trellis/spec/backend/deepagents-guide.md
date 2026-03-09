@@ -141,7 +141,7 @@ import { analyzerTools } from '../tools/analyzer.js';
 
 export const reverseSubagent = createSubagent({
   name: 'reverse-agent',
-  description: '逆向分析专家。覆盖逆向全流程：反混淆、断点调试、Hook、沙箱验证、补环境。不能生成 Python 代码（用 js2python）、不能编排爬虫（用 crawler）。',
+  description: '逆向分析专家。覆盖逆向全流程：反混淆、断点调试、Hook、沙箱验证、补环境、生成 Python 代码。不能编排爬虫（用 crawler）。',
   systemPrompt: `你是 DeepSpider 的逆向分析专家。...`,
   tools: [...analyzerTools, ...deobfuscatorTools, ...debugTools],
   skills: ['static', 'dynamic', 'sandbox', 'env'],  // 加载多个领域的知识
@@ -178,7 +178,6 @@ export const reverseSubagent = createSubagent({
 | 子代理 | skills | evolveSkill |
 |--------|--------|-------------|
 | reverse-agent | `['static', 'dynamic', 'sandbox', 'env']` | `['static-analysis', 'dynamic-analysis', 'sandbox', 'env']` |
-| js2python | `['js2python']` | `'js2python'` |
 | crawler | `['crawler', 'xpath']` | `'crawler'` |
 | captcha | `['captcha']` | `'captcha'` |
 | anti-detect | `['antiDetect']` | `'anti-detect'` |
@@ -314,7 +313,6 @@ export const SKILLS = {
   dynamic: `${BASE_DIR}dynamic-analysis`,
   sandbox: `${BASE_DIR}sandbox`,
   env: `${BASE_DIR}env`,
-  js2python: `${BASE_DIR}js2python`,
   // 爬虫能力
   captcha: `${BASE_DIR}captcha`,
   antiDetect: `${BASE_DIR}anti-detect`,

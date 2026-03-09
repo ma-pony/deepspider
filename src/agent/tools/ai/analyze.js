@@ -1,18 +1,13 @@
 /**
- * AI 直接分析工具 - 核心分析能力
+ * AI 直接分析工具
  */
-
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 
-/**
- * 直接分析 JS 源码
- */
 export const analyzeJsSource = tool(
   async ({ source, task }) => {
-    // 直接返回源码和任务，让 LLM 处理
     return JSON.stringify({
-      source: source.slice(0, 100000), // 限制 100KB
+      source: source.slice(0, 100000),
       task,
       instruction: '请分析以上 JS 代码并完成任务'
     });

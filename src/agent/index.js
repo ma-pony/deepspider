@@ -56,20 +56,28 @@ function stripUnsupportedSchemaKeys(obj) {
 }
 
 /**
- * 自定义 fetch：拦截 LLM API 请求，strip 工具 schema 中 Zod v4 生成的不兼容字段
- * 保留作为安全网，防止 $schema / propertyNames / additionalProperties:{} 泄漏到 API
+ * 自定义 fetch：仅拦截发往 Anthropic API 的请求，strip Zod v4 生成的不兼容字段
+ * 限制拦截范围，避免影响 CycleTLS、第三方库等其他模块的 fetch 调用
  */
 const _origFetch = globalThis.fetch;
+const ANTHROPIC_URL_PATTERNS = [
+  'api.anthropic.com',
+  '/v1/messages',      // 兼容自定义 baseUrl 的代理
+];
 globalThis.fetch = async function(url, opts) {
-  if (opts?.body && typeof opts.body === 'string' && opts.body.includes('"tools"')) {
-    try {
-      const body = JSON.parse(opts.body);
-      if (body.tools) {
-        body.tools = stripUnsupportedSchemaKeys(body.tools);
-        opts = { ...opts, body: JSON.stringify(body) };
-      }
-    } catch { /* ignore parse errors on non-LLM requests */ }
-  }
+  try {
+    const urlStr = typeof url === 'string' ? url : url?.toString?.() || '';
+    const isAnthropicRequest = ANTHROPIC_URL_PATTERNS.some(p => urlStr.includes(p));
+    if (isAnthropicRequest && opts?.body && typeof opts.body === 'string' && opts.body.includes('"tools"')) {
+      try {
+        const body = JSON.parse(opts.body);
+        if (body.tools) {
+          body.tools = stripUnsupportedSchemaKeys(body.tools);
+          opts = { ...opts, body: JSON.stringify(body) };
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  } catch { /* 确保 URL 解析异常不会中断正常请求 */ }
   return _origFetch(url, opts);
 };
 
