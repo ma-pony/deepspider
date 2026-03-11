@@ -8,7 +8,10 @@ export class HookBase {
    * 获取 Hook 基础代码
    * 包含：反检测、统一日志管理
    */
-  static getBaseCode() {
+  static getBaseCode(configOverrides = {}) {
+    const overrideStr = Object.keys(configOverrides).length > 0
+      ? Object.entries(configOverrides).map(([k, v]) => `    config.${k} = ${JSON.stringify(v)};`).join('\n')
+      : '';
     return `
 // === DeepSpider Hook Base ===
 (function() {
@@ -59,13 +62,14 @@ export class HookBase {
     stackDepth: 5,            // 调用栈深度限制
     minLogLength: 20,         // 最小记录长度（过滤小数据）
     // 反检测配置
+    protectToString: true,    // 保护 Function.prototype.toString
     protectDescriptor: true,  // 保护 getOwnPropertyDescriptor
     protectKeys: true,        // 保护 Object.keys/getOwnPropertyNames
     // 输出控制
     silent: false,            // 静默模式（不输出 console.log）
     logToConsole: true        // 是否输出到控制台
   };
-
+${overrideStr ? '\n  // 配置覆盖\n' + overrideStr + '\n' : ''}
   // 保存原始方法（用于反检测）
   const originals = {
     getOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
@@ -578,11 +582,13 @@ export class HookBase {
     }
   };
 
-  // 绕过 toString 检测
-  Function.prototype.toString = function() {
-    return hookedFns.has(this) ? hookedFns.get(this) : originalToString.call(this);
-  };
-  hookedFns.set(Function.prototype.toString, originalToString.call(originalToString));
+  // 绕过 toString 检测（可通过 config.protectToString 控制）
+  if (config.protectToString !== false) {
+    Function.prototype.toString = function() {
+      return hookedFns.has(this) ? hookedFns.get(this) : originalToString.call(this);
+    };
+    hookedFns.set(Function.prototype.toString, originalToString.call(originalToString));
+  }
 
   // === 增强反检测：保护 getOwnPropertyDescriptor ===
   if (config.protectDescriptor) {

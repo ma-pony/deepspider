@@ -34,13 +34,14 @@ function isAlgorithmVerification(state) {
 }
 
 /**
- * 检测是否通过了端到端验证（sandbox_execute 成功返回目标数据）
+ * 检测是否通过了端到端验证（执行工具成功返回目标数据）
  */
 function isEndToEndVerification(state) {
   const messages = state.messages || [];
+  const validTools = ['sandbox_execute', 'run_python_code', 'run_node_code', 'execute_python_code'];
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.type === 'tool' && msg.name === 'sandbox_execute') {
+    if (msg.type === 'tool' && validTools.includes(msg.name)) {
       try {
         const result = JSON.parse(msg.content);
         // 检查是否成功且包含目标数据
@@ -89,7 +90,7 @@ export function createValidationWorkflowMiddleware() {
     afterModel: (state) => {
       const updates = {};
 
-      // 检查当前验证阶段
+      // 检查当前验证阶段（state 已有的标志不重新扫描，防止上下文清理后误重置）
       if (!state.algorithmVerified && isAlgorithmVerification(state)) {
         updates.algorithmVerified = true;
         updates.validationStage = 'algorithm';
@@ -104,8 +105,14 @@ export function createValidationWorkflowMiddleware() {
         updates.savedPythonCode = true;
       }
 
-      // 所有验证通过
-      if (updates.algorithmVerified && updates.endToEndVerified && updates.savedPythonCode) {
+      // 使用合并后的状态判断是否全部通过，避免 updates 中缺少已在 state 里的字段
+      const merged = {
+        algorithmVerified: state.algorithmVerified || updates.algorithmVerified,
+        endToEndVerified: state.endToEndVerified || updates.endToEndVerified,
+        savedPythonCode: state.savedPythonCode || updates.savedPythonCode,
+      };
+
+      if (merged.algorithmVerified && merged.endToEndVerified && merged.savedPythonCode) {
         updates.validationStage = 'passed';
       }
 
@@ -146,7 +153,7 @@ export function createValidationWorkflowMiddleware() {
           // 构造阻止消息
           const missing = [];
           if (!state.algorithmVerified) missing.push('算法验证（委托 reverse-agent）');
-          if (!state.endToEndVerified) missing.push('端到端验证（sandbox_execute）');
+          if (!state.endToEndVerified) missing.push('端到端验证（run_python_code / run_node_code / sandbox_execute）');
           if (!state.savedPythonCode) missing.push('保存 Python 代码');
 
           return {

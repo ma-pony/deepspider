@@ -5,11 +5,12 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
-import { writeFileSync, readFileSync, existsSync, readdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, readdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { DEEPSPIDER_HOME, ensureDir } from '../../config/paths.js';
 
 const MEMO_DIR = join(DEEPSPIDER_HOME, 'memo');
+const FINDINGS_FILE = join(DEEPSPIDER_HOME, 'memo', 'findings.jsonl');
 
 /** 清理 key：只保留字母、数字、连字符、下划线，防止路径穿越 */
 function sanitizeKey(key) {
@@ -67,4 +68,41 @@ export const listMemo = tool(
   }
 );
 
-export const scratchpadTools = [saveMemo, loadMemo, listMemo];
+export const saveFinding = tool(
+  async ({ type, title, data }) => {
+    ensureDir(MEMO_DIR);
+    const entry = { type, title, data, ts: Date.now() };
+    appendFileSync(FINDINGS_FILE, JSON.stringify(entry) + '\n');
+    return JSON.stringify({ success: true, type, title });
+  },
+  {
+    name: 'save_finding',
+    description: '保存结构化分析发现（比 save_memo 更精确，用于上下文压缩后快速恢复状态）',
+    schema: z.object({
+      type: z.enum(['endpoint', 'crypto_algo', 'key_source', 'python_code', 'validation', 'other']),
+      title: z.string().describe('简短标题'),
+      data: z.string().describe('发现内容（JSON 字符串或纯文本）'),
+    }),
+  }
+);
+
+export const listFindings = tool(
+  async ({ type }) => {
+    if (!existsSync(FINDINGS_FILE)) return JSON.stringify({ findings: [], count: 0 });
+    const lines = readFileSync(FINDINGS_FILE, 'utf-8').trim().split('\n').filter(Boolean);
+    let findings = lines.map(l => JSON.parse(l));
+    if (type) findings = findings.filter(f => f.type === type);
+    // 只返回 type + title，不返回 data（节省 tokens）
+    const summary = findings.map(f => ({ type: f.type, title: f.title, ts: f.ts }));
+    return JSON.stringify({ findings: summary, count: summary.length });
+  },
+  {
+    name: 'list_findings',
+    description: '列出已保存的分析发现摘要（上下文压缩后调用此工具恢复分析状态）',
+    schema: z.object({
+      type: z.enum(['endpoint', 'crypto_algo', 'key_source', 'python_code', 'validation', 'other']).optional(),
+    }),
+  }
+);
+
+export const scratchpadTools = [saveMemo, loadMemo, listMemo, saveFinding, listFindings];

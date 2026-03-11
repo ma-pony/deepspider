@@ -43,7 +43,11 @@ export class BrowserClient extends EventEmitter {
       executablePath = null,
       args = [],
       userDataDir = null,
+      hookMode = 'full',       // 'full' | 'minimal' | 'none'
+      disableInterceptors = false, // 禁用 CDP 拦截器
     } = options;
+    this._hookMode = hookMode;
+    this._disableInterceptors = disableInterceptors;
 
     const launchOptions = {
       headless,
@@ -77,10 +81,12 @@ export class BrowserClient extends EventEmitter {
     }
 
     // 保存 hook 脚本
-    this.hookScript = getDefaultHookScript();
+    this.hookScript = getDefaultHookScript(hookMode);
 
     // 使用 addInitScript 在 context 级别注入
-    await this.context.addInitScript(this.hookScript);
+    if (hookMode !== 'none' || this.hookScript) {
+      await this.context.addInitScript(this.hookScript);
+    }
 
     // 持久化上下文自带默认页面，临时模式需要新建
     this.page = this._persistent
@@ -154,24 +160,32 @@ export class BrowserClient extends EventEmitter {
       });
 
       // 4. 启动拦截器
-      const networkInterceptor = new NetworkInterceptor(cdp, page);
-      const scriptInterceptor = new ScriptInterceptor(cdp, page);
-      await networkInterceptor.start();
-      await scriptInterceptor.start();
+      let networkInterceptor = null;
+      let scriptInterceptor = null;
+      let antiDebugInterceptor = null;
 
-      // 反无限 debugger：必须在 ScriptInterceptor 之后（Debugger 域已启用）
-      const antiDebugInterceptor = new AntiDebugInterceptor(cdp);
-      await antiDebugInterceptor.start();
+      if (!this._disableInterceptors) {
+        networkInterceptor = new NetworkInterceptor(cdp, page);
+        scriptInterceptor = new ScriptInterceptor(cdp, page);
+        await networkInterceptor.start();
+        await scriptInterceptor.start();
 
-      // ScriptInterceptor 拉取源码后通知 AntiDebugInterceptor，避免重复 CDP 调用
-      scriptInterceptor.onSource = (scriptId, source) => {
-        antiDebugInterceptor.checkScript(scriptId, source);
-      };
+        // 反无限 debugger：必须在 ScriptInterceptor 之后（Debugger 域已启用）
+        antiDebugInterceptor = new AntiDebugInterceptor(cdp);
+        await antiDebugInterceptor.start();
+
+        // ScriptInterceptor 拉取源码后通知 AntiDebugInterceptor，避免重复 CDP 调用
+        scriptInterceptor.onSource = (scriptId, source) => {
+          antiDebugInterceptor.checkScript(scriptId, source);
+        };
+      } else {
+        console.log('[BrowserClient] CDP 拦截器已禁用');
+      }
 
       // 保存引用（仅对当前活动页面）
       if (page === this.page) {
         this.cdpSession = cdp;
-        this._cdpSessionPage = page;  // 关键：设置标记，让 getCDPSession 知道这是当前页面的 session
+        this._cdpSessionPage = page;
         this.networkInterceptor = networkInterceptor;
         this.scriptInterceptor = scriptInterceptor;
         this.antiDebugInterceptor = antiDebugInterceptor;

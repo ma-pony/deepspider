@@ -474,7 +474,7 @@ export const executePythonCode = tool(
   },
   {
     name: 'run_python_code',
-    description: '执行 Python 代码。可用于加密验证、HTTP 请求、数据处理等任务。环境已预装 pycryptodome、requests 等常用库。',
+    description: '执行 Python 代码。可用于加密验证、数据处理、算法对比等任务。环境已预装 pycryptodome、gmssl 等加密库。',
     schema: z.object({
       code: z.string().describe('Python 代码'),
       timeout: z.number().optional().default(30000).describe('超时时间（毫秒）'),

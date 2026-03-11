@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, delimiter } from 'path';
+import { homedir } from 'os';
 
 // 项目根目录（用于 require 加密库）
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +33,15 @@ async function executeNode(code, timeout = 10000) {
 
   return new Promise((resolve) => {
     const proc = spawn('node', ['-e', code], {
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        NODE_PATH: [
+          join(PROJECT_ROOT, 'node_modules'),
+          join(homedir(), '.deepspider', 'output', 'node_modules'),
+          join(homedir(), 'node_modules'),
+          process.env.NODE_PATH || '',
+        ].filter(Boolean).join(delimiter),
+      },
       cwd: PROJECT_ROOT,
     });
 

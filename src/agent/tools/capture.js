@@ -34,8 +34,21 @@ export const collectProperty = tool(
     const collector = new EnvCollector(browser.getPage());
     const data = await collector.collect(path, { depth });
 
-    // 变量未定义时追加 fallback 引导，引导 LLM 走断点路径
+    // 变量未定义时追加 fallback 引导
     if (data?.success === false && /undefined|null/.test(data?.error || '')) {
+      // Storage 场景：列出所有 key 帮助诊断
+      const storageMatch = path.match(/^(localStorage|sessionStorage)\./);
+      if (storageMatch) {
+        const storageType = storageMatch[1];
+        try {
+          const keysData = await collector.collect(storageType, { depth: 1 });
+          const keys = keysData?.success ? Object.keys(keysData.data?.properties || {}) : [];
+          return JSON.stringify({
+            ...data,
+            hint: `${storageType} 中共 ${keys.length} 个 key: [${keys.slice(0, 30).join(', ')}]。请检查 key 名称是否正确，或该 key 是否需要特定操作后才会被写入。`,
+          }, null, 2);
+        } catch (_e) { /* fall through to default hint */ }
+      }
       return JSON.stringify({
         ...data,
         hint: `⚠️ 变量 ${path} 未定义。该变量可能仅在特定函数执行时存在（如请求发起时动态赋值，执行后被清理）。\n请使用 set_breakpoint 在目标函数处设断点，断点命中后用 evaluate_at_breakpoint 采集变量值。不要猜测变量值。`,

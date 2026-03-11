@@ -213,6 +213,46 @@ export const getRequestInitiator = tool(
   }
 );
 
+/**
+ * 搜索关键字并直接提取上下文代码
+ */
+export const searchAndExtract = tool(
+  async ({ keyword, site, contextChars }) => {
+    const store = getDataStore();
+    const results = await store.searchInScripts(keyword, site || null);
+    if (!results || results.length === 0) {
+      return JSON.stringify({ found: false, results: [] });
+    }
+    // 取前 3 个匹配，每个提取上下文
+    const extracts = [];
+    for (const match of results.slice(0, 3)) {
+      const source = await store.getScript(match.site, match.id);
+      if (!source) continue;
+      const pos = source.indexOf(keyword);
+      if (pos === -1) continue;
+      const halfCtx = Math.floor((contextChars || 3000) / 2);
+      const start = Math.max(0, pos - halfCtx);
+      const end = Math.min(source.length, pos + halfCtx);
+      extracts.push({
+        site: match.site, scriptId: match.id, scriptUrl: match.url,
+        offset: start, matchAt: pos,
+        code: source.slice(start, end),
+        totalLength: source.length,
+      });
+    }
+    return JSON.stringify({ found: true, count: results.length, extracts });
+  },
+  {
+    name: 'search_and_extract',
+    description: '搜索关键字并直接提取上下文代码（合并 search_in_scripts + get_script_source，一步到位）',
+    schema: z.object({
+      keyword: z.string().describe('搜索关键字（函数名、变量名、加密特征词等）'),
+      site: z.string().optional().describe('限定站点'),
+      contextChars: z.number().optional().default(3000).describe('提取上下文字符数（默认 3000）'),
+    }),
+  }
+);
+
 export const tracingTools = [
   getSiteList,
   searchInResponses,
@@ -222,6 +262,7 @@ export const tracingTools = [
   getScriptList,
   getScriptSource,
   searchInScripts,
+  searchAndExtract,
   clearSiteData,
   clearAllData,
 ];

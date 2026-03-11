@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
-import { getBrowser } from '../../browser/index.js';
+import { getBrowser, getBrowserClient } from '../../browser/index.js';
 import { CDPSession } from '../../browser/cdp.js';
 import { logStore } from '../logger.js';
 
@@ -60,6 +60,11 @@ function checkPaused() {
  */
 export const setBreakpoint = tool(
   async ({ url, line, column }) => {
+    // 设断点前需要关闭 skipAllPauses，否则断点无效
+    const client = getBrowserClient();
+    if (client?.antiDebugInterceptor) {
+      await client.antiDebugInterceptor.enablePauses();
+    }
     const session = await getSession();
     const result = await session.setBreakpoint(url, line, column);
     return JSON.stringify({ success: true, breakpointId: result.breakpointId });
@@ -80,6 +85,10 @@ export const setBreakpoint = tool(
  */
 export const setXHRBreakpoint = tool(
   async ({ urlPattern }) => {
+    const client = getBrowserClient();
+    if (client?.antiDebugInterceptor) {
+      await client.antiDebugInterceptor.enablePauses();
+    }
     const session = await getSession();
     await session.setXHRBreakpoint(urlPattern);
     return JSON.stringify({ success: true });
@@ -271,6 +280,31 @@ export const getAgentLogs = tool(
   }
 );
 
+/**
+ * 设置日志断点（不暂停执行）
+ */
+export const setLogpoint = tool(
+  async ({ url, line, column, logExpression }) => {
+    const session = await getSession();
+    // condition 表达式执行 console.log 并返回 false（不暂停）
+    const condition = `(console.log('[logpoint]', ${logExpression}), false)`;
+    const result = await session.client.send('Debugger.setBreakpointByUrl', {
+      url, lineNumber: line, columnNumber: column || 0, condition,
+    });
+    return JSON.stringify({ breakpointId: result.breakpointId, url, line });
+  },
+  {
+    name: 'set_logpoint',
+    description: '设置日志断点（不暂停执行）。在指定代码位置记录表达式值到控制台，用于监控函数参数、返回值等',
+    schema: z.object({
+      url: z.string().describe('脚本 URL'),
+      line: z.number().describe('行号'),
+      column: z.number().optional().describe('列号'),
+      logExpression: z.string().describe('要记录的 JS 表达式，如 "arguments[0], arguments[1]" 或 "{key, iv, plaintext}"'),
+    }),
+  }
+);
+
 export const debugTools = [
   setBreakpoint,
   setXHRBreakpoint,
@@ -280,4 +314,5 @@ export const debugTools = [
   resumeExecution,
   stepOver,
   getAgentLogs,
+  setLogpoint,
 ];

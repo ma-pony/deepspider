@@ -5,7 +5,7 @@
 export { sandboxTools, sandboxExecute, sandboxInject, sandboxReset, getSandbox } from './sandbox.js';
 export { storeTools, saveToStore, queryStore, listStore } from './store.js';
 export { runtimeTools, launchBrowser, navigateTo, browserClose, addInitScript, clearCookies } from './runtime.js';
-export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver, getAgentLogs } from './debug.js';
+export { debugTools, setBreakpoint, setXHRBreakpoint, getCallStack, getFrameVariables, evaluateAtBreakpoint, resumeExecution, stepOver, getAgentLogs, setLogpoint } from './debug.js';
 export { captureTools, collectEnv, collectProperty, autoFixEnv, getHookLogs } from './capture.js';
 export { browserTools, clickElement, fillInput, waitForSelector, takeScreenshot, reloadPage, goBack, goForward, scrollPage, pressKey, hoverElement, getPageInfo, getPageSource, getElementHtml, getCookies, getInteractiveElements } from './browser.js';
 export { reportTools, saveAnalysisReport } from './report.js';
@@ -16,7 +16,7 @@ export { verifyTools, verifyMD5, verifySHA256, verifyHMAC, verifyAES, identifyEn
 export { cryptoHookTools, generateCryptoJSHook, generateRSAHook } from './cryptohook.js';
 // 合并工具（reverse-agent 使用）
 export { correlateTools, analyzeCorrelation, locateCryptoSource, analyzeHeaderEncryption, analyzeCookieEncryption, analyzeResponseDecryption, analyzeRequestParams } from './correlate.js';
-export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequestList, getRequestInitiator, getScriptList, getScriptSource, searchInScripts, clearSiteData, clearAllData } from './tracing.js';
+export { tracingTools, getSiteList, searchInResponses, getRequestDetail, getRequestList, getRequestInitiator, getScriptList, getScriptSource, searchInScripts, searchAndExtract, clearSiteData, clearAllData } from './tracing.js';
 export { analysisTools, getPendingAnalysis, getPendingChat, sendPanelMessage, startSelector } from './analysis.js';
 export { fileTools, artifactSave, artifactLoad, artifactEdit, artifactGlob, artifactGrep } from './file.js';
 export { evolveTools, evolveSkill } from './evolve.js';
@@ -26,16 +26,16 @@ export { crawlerTools } from './crawler.js';
 export { crawlerGeneratorTools, generateCrawlerWithConfirm, delegateCrawlerGeneration } from './crawlerGenerator.js';
 export { nodejsTools, runNodeCode } from './nodejs.js';
 export { pythonTools, executePythonCode } from './python.js';
-export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig } from './hookManager.js';
-export { scratchpadTools, saveMemo, loadMemo, listMemo } from './scratchpad.js';
-export { analyzeJsSource, understandEncryption, generateFullCrawler } from './ai/index.js';
+export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig, generateHookCode } from './hookManager.js';
+export { scratchpadTools, saveMemo, loadMemo, listMemo, saveFinding, listFindings } from './scratchpad.js';
+export { generateFullCrawler } from './ai/index.js';
 export { httpFetch, smartFetch } from './http/index.js';
 // 所有工具
 import { sandboxTools } from './sandbox.js';
 import { storeTools } from './store.js';
 import { runtimeTools } from './runtime.js';
 import { debugTools } from './debug.js';
-import { captureTools } from './capture.js';
+import { captureTools, collectProperty } from './capture.js';
 import { browserTools, clickElement, scrollPage, fillInput, getInteractiveElements, getPageInfo, hoverElement, pressKey } from './browser.js';
 import { reportTools } from './report.js';
 import { hookTools } from './hook.js';
@@ -43,7 +43,7 @@ import { asyncTools } from './async.js';
 import { antiDebugTools } from './antidebug.js';
 import { verifyTools } from './verify.js';
 import { cryptoHookTools } from './cryptohook.js';
-import { tracingTools, getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator } from './tracing.js';
+import { tracingTools, getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator, searchAndExtract } from './tracing.js';
 import { analysisTools } from './analysis.js';
 import { fileTools } from './file.js';
 import { evolveTools } from './evolve.js';
@@ -56,7 +56,7 @@ import { executePythonCode } from './python.js';
 import { hookManagerTools } from './hookManager.js';
 import { aiTools } from './ai/index.js';
 import { httpFetch, smartFetch } from './http/index.js';
-import { scratchpadTools } from './scratchpad.js';
+import { scratchpadTools, saveFinding, listFindings } from './scratchpad.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -94,7 +94,7 @@ export const allTools = [
  * - 验证层：执行测试，确保正确性
  * 
  * 已移除的传统工具（由 AI 替代）：
- * - AST 分析工具 → analyze_js_source
+ * - AST 分析工具 → LLM 直接理解混淆代码
  * - 反混淆工具 → LLM 直接理解混淆代码
  * - 代码转换工具 → LLM 直接生成目标代码
  * 
@@ -115,6 +115,8 @@ export const coreTools = [
   ...analysisTools,
   // 数据查询（仅调度所需的最小集：列表、搜索、详情、initiator）
   getSiteList, getRequestList, searchInResponses, getRequestDetail, getRequestInitiator,
+  // 浏览器环境采集（快速获取 localStorage、cookie、全局变量等）
+  collectProperty,
   // 报告生成
   ...reportTools,
   // 文件操作（包含 read_file 用于读取 skills）

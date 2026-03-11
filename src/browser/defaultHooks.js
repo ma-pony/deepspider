@@ -10,9 +10,28 @@ import { getAnalysisPanelScript } from './ui/analysisPanel.js';
 /**
  * 生成默认注入的 Hook 代码
  */
-export function getDefaultHookScript() {
+/**
+ * Hook 模式：
+ * - 'full': 全量 Hook（默认）
+ * - 'minimal': 最小 Hook（仅基础框架 + 面板 UI，用于排查 Hook 干扰）
+ * - 'none': 无 Hook（仅面板 UI）
+ */
+export function getDefaultHookScript(mode = 'full') {
+  if (mode === 'none') {
+    return getAllCollectorScripts() + getAnalysisPanelScript();
+  }
+
+  if (mode === 'minimal') {
+    // 最小模式：基础框架 + 面板（网络监控由 CDP NetworkInterceptor 处理）
+    return HookBase.getBaseCode()
+      + getAllCollectorScripts()
+      + getAnalysisPanelScript();
+  }
+
+  // 全量模式
+  // 注意：不注入 XHR/Fetch Hook，改用 CDP NetworkInterceptor 在协议层捕获
+  // JS 层 Hook 会被反爬网站检测到（构造函数替换/原型方法修改）
   return HookBase.getBaseCode()
-    + getNetworkHooks()
     + getCookieHook()
     + getJSONHooks()
     + getEncodingHooks()
@@ -27,66 +46,82 @@ export function getDefaultHookScript() {
     + getProxyHooks()
     + getErrorStackHooks()
     + getAllCollectorScripts()
-    + getAnalysisPanelScript(); // 分析面板 UI
+    + getAnalysisPanelScript();
 }
 
 /**
- * 网络请求 Hook (XHR + Fetch)
+ * XHR Hook
  */
-function getNetworkHooks() {
+function getXHRHook() {
   return `
 // === XHR Hook ===
+// 在 prototype 上 Hook，不替换构造函数，避免被反爬检测
 (function() {
   const deepspider = window.__deepspider__;
   if (!deepspider) return;
 
-  const OriginalXHR = XMLHttpRequest;
+  // 用 WeakMap 存储每个 xhr 实例的上下文（不污染实例属性）
+  const xhrCtx = new WeakMap();
 
-  XMLHttpRequest = function() {
-    const xhr = new OriginalXHR();
-    const log = { method: '', url: '', requestHeaders: {}, requestBody: null, response: null, status: 0 };
+  function getCtx(xhr) {
+    let ctx = xhrCtx.get(xhr);
+    if (!ctx) {
+      ctx = { method: '', url: '', requestHeaders: {}, requestBody: null };
+      xhrCtx.set(xhr, ctx);
+    }
+    return ctx;
+  }
 
-    const originalOpen = xhr.open;
-    xhr.open = deepspider.native(function(method, url) {
-      log.method = method;
-      log.url = url;
-      return originalOpen.apply(xhr, arguments);
-    }, originalOpen);
+  // Hook prototype.open
+  const origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = deepspider.native(function(method, url) {
+    const ctx = getCtx(this);
+    ctx.method = method;
+    ctx.url = typeof url === 'string' ? url : String(url);
+    return origOpen.apply(this, arguments);
+  }, origOpen);
 
-    const originalSetHeader = xhr.setRequestHeader;
-    xhr.setRequestHeader = deepspider.native(function(name, value) {
-      log.requestHeaders[name] = value;
-      return originalSetHeader.apply(xhr, arguments);
-    }, originalSetHeader);
+  // Hook prototype.setRequestHeader
+  const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = deepspider.native(function(name, value) {
+    const ctx = getCtx(this);
+    ctx.requestHeaders[name] = value;
+    return origSetHeader.apply(this, arguments);
+  }, origSetHeader);
 
-    const originalSend = xhr.send;
-    xhr.send = deepspider.native(function(body) {
-      log.requestId = deepspider.startRequest(log.url, log.method);
-      log.requestBody = body;
-      deepspider.log('xhr', { action: 'send', ...log, body: body?.toString().slice(0, 200) });
-      return originalSend.apply(xhr, arguments);
-    }, originalSend);
+  // Hook prototype.send
+  const origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = deepspider.native(function(body) {
+    const ctx = getCtx(this);
+    ctx.requestId = deepspider.startRequest(ctx.url, ctx.method);
+    ctx.requestBody = body;
+    deepspider.log('xhr', { action: 'send', method: ctx.method, url: ctx.url, body: body?.toString?.()?.slice(0, 200) });
 
-    xhr.addEventListener('load', function() {
-      log.status = xhr.status;
-      log.response = xhr.responseText?.slice(0, 500);
-      const ctx = deepspider.endRequest();
+    // 监听响应（每次 send 绑定，用 once 语义避免重复）
+    this.addEventListener('load', function onLoad() {
+      const endCtx = deepspider.endRequest();
       deepspider.log('xhr', {
         action: 'response',
-        url: log.url,
-        status: log.status,
-        response: log.response?.slice(0, 100),
-        linkedCrypto: ctx?.cryptoCalls || []
+        url: ctx.url,
+        status: this.status,
+        response: this.responseText?.slice(0, 100),
+        linkedCrypto: endCtx?.cryptoCalls || []
       });
     });
 
-    return xhr;
-  };
+    return origSend.apply(this, arguments);
+  }, origSend);
 
-  XMLHttpRequest.prototype = OriginalXHR.prototype;
   console.log('[DeepSpider] XHR Hook 已启用');
 })();
+`;
+}
 
+/**
+ * Fetch Hook
+ */
+function getFetchHook() {
+  return `
 // === Fetch Hook ===
 (function() {
   const deepspider = window.__deepspider__;
@@ -137,6 +172,13 @@ function getNetworkHooks() {
   console.log('[DeepSpider] Fetch Hook 已启用');
 })();
 `;
+}
+
+/**
+ * 网络请求 Hook (XHR + Fetch)
+ */
+function getNetworkHooks() {
+  return getXHRHook() + getFetchHook();
 }
 
 /**

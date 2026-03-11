@@ -21,10 +21,22 @@ export class AntiDebugInterceptor {
   }
 
   async start() {
-    // 兜底：对于 blackbox 来不及处理的同步 debugger（时序竞争），自动 resume
-    // reason 可能是 'other' 或 'debugCommand'（不同 Chrome 版本），
-    // 只要不是我们主动设的断点（hitBreakpoints 非空 / reason=breakpoint）就 resume
+    // 核心策略：默认跳过所有断点暂停
+    // Debugger.enable 是 ScriptInterceptor 捕获脚本所必须的，
+    // 但 debugger 语句会触发 CDP pause，反调试网站利用这点制造 pause/resume 风暴。
+    // setSkipAllPauses(true) 让引擎完全忽略 debugger 语句，零开销。
+    // 用户主动设断点时通过 enablePauses() 关闭。
+    await this.client.send('Debugger.setSkipAllPauses', { skip: true });
+    this._skipAll = true;
+
+    // 兜底：当 skipAll 关闭后，对非手动断点的 paused 事件自动 resume
     this.client.on('Debugger.paused', (params) => {
+      // skipAll 模式下不会触发此事件，但作为防御性代码保留
+      if (this._skipAll) {
+        this.client.send('Debugger.resume').catch(() => {});
+        return;
+      }
+
       // 手动设置的断点（除非在风暴模式）
       if (!this.stormMode && params.reason === 'breakpoint') return;
       if (!this.stormMode && params.hitBreakpoints?.length > 0) return;
@@ -38,7 +50,6 @@ export class AntiDebugInterceptor {
       // 高频 debugger 检测
       const now = Date.now();
       if (now - this.pausedWindowStart > this.PAUSED_WINDOW_MS) {
-        // 新窗口
         this.pausedWindowStart = now;
         this.pausedCount = 1;
       } else {
@@ -49,11 +60,7 @@ export class AntiDebugInterceptor {
       if (this.pausedCount > this.PAUSED_THRESHOLD) {
         console.log('[AntiDebugInterceptor] 检测到 debugger 风暴，启用风暴模式');
         this.stormMode = true;
-        // 清除之前的定时器
-        if (this.stormTimer) {
-          clearTimeout(this.stormTimer);
-        }
-        // 3秒后退出风暴模式
+        if (this.stormTimer) clearTimeout(this.stormTimer);
         this.stormTimer = setTimeout(() => {
           console.log('[AntiDebugInterceptor] 退出风暴模式');
           this.stormMode = false;
@@ -66,7 +73,28 @@ export class AntiDebugInterceptor {
       this.client.send('Debugger.resume').catch(() => {});
     });
 
-    console.log('[AntiDebugInterceptor] 已启动');
+    console.log('[AntiDebugInterceptor] 已启动 (skipAllPauses)');
+  }
+
+  /**
+   * 启用断点暂停（用户主动设断点时调用）
+   * 关闭 skipAllPauses，依赖 blackbox + storm mode 防御反调试
+   */
+  async enablePauses() {
+    if (!this._skipAll) return;
+    this._skipAll = false;
+    await this.client.send('Debugger.setSkipAllPauses', { skip: false });
+    console.log('[AntiDebugInterceptor] 已启用断点暂停');
+  }
+
+  /**
+   * 禁用断点暂停（恢复默认防御模式）
+   */
+  async disablePauses() {
+    if (this._skipAll) return;
+    this._skipAll = true;
+    await this.client.send('Debugger.setSkipAllPauses', { skip: true });
+    console.log('[AntiDebugInterceptor] 已禁用断点暂停');
   }
 
   /**

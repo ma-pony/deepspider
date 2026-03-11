@@ -178,6 +178,48 @@ export const setHookConfig = tool(
   }
 );
 
+/**
+ * 生成标准 Hook 代码模板
+ */
+export const generateHookCode = tool(
+  async ({ targetPath, captureArgs, captureReturn, logChannel }) => {
+    const channel = logChannel || 'trace';
+    const code = `
+(function() {
+  const ds = window.__deepspider__;
+  if (!ds) return;
+  const parts = ${JSON.stringify(targetPath)}.split('.');
+  const parent = parts.slice(0, -1).reduce((o, k) => o?.[k], window);
+  const methodName = parts[parts.length - 1];
+  if (!parent || typeof parent[methodName] !== 'function') {
+    console.warn('[Hook] 目标不存在:', ${JSON.stringify(targetPath)});
+    return;
+  }
+  const orig = parent[methodName].bind(parent);
+  parent[methodName] = ds.native(function(...args) {
+    const entry = { target: ${JSON.stringify(targetPath)} };
+    ${captureArgs ? 'entry.args = args.map(a => typeof a === "string" ? a.slice(0, 200) : String(a).slice(0, 200));' : ''}
+    const result = orig(...args);
+    ${captureReturn ? 'entry.result = typeof result === "string" ? result.slice(0, 200) : String(result).slice(0, 200);' : ''}
+    ${captureArgs || captureReturn ? `ds.log('${channel}', entry);` : ''}
+    return result;
+  }, orig);
+  console.log('[Hook] 已挂钩:', ${JSON.stringify(targetPath)});
+})();`.trim();
+    return JSON.stringify({ code });
+  },
+  {
+    name: 'generate_hook_code',
+    description: '生成标准 Hook 代码模板。生成后传给 inject_hook 注入。比手写 Hook 更安全（自动 deepspider.native 包装、参数截断、日志集成）',
+    schema: z.object({
+      targetPath: z.string().describe('目标函数路径，如 "CryptoJS.AES.encrypt" 或 "localStorage.getItem"'),
+      captureArgs: z.boolean().optional().default(true).describe('是否捕获参数'),
+      captureReturn: z.boolean().optional().default(true).describe('是否捕获返回值'),
+      logChannel: z.string().optional().default('trace').describe('日志通道: crypto, trace, storage 等'),
+    }),
+  }
+);
+
 // 导出所有工具
 export const hookManagerTools = [
   listHooks,
@@ -185,4 +227,5 @@ export const hookManagerTools = [
   disableHook,
   injectHook,
   setHookConfig,
+  generateHookCode,
 ];

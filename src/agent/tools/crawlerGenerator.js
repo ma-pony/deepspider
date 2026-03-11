@@ -13,16 +13,29 @@ import { interrupt } from '@langchain/langgraph';
  */
 export const generateCrawlerWithConfirm = tool(
   async ({ analysisSummary, domain }) => {
-    const userChoice = interrupt({
-      type: 'choices',
-      question: '分析完成！选择爬虫框架生成完整脚本：',
-      options: [
-        { id: 'requests', label: 'requests', description: '简单易用，适合快速原型' },
-        { id: 'httpx', label: 'httpx', description: '异步高性能，适合大规模并发' },
-        { id: 'scrapy', label: 'Scrapy', description: '企业级框架，适合复杂项目' },
-        { id: 'skip', label: '不需要', description: '仅保存当前分析结果' },
-      ],
-    });
+    // interrupt with timeout — don't block forever in CLI mode
+    const timeoutMs = 60000;
+    let userChoice;
+    try {
+      userChoice = await Promise.race([
+        Promise.resolve(interrupt({
+          type: 'choices',
+          question: '分析完成！选择爬虫框架生成完整脚本：',
+          options: [
+            { id: 'requests', label: 'requests', description: '简单易用，适合快速原型' },
+            { id: 'httpx', label: 'httpx', description: '异步高性能，适合大规模并发' },
+            { id: 'scrapy', label: 'Scrapy', description: '企业级框架，适合复杂项目' },
+            { id: 'skip', label: '不需要', description: '仅保存当前分析结果' },
+          ],
+        })),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), timeoutMs)
+        ),
+      ]);
+    } catch (e) {
+      // Timeout or error — default to requests
+      userChoice = 'requests';
+    }
 
     return JSON.stringify({
       success: true,
@@ -37,7 +50,8 @@ export const generateCrawlerWithConfirm = tool(
     name: 'generate_crawler_code',
     description: `分析完成后，向用户展示可点击的框架选项（requests/httpx/Scrapy/不需要）。
 
-用户点击后，工具返回用户选择的框架名称。根据返回值委托 crawler 子代理生成代码。`,
+用户点击后，工具返回用户选择的框架名称。根据返回值委托 crawler 子代理生成代码。
+如果60秒内无响应，默认选择 requests 框架。`,
     schema: z.object({
       analysisSummary: z.string().describe('分析结果摘要'),
       domain: z.string().describe('目标网站域名'),

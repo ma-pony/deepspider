@@ -234,6 +234,8 @@ async function init() {
   DEBUG = process.env.DEBUG === 'true' || args.includes('--debug');
   const PERSIST = args.includes('--persist');
   const RESUME = args.includes('--resume');
+  const STEALTH = args.includes('--stealth');
+  const RAW = args.includes('--raw');
   debugFn = (...a) => { if (DEBUG) console.log('[DEBUG]', ...a); };
 
   debugFn('init: 启动');
@@ -324,6 +326,20 @@ async function init() {
         ensureDir(PATHS.BROWSER_DATA_DIR);
         browserOptions.userDataDir = PATHS.BROWSER_DATA_DIR;
         console.log(`[持久化模式] 浏览器数据保存在 ${PATHS.BROWSER_DATA_DIR}`);
+      }
+      if (RAW) {
+        browserOptions.hookMode = 'none';
+        browserOptions.disableInterceptors = true;
+        console.log('[纯净模式] 无 Hook、无 CDP 拦截器');
+      } else if (args.includes('--no-hooks')) {
+        browserOptions.hookMode = 'none';
+        console.log('[无 Hook 模式] 禁用 Hook，保留 CDP 拦截器');
+      } else if (args.includes('--no-cdp')) {
+        browserOptions.disableInterceptors = true;
+        console.log('[无拦截器模式] 禁用 CDP 拦截器，保留全量 Hook');
+      } else if (STEALTH) {
+        browserOptions.hookMode = 'minimal';
+        console.log('[隐身模式] 仅启用最小 Hook（基础框架 + 面板）');
       }
       browser = await getBrowser(browserOptions);
       browser.onMessage = handleBrowserMessage;
