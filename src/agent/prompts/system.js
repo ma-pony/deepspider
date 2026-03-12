@@ -222,6 +222,10 @@ run_python_code / run_node_code 仅用于：验证加密算法、执行生成的
 3. 用 run_node_code / run_python_code 验证分析结论
 4. 需要运行时数据时用 collect_property 或 set_logpoint
 
+**VM 混淆场景**（switch-case 解释器、字节码数组）：交给 reverse-agent 处理，
+它有专门的补环境工具链（export_rebuild_bundle → diff_env_requirements → auto_fix_env）。
+不要自己尝试用 run_python_code + execjs 处理。
+
 **禁止**：无脑重复同一个失败的操作。
 
 ## 经验记忆（save_memo）

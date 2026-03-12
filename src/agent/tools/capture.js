@@ -71,17 +71,45 @@ export const collectProperty = tool(
  * 自动补环境
  */
 export const autoFixEnv = tool(
-  async ({ missingPaths }) => {
+  async ({ missingPaths, errorText }) => {
     const browser = await getBrowser();
     const bridge = new EnvBridge(browser.getPage());
-    const result = await bridge.runFullPipeline(missingPaths);
-    return JSON.stringify(result, null, 2);
+
+    // 从错误文本中提取缺失路径
+    let paths = missingPaths || [];
+    if (errorText) {
+      const { PatchGenerator } = await import('../../core/PatchGenerator.js');
+      const parsed = PatchGenerator.parseEnvError(errorText);
+      paths = [...new Set([...paths, ...parsed])];
+    }
+
+    if (paths.length === 0) {
+      // 无指定路径时执行全量采集
+      const result = await bridge.runFullPipeline();
+      return JSON.stringify(result, null, 2);
+    }
+
+    // 有指定路径时逐个采集
+    const result = await bridge.autoFix(paths);
+    const mergedCode = bridge.generateMergedPatch(result.patched);
+    return JSON.stringify({
+      success: result.failed.length === 0,
+      stats: {
+        total: paths.length,
+        collected: result.collected.length,
+        patched: result.patched.length,
+        failed: result.failed.length
+      },
+      patchCode: mergedCode,
+      failed: result.failed
+    }, null, 2);
   },
   {
     name: 'auto_fix_env',
-    description: '根据缺失属性列表，自动从真实浏览器采集并生成补丁代码',
+    description: '自动补环境：从真实浏览器采集数据生成补丁代码。可传入缺失路径列表或错误文本（自动解析）。无参数时执行全量采集。',
     schema: z.object({
-      missingPaths: z.array(z.string()).describe('缺失的属性路径列表'),
+      missingPaths: z.array(z.string()).optional().describe('缺失的属性路径列表'),
+      errorText: z.string().optional().describe('Node.js 执行报错信息，自动解析缺失的 API'),
     }),
   }
 );

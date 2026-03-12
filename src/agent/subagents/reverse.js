@@ -31,6 +31,9 @@ import { executePythonCode } from '../tools/python.js';
 import { fileTools } from '../tools/file.js';
 import { storeTools } from '../tools/store.js';
 
+// 补环境重建
+import { rebuildTools } from '../tools/rebuild.js';
+
 // 页面交互（最小集）
 import { reloadPage, clickElement, scrollPage, getCookies, getPageSource } from '../tools/browser.js';
 
@@ -95,7 +98,7 @@ export const reverseSubagent = createSubagent({
 ## 注意事项
 
 1. **禁止全量拉取源码** — 先定位再拉取
-2. **混淆代码无需反混淆** — AI 能直接理解混淆代码
+2. **普通混淆无需反混淆** — AI 能直接理解。**VM 混淆走补环境路径**（见下方）
 3. **验证很重要** — 生成 Python 后必须验证，对比输入输出是否一致
 4. **Hook 用于采集数据** — 捕获运行时参数，记录加密调用
 
@@ -104,6 +107,25 @@ export const reverseSubagent = createSubagent({
 分析完成后，保存结果：
 - artifact_save: 保存 Python 代码
 - save_memo: 记录分析过程
+
+## VM 混淆处理（补环境路径）
+
+当代码呈现以下特征时判定为 VM 混淆，**禁止静态分析**：
+- 巨大的 switch-case 解释器循环
+- 超长数组（>50 个元素）+ 程序计数器（++/--）
+- 代码完全不可读，search_and_extract 搜不到加密函数名
+
+**处理路径**：
+1. export_rebuild_bundle 导出本地可运行项目（自动采集真实浏览器环境）
+2. run_node_code 执行 entry.js，观察输出
+3. 如果报错 → diff_env_requirements 解析缺失 API → auto_fix_env 从浏览器补采
+4. 用 artifact_edit 将补丁追加到 env.js → 重试步骤 2
+5. 成功执行后，封装为最终输出（Python execjs 方案或纯协议方案）
+
+**禁止**：
+- 对 VM 代码尝试静态反混淆
+- 在 execjs 和 Selenium 之间来回切换
+- 用 search_and_extract 搜索加密算法名（VM 内部不暴露）
 `,
 
   tools: [
@@ -117,6 +139,8 @@ export const reverseSubagent = createSubagent({
     ...hookManagerTools,
     // 沙箱验证
     ...sandboxTools,
+    // 补环境重建
+    ...rebuildTools,
     // 代码执行
     ...nodejsTools,
     executePythonCode,

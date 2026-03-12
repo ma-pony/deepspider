@@ -28,6 +28,7 @@ export { nodejsTools, runNodeCode } from './nodejs.js';
 export { pythonTools, executePythonCode } from './python.js';
 export { hookManagerTools, listHooks, enableHook, disableHook, injectHook, setHookConfig, generateHookCode } from './hookManager.js';
 export { scratchpadTools, saveMemo, loadMemo, listMemo, saveFinding, listFindings } from './scratchpad.js';
+export { rebuildTools, exportRebuildBundle, diffEnvRequirements } from './rebuild.js';
 export { generateFullCrawler } from './ai/index.js';
 export { httpFetch, smartFetch } from './http/index.js';
 // 所有工具
@@ -57,6 +58,7 @@ import { hookManagerTools } from './hookManager.js';
 import { aiTools } from './ai/index.js';
 import { httpFetch, smartFetch } from './http/index.js';
 import { scratchpadTools, saveFinding, listFindings } from './scratchpad.js';
+import { rebuildTools } from './rebuild.js';
 
 export const allTools = [
   ...sandboxTools,
@@ -82,6 +84,7 @@ export const allTools = [
   ...nodejsTools,
   ...hookManagerTools,
   ...scratchpadTools,
+  ...rebuildTools,
 ];
 
 /**

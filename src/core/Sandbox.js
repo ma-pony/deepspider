@@ -6,7 +6,7 @@
 import ivm from 'isolated-vm';
 import { EnvMonitor } from './EnvMonitor.js';
 import { PatchGenerator } from './PatchGenerator.js';
-import { modules, loadOrder } from '../env/modules/index.js';
+import { buildEnvCode, eventCode, historyCode, urlCode, fetchCode, xhrCode } from '../env/modules/index.js';
 
 export class Sandbox {
   constructor() {
@@ -152,19 +152,29 @@ export class Sandbox {
 
   /**
    * 自动补环境闭环执行
-   * 加载预置模块 → Proxy 监控 → 迭代补丁 → 返回结果
+   * 支持两种模式：
+   * 1. 有 pageData：使用 buildEnvCode 生成真实环境（推荐）
+   * 2. 无 pageData：仅加载结构性模块，迭代补丁仅来自知识库
    */
   async executeWithAutoFix(code, options = {}) {
     const {
       timeout = 5000,
       maxIterations = 10,
       loadModules = true,
+      pageData = null,
     } = options;
 
-    // 1. 加载预置环境模块
-    if (loadModules && !this.envLoaded) {
-      const envCode = loadOrder.map(n => modules[n]).filter(Boolean).join('\n\n');
-      await this.loadEnv(envCode);
+    // 1. 加载环境模块
+    if (!this.envLoaded) {
+      if (pageData) {
+        // 有真实数据：使用 buildEnvCode 生成完整环境
+        const envCode = buildEnvCode(pageData);
+        await this.loadEnv(envCode);
+      } else if (loadModules) {
+        // 无真实数据：仅加载结构性模块（event, history, url, fetch, xhr）
+        const envCode = [eventCode, historyCode, urlCode, fetchCode, xhrCode].join('\n\n');
+        await this.loadEnv(envCode);
+      }
     }
 
     // 2. 用 __createProxy__ 包裹全局对象，启用 missing 监控
@@ -190,6 +200,7 @@ export class Sandbox {
           appliedPatches,
           remainingMissing: result.missingEnv,
           stalled: currentKey === lastMissingKey,
+          needsRealData: !pageData && result.missingEnv.length > 0,
         };
       }
       lastMissingKey = currentKey;
@@ -207,19 +218,21 @@ export class Sandbox {
         }
       }
 
-      // 批量生成补丁并注入（过滤掉 skipped 和低置信度的）
-      // 未加载模块时，不跳过 coveredAPIs 中的属性
+      // 尝试从知识库生成补丁（不再生成假数据模板）
       const genContext = this.envLoaded ? {} : { skipCoveredCheck: true };
       const batch = await this.patchGenerator.generateBatch(result.missingEnv, genContext);
-      const effective = batch.patches.filter(p => p.confidence >= 0.5 && !p.skipped);
+      // 只使用有实际代码的补丁（知识库来源），跳过 needsRealData 的
+      const effective = batch.patches.filter(p => p.code && p.confidence >= 0.5 && !p.skipped && !p.needsRealData);
       const patchCode = this.patchGenerator.mergePatchCode(effective);
 
       if (!patchCode.trim()) {
+        // 无可用补丁，返回需要真实数据的提示
         return {
           ...result,
           iterations: i + 1,
           appliedPatches,
           remainingMissing: result.missingEnv,
+          needsRealData: true,
         };
       }
 

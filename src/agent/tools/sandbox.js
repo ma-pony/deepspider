@@ -80,18 +80,39 @@ export const sandboxReset = tool(
  * 自动补环境执行工具
  */
 export const sandboxAutoFix = tool(
-  async ({ code, timeout, maxIterations }) => {
+  async ({ code, timeout, maxIterations, useBrowserEnv }) => {
     const sb = await getSandbox();
-    const result = await sb.executeWithAutoFix(code, { timeout, maxIterations });
+    let pageData = null;
+
+    if (useBrowserEnv) {
+      // 从浏览器采集真实环境数据
+      try {
+        const { getBrowser } = await import('../../browser/index.js');
+        const { EnvBridge } = await import('../../browser/EnvBridge.js');
+        const browser = await getBrowser();
+        const bridge = new EnvBridge(browser.getPage());
+        const pipelineResult = await bridge.collectPageData();
+        pageData = pipelineResult;
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: `浏览器环境采集失败: ${e.message}`,
+          hint: '确保浏览器已打开并导航到目标页面'
+        }, null, 2);
+      }
+    }
+
+    const result = await sb.executeWithAutoFix(code, { timeout, maxIterations, pageData });
     return JSON.stringify(result, null, 2);
   },
   {
     name: 'sandbox_auto_fix',
-    description: '自动补环境闭环执行：加载预置模块 → 执行代码 → 发现缺失环境 → 自动生成补丁 → 重试，直到成功或无法继续。适合快速验证混淆代码能否在沙箱中运行。',
+    description: '自动补环境闭环执行：加载环境模块 → 执行代码 → 发现缺失 → 补丁 → 重试。设置 useBrowserEnv=true 时自动从浏览器采集真实环境数据（推荐用于 VM 混淆代码）。',
     schema: z.object({
       code: z.string().describe('要执行的目标JS代码'),
       timeout: z.number().optional().default(5000).describe('单次执行超时时间(ms)'),
       maxIterations: z.number().optional().default(10).describe('最大迭代次数'),
+      useBrowserEnv: z.boolean().optional().default(false).describe('是否从浏览器采集真实环境数据（推荐 VM 混淆场景开启）'),
     }),
   }
 );

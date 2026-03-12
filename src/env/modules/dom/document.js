@@ -1,9 +1,10 @@
 /**
- * DeepSpider - Document 环境模块（基础版）
+ * DeepSpider - Document 环境模块（数据驱动）
  */
 
-export const documentCode = `
-(function() {
+export function documentCode(data) {
+  if (!data) throw new Error('document: 需要真实浏览器数据');
+  return `(function() {
   // 元素ID生成器
   let __elId = 0;
   const __elements = new Map();
@@ -23,9 +24,9 @@ export const documentCode = `
     this.style = {};
     this.classList = {
       _list: [],
-      add: function(...c) { c.forEach(x => !this._list.includes(x) && this._list.push(x)); },
-      remove: function(...c) { c.forEach(x => { const i = this._list.indexOf(x); if (i > -1) this._list.splice(i, 1); }); },
-      contains: function(c) { return this._list.includes(c); },
+      add: function() { var c = arguments; for (var i = 0; i < c.length; i++) if (this._list.indexOf(c[i]) === -1) this._list.push(c[i]); },
+      remove: function() { var c = arguments; for (var i = 0; i < c.length; i++) { var idx = this._list.indexOf(c[i]); if (idx > -1) this._list.splice(idx, 1); } },
+      contains: function(c) { return this._list.indexOf(c) !== -1; },
       toggle: function(c) { this.contains(c) ? this.remove(c) : this.add(c); }
     };
     this.innerHTML = '';
@@ -44,7 +45,7 @@ export const documentCode = `
     hasAttribute: function(n) { return n in this._attrs; },
     appendChild: function(c) { this.children.push(c); this.childNodes.push(c); c.parentNode = this; return c; },
     removeChild: function(c) {
-      const i = this.children.indexOf(c);
+      var i = this.children.indexOf(c);
       if (i > -1) { this.children.splice(i, 1); this.childNodes.splice(i, 1); }
       return c;
     },
@@ -62,17 +63,17 @@ export const documentCode = `
   };
 
   // Document 对象
-  const document = {
+  var document = {
     nodeType: 9,
     nodeName: '#document',
     documentElement: new Element('HTML'),
     head: new Element('HEAD'),
     body: new Element('BODY'),
-    title: '',
-    cookie: '',
-    domain: 'example.com',
-    URL: 'https://example.com/',
-    referrer: '',
+    title: ${JSON.stringify(data.title || '')},
+    cookie: ${JSON.stringify(data.cookie || '')},
+    domain: ${JSON.stringify(data.domain || '')},
+    URL: ${JSON.stringify(data.URL || '')},
+    referrer: ${JSON.stringify(data.referrer || '')},
     readyState: 'complete',
     hidden: false,
     visibilityState: 'visible',
@@ -104,8 +105,8 @@ export const documentCode = `
 
   window.document = document;
   window.Element = Element;
-})();
-`;
+})();`;
+}
 
 export const documentCovers = [
   'document.nodeType', 'document.nodeName', 'document.documentElement',

@@ -1,48 +1,14 @@
 /**
  * DeepSpider - 补丁生成器
- * 多级生成策略：模式规则 → 模板生成
+ * 多级生成策略：知识库匹配 → 错误解析
  */
 
 import { Store } from '../store/Store.js';
 import { coveredAPIs } from '../env/modules/index.js';
 
-// 属性类型推断规则
-const TYPE_RULES = {
-  // 字符串类型
-  string: [
-    /userAgent$/, /platform$/, /language$/, /vendor$/,
-    /href$/, /hostname$/, /pathname$/, /protocol$/,
-    /cookie$/, /title$/, /referrer$/, /domain$/
-  ],
-  // 数字类型
-  number: [
-    /width$/, /height$/, /devicePixelRatio$/, /colorDepth$/,
-    /hardwareConcurrency$/, /maxTouchPoints$/, /length$/
-  ],
-  // 布尔类型
-  boolean: [
-    /cookieEnabled$/, /onLine$/, /hidden$/, /webdriver$/
-  ],
-  // 数组类型
-  array: [
-    /languages$/, /plugins$/, /mimeTypes$/
-  ],
-  // 对象类型
-  object: [
-    /connection$/, /geolocation$/, /mediaDevices$/,
-    /style$/, /dataset$/, /classList$/
-  ],
-  // 函数类型
-  function: [
-    /getElementById$/, /querySelector/, /createElement$/,
-    /addEventListener$/, /getAttribute$/, /setAttribute$/
-  ]
-};
-
 export class PatchGenerator {
   constructor() {
     this.store = new Store();
-    this.patterns = this._initPatterns();
     this.generated = new Map();
   }
 
@@ -76,15 +42,8 @@ export class PatchGenerator {
       return libResult;
     }
 
-    // 2. 模式规则匹配
-    const patternResult = this._matchPattern(property);
-    if (patternResult) {
-      this.generated.set(property, patternResult);
-      return patternResult;
-    }
-
-    // 3. 智能模板生成
-    const templateResult = this._generateSmartTemplate(property, context);
+    // 2. 不再生成假数据模板，返回需要真实数据的提示
+    const templateResult = this._generateSmartTemplate(property);
     this.generated.set(property, templateResult);
     return templateResult;
   }
@@ -122,93 +81,44 @@ export class PatchGenerator {
     return null;
   }
 
-  _initPatterns() {
-    return {
-      // Navigator
-      'navigator.userAgent': `navigator.userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";`,
-      'navigator.platform': `navigator.platform = "Win32";`,
-      'navigator.language': `navigator.language = "zh-CN";`,
-      'navigator.languages': `navigator.languages = ["zh-CN", "en"];`,
-      'navigator.cookieEnabled': `navigator.cookieEnabled = true;`,
-      'navigator.onLine': `navigator.onLine = true;`,
-      'navigator.hardwareConcurrency': `navigator.hardwareConcurrency = 8;`,
-      'navigator.webdriver': `Object.defineProperty(navigator, 'webdriver', { get: () => false });`,
-      // Location
-      'location.href': `location.href = "https://example.com/";`,
-      'location.hostname': `location.hostname = "example.com";`,
-      'location.protocol': `location.protocol = "https:";`,
-      // Document
-      'document.cookie': `document.cookie = "";`,
-      'document.referrer': `document.referrer = "";`,
-      'document.domain': `document.domain = "example.com";`,
-      // Screen
-      'screen.width': `screen.width = 1920;`,
-      'screen.height': `screen.height = 1080;`,
-      'screen.colorDepth': `screen.colorDepth = 24;`,
-      // Window
-      'window.innerWidth': `window.innerWidth = 1920;`,
-      'window.innerHeight': `window.innerHeight = 1080;`,
-      'window.devicePixelRatio': `window.devicePixelRatio = 1;`
-    };
-  }
-
-  _matchPattern(property) {
-    const pattern = this.patterns[property];
-    if (pattern) {
-      return {
-        source: 'pattern',
-        code: pattern,
-        property,
-        confidence: 0.9
-      };
-    }
-    return null;
-  }
-
-  _inferType(property) {
-    for (const [type, patterns] of Object.entries(TYPE_RULES)) {
-      if (patterns.some(p => p.test(property))) {
-        return type;
-      }
-    }
-    return 'unknown';
-  }
-
-  _getDefaultValue(type) {
-    const defaults = {
-      string: '""',
-      number: '0',
-      boolean: 'false',
-      array: '[]',
-      object: '{}',
-      function: 'function() {}',
-      unknown: 'undefined'
-    };
-    return defaults[type] || 'undefined';
-  }
-
-  _generateSmartTemplate(property, _context = {}) {
-    const parts = property.split('.');
-    const propName = parts[parts.length - 1];
-    const type = this._inferType(property);
-    const defaultVal = this._getDefaultValue(type);
-
-    let code;
-    if (parts.length === 1) {
-      code = `window.${property} = ${defaultVal};`;
-    } else {
-      const parent = parts.slice(0, -1).join('.');
-      code = `${parent}.${propName} = ${defaultVal};`;
-    }
-
+  _generateSmartTemplate(property) {
     return {
       source: 'template',
-      code,
+      code: '',
       property,
-      inferredType: type,
-      confidence: 0.5,
-      needsLLM: true
+      confidence: 0,
+      needsRealData: true,
     };
+  }
+
+  /**
+   * 从错误文本中解析缺失的环境 API
+   */
+  static parseEnvError(errorText) {
+    const missing = [];
+    // "X is not defined"
+    const refMatch = errorText.match(/(\w+) is not defined/g);
+    if (refMatch) {
+      for (const m of refMatch) {
+        missing.push(m.replace(' is not defined', ''));
+      }
+    }
+    // "Cannot read properties of undefined (reading 'Y')"
+    const propMatch = errorText.match(/Cannot read propert\w+ of (?:undefined|null) \(reading ['"](\w+)['"]\)/g);
+    if (propMatch) {
+      for (const m of propMatch) {
+        const key = m.match(/reading ['"](\w+)['"]/)?.[1];
+        if (key) missing.push(key);
+      }
+    }
+    // "X is not a function"
+    const fnMatch = errorText.match(/(\w+(?:\.\w+)*) is not a function/g);
+    if (fnMatch) {
+      for (const m of fnMatch) {
+        missing.push(m.replace(' is not a function', ''));
+      }
+    }
+    return [...new Set(missing)];
   }
 
   // 批量生成补丁
@@ -227,9 +137,8 @@ export class PatchGenerator {
       conflicts: Array.from(conflicts),
       stats: {
         total: results.length,
-        fromLibrary: results.filter(r => r.source === 'library').length,
-        fromPattern: results.filter(r => r.source === 'pattern').length,
-        needsLLM: results.filter(r => r.needsLLM).length
+        fromStore: results.filter(r => r.source === 'store' || r.source === 'store-partial').length,
+        needsRealData: results.filter(r => r.needsRealData).length
       }
     };
   }
@@ -270,8 +179,8 @@ export class PatchGenerator {
     const grouped = new Map();
 
     for (const patch of patches) {
-      // 跳过已被模块覆盖或无代码的补丁
-      if (patch.skipped || !patch.code) continue;
+      // 跳过已被模块覆盖、无代码、需要真实数据的补丁
+      if (patch.skipped || !patch.code || patch.needsRealData) continue;
       const root = patch.property.split('.')[0];
       if (!grouped.has(root)) {
         grouped.set(root, []);
