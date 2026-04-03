@@ -1,212 +1,60 @@
 /**
- * DeepSpider - DeepAgent 主入口
- * 使用 createAgent 手动组装 middleware 栈，替换 createDeepAgent
- * 目的：用自定义 subagent middleware 支持 context 结构化传递
+ * Agent 入口
+ * 启动 opencode server + 连接 + 创建会话
  */
 
-import 'dotenv/config';
-import { StateBackend, FilesystemBackend, createFilesystemMiddleware, createPatchToolCallsMiddleware, createSkillsMiddleware } from 'deepagents';
-import { createAgent, toolRetryMiddleware, summarizationMiddleware, anthropicPromptCachingMiddleware, todoListMiddleware, humanInTheLoopMiddleware } from 'langchain';
-import { ChatAnthropic } from '@langchain/anthropic';
-import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
-
-import { coreTools } from './tools/index.js';
-import { allSubagents } from './subagents/index.js';
-import { systemPrompt } from './prompts/system.js';
-import { SKILLS, skillsBackend } from './skills/config.js';
-import { createReportMiddleware } from './middleware/report.js';
-import { createFilterToolsMiddleware } from './middleware/filterTools.js';
-import { createCustomSubAgentMiddleware } from './middleware/subagent.js';
-import { createSubagentRecoveryMiddleware } from './middleware/subagentRecovery.js';
-import { createToolGuardMiddleware } from './middleware/toolGuard.js';
-import { createToolCallLimitMiddleware } from './subagents/factory.js';
-import { createValidationWorkflowMiddleware } from './middleware/validationWorkflow.js';
-import { createMemoryFlushMiddleware } from './middleware/memoryFlush.js';
-import { createToolAvailabilityMiddleware } from './middleware/toolAvailability.js';
-
-// createDeepAgent 内部拼接的 BASE_PROMPT
-const BASE_PROMPT = 'In order to complete the objective that the user asks of you, you have access to a number of standard tools.';
-
-// 从环境变量读取配置
-const config = {
-  apiKey: process.env.DEEPSPIDER_API_KEY,
-  baseUrl: process.env.DEEPSPIDER_BASE_URL,
-  model: process.env.DEEPSPIDER_MODEL || 'gpt-4o',
-};
+import path from 'path'
+import { homedir } from 'os'
+import { createOpencode } from '@opencode-ai/sdk'
+import { buildOpencodeConfig } from './config.js'
+import { loadConfig } from '../config/settings.js'
+import { ensureDir } from '../config/paths.js'
 
 /**
- * 递归移除 JSON Schema 中 Anthropic API 不支持的关键字
- * Zod v4 的 toJSONSchema 会生成 $schema 和 propertyNames，Anthropic 拒绝
- * additionalProperties: {} 空对象也不被接受，改成 true
+ * 启动 DeepSpider Agent
+ *
+ * @param {object} options - CLI 选项
+ * @param {string} [options.model] - 覆盖 LLM 模型
+ * @param {boolean} [options.verbose] - 详细日志
+ * @returns {Promise<{client, server}>}
  */
-function stripUnsupportedSchemaKeys(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(stripUnsupportedSchemaKeys);
-  const res = {};
-  for (const k in obj) {
-    if (k === '$schema' || k === 'propertyNames') continue;
-    // additionalProperties: {} → true (空对象等于"任意类型"，但Anthropic不接受空对象)
-    if (k === 'additionalProperties' && obj[k] !== null && typeof obj[k] === 'object' && Object.keys(obj[k]).length === 0) {
-      res[k] = true;
-      continue;
-    }
-    res[k] = stripUnsupportedSchemaKeys(obj[k]);
+export async function startAgent(options = {}) {
+  // 读取用户配置
+  const fileConfig = loadConfig()
+  const userConfig = { ...fileConfig }
+
+  // CLI --model 覆盖
+  if (options.model) {
+    userConfig.model = options.model
   }
-  return res;
+
+  const config = buildOpencodeConfig(userConfig)
+
+  if (options.verbose) {
+    console.error('[agent] config:', JSON.stringify(config, null, 2))
+  }
+
+  // 隔离环境变量
+  process.env.OPENCODE_DISABLE_PROJECT_CONFIG = 'true'
+
+  const dbPath = path.join(homedir(), '.deepspider', 'db')
+  ensureDir(dbPath)
+  process.env.OPENCODE_DB = dbPath
+
+  // 启动 opencode server（独立进程）
+  // SDK 接收 JS 对象，内部自动 JSON.stringify 设为 OPENCODE_CONFIG_CONTENT
+  if (options.verbose) {
+    console.error('[agent] starting opencode server...')
+  }
+
+  const { client, server } = await createOpencode({
+    config,
+    timeout: 10000,
+  })
+
+  if (options.verbose) {
+    console.error('[agent] opencode server started')
+  }
+
+  return { client, server }
 }
-
-/**
- * 自定义 fetch：仅拦截发往 Anthropic API 的请求，strip Zod v4 生成的不兼容字段
- * 限制拦截范围，避免影响 CycleTLS、第三方库等其他模块的 fetch 调用
- */
-const _origFetch = globalThis.fetch;
-const ANTHROPIC_URL_PATTERNS = [
-  'api.anthropic.com',
-  '/v1/messages',      // 兼容自定义 baseUrl 的代理
-];
-globalThis.fetch = async function(url, opts) {
-  try {
-    const urlStr = typeof url === 'string' ? url : url?.toString?.() || '';
-    const isAnthropicRequest = ANTHROPIC_URL_PATTERNS.some(p => urlStr.includes(p));
-    if (isAnthropicRequest && opts?.body && typeof opts.body === 'string' && opts.body.includes('"tools"')) {
-      try {
-        const body = JSON.parse(opts.body);
-        if (body.tools) {
-          body.tools = stripUnsupportedSchemaKeys(body.tools);
-          opts = { ...opts, body: JSON.stringify(body) };
-        }
-      } catch { /* ignore parse errors */ }
-    }
-  } catch { /* 确保 URL 解析异常不会中断正常请求 */ }
-  return _origFetch(url, opts);
-};
-
-/**
- * 创建 LLM 模型实例
- * 使用 ChatAnthropic 发送原生 Anthropic 格式，避免代理的 OpenAI→Anthropic 转换引入 schema 错误
- */
-function createModel(options = {}) {
-  const {
-    model = config.model,
-    apiKey = config.apiKey,
-    baseUrl = config.baseUrl,
-  } = options;
-
-  // ChatAnthropic 的 baseURL 不含 /v1（SDK 自动拼接）
-  const anthropicBaseUrl = baseUrl?.replace(/\/v1\/?$/, '') || undefined;
-
-  return new ChatAnthropic({
-    model,
-    anthropicApiKey: apiKey,
-    anthropicApiUrl: anthropicBaseUrl,
-    temperature: 0,
-  });
-}
-
-/**
- * 创建 DeepSpider Agent
- */
-export function createDeepSpiderAgent(options = {}) {
-  const {
-    model = config.model,
-    apiKey = config.apiKey,
-    baseUrl = config.baseUrl,
-    enableMemory = true,
-    enableInterrupt = false,
-    onReportReady = null,  // 报告就绪回调
-    onFileSaved = null,    // 文件保存通知回调
-    checkpointer,
-    callbacks = [],        // 流式输出回调
-  } = options;
-
-  // 创建 LLM 模型实例（加 timeout 防止 API 无响应时 streamEvents 永久挂起）
-  const llm = createModel({ model, apiKey, baseUrl });
-  llm.timeout = 120000; // 120s — 主 LLM 超时
-
-  // 摘要专用 LLM：故意不设 timeout
-  // 原因：summarizationMiddleware 的 createSummary 有 try-catch，超时会返回错误字符串，
-  // 但 beforeModel 仍会用这个错误字符串替换所有原始消息（REMOVE_ALL_MESSAGES），导致数据丢失。
-  // 安全网由 StreamHandler.withStallTimeout (150s) 提供 — 它在 BeforeModelNode 完成前触发，
-  // 不会写入 checkpoint，原始数据得以保留。
-  const summaryLlm = createModel({ model, apiKey, baseUrl });
-
-  // 后端配置：使用文件系统持久化
-  const backend = enableMemory
-    ? new FilesystemBackend({ rootDir: './.deepspider-agent' })
-    : new StateBackend();
-
-  const resolvedCheckpointer = checkpointer ?? SqliteSaver.fromConnString(':memory:');
-
-  // 人机交互配置
-  const interruptOn = enableInterrupt
-    ? {
-        sandbox_execute: { allowedDecisions: ['approve', 'reject', 'edit'] },
-        sandbox_inject: { allowedDecisions: ['approve', 'reject'] },
-      }
-    : undefined;
-
-  // 框架级子代理默认中间件（对照 createDeepAgent 内部的 subagentMiddleware）
-  const subagentDefaultMiddleware = [
-    todoListMiddleware(),
-    createFilesystemMiddleware({ backend }),
-    summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 }, keep: { messages: 6 } }),
-    anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
-    createPatchToolCallsMiddleware(),
-  ];
-
-  // 组装完整 middleware 栈（对照 createDeepAgent 源码 dist/index.js:3791-3826）
-  return createAgent({
-    name: 'deepspider',
-    model: llm,
-    tools: coreTools,
-    callbacks,
-    systemPrompt: `${systemPrompt}\n\n${BASE_PROMPT}`,
-    middleware: [
-      // === 框架内置 middleware ===
-      todoListMiddleware(),
-      createFilesystemMiddleware({ backend }),
-      createSkillsMiddleware({
-        backend: skillsBackend,
-        sources: [SKILLS.general, SKILLS.report],
-      }),
-      createCustomSubAgentMiddleware({
-        defaultModel: llm,
-        defaultTools: coreTools,
-        subagents: allSubagents,
-        defaultMiddleware: subagentDefaultMiddleware,
-        generalPurposeAgent: false,
-        defaultInterruptOn: interruptOn,
-      }),
-      // === 子代理会话恢复 ===
-      createSubagentRecoveryMiddleware(),
-      // === 预警 + 拦截（在 summarization 之前）===
-      createMemoryFlushMiddleware(),
-      createToolAvailabilityMiddleware(),
-      summarizationMiddleware({ model: summaryLlm, trigger: { tokens: 100000 }, keep: { messages: 6 } }),
-      anthropicPromptCachingMiddleware({ unsupportedModelBehavior: 'ignore' }),
-      createPatchToolCallsMiddleware(),
-      // === HITL（如果启用）===
-      ...(interruptOn ? [humanInTheLoopMiddleware({ interruptOn })] : []),
-      // === 自定义 middleware ===
-      toolRetryMiddleware({
-        maxRetries: 0,
-        onFailure: (err) => {
-          // GraphInterrupt / ParentCommand 等 LangGraph 内部控制流异常必须透传，不能吞掉
-          if (err?.is_bubble_up === true) throw err;
-          return `Tool call failed: ${err.message}\nPlease fix the arguments and retry.`;
-        },
-      }),
-      createToolGuardMiddleware(),
-      createToolCallLimitMiddleware(200),
-      createFilterToolsMiddleware(),
-      createValidationWorkflowMiddleware(),
-      createReportMiddleware({ onReportReady, onFileSaved }),
-    ],
-    checkpointer: resolvedCheckpointer,
-  });
-}
-
-// 默认导出（内存模式，兼容 MCP 等非 CLI 场景）
-export const agent = createDeepSpiderAgent();
-
-export default agent;

@@ -1,0 +1,9 @@
+{
+  "name": "deepspider-plugin",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "opencode": ">=1.0.0"
+  }
+}

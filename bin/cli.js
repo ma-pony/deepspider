@@ -48,10 +48,49 @@ switch (first) {
     break;
   }
 
+  case 'agent': {
+    // 启动独立 Agent
+    const { startAgent } = await import('../src/agent/index.js');
+    const { startTUI } = await import('../src/agent/tui.js');
+
+    const agentArgs = args.slice(1);
+    const modelIdx = agentArgs.indexOf('--model');
+    const model = modelIdx !== -1 ? agentArgs[modelIdx + 1] : undefined;
+    const verbose = agentArgs.includes('--verbose');
+
+    try {
+      const { client, server } = await startAgent({ model, verbose });
+      await startTUI(client, server, { verbose });
+    } catch (err) {
+      console.error(`❌ Agent 启动失败: ${err.message}`);
+      if (verbose) console.error(err.stack);
+      process.exit(1);
+    }
+    break;
+  }
+
+  case 'mcp': {
+    // 启动 MCP Server
+    await import('../src/mcp/server.js');
+    break;
+  }
+
   default: {
-    // URL 或无参数 → 启动 Agent
-    const { init } = await import('../src/agent/run.js');
-    await init();
+    console.log('DeepSpider - 智能爬虫工程平台');
+    console.log('');
+    console.log('Commands:');
+    console.log('  deepspider agent             Start standalone Agent (TUI)');
+    console.log('  deepspider agent --model <id> Override LLM model');
+    console.log('  deepspider agent --verbose   Verbose logging');
+    console.log('  deepspider mcp              Start MCP server');
+    console.log('  deepspider config <action>   Manage configuration');
+    console.log('  deepspider fetch <url>       Quick HTTP request');
+    console.log('  deepspider update            Check for updates');
+    console.log('  deepspider --version         Show version');
+    console.log('  deepspider --help            Show help');
+    console.log('');
+    console.log('Usage with Claude Code:');
+    console.log('  claude mcp add deepspider node src/mcp/server.js');
     break;
   }
 }

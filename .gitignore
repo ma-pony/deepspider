@@ -33,3 +33,7 @@ docs/IMPLEMENTATION.md
 docs/BUSINESS.md
 
 .deepspider-agent
+
+# Spec artifacts (design docs, not code)
+specs/
+specs/opencode-agent-prd.md
