@@ -48,6 +48,10 @@ const overdueSkills = [];
 const now = Date.now();
 
 try {
+  if (!existsSync(SKILLS_DIR)) {
+    console.log('✅ skills 目录尚未创建，跳过检查');
+    process.exit(0);
+  }
   const entries = readdirSync(SKILLS_DIR, { withFileTypes: true });
 
   for (const entry of entries) {

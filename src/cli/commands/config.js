@@ -1,102 +1,165 @@
 /**
  * deepspider config 子命令
+ *
+ * DeepSpider 不再维护自己的 settings.json。用户的配置完全由
+ * ~/.deepspider/opencode-sandbox/ 内的 opencode.json + auth.json 管理，
+ * 本命令是对沙箱内 opencode 的薄封装。
+ *
+ * 子命令：
+ *   deepspider config list               # 打印沙箱 opencode.json 内容
+ *   deepspider config path               # 打印沙箱路径
+ *   deepspider config set-model <model>  # 写 model 字段到沙箱 opencode.json
+ *   deepspider config auth [args...]     # 透传给 opencode auth（沙箱 XDG 环境）
+ *   deepspider config reset              # 清空沙箱（删除链接/opencode.json + init 标记）
  */
 
+import fs from 'fs'
+import path from 'path'
+import { spawnSync } from 'child_process'
+import { fileURLToPath } from 'url'
 import {
-  loadConfig,
-  saveConfig,
-  getEffectiveConfig,
-  resetConfig,
-  CONFIG_FILE,
-  ENV_MAP,
-  DEFAULTS,
-} from '../config.js';
+  prepareSandbox,
+  applySandboxEnv,
+  getSandboxPaths,
+} from '../../agent/sandbox.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const PROJECT_ROOT = path.resolve(__dirname, '../../..')
+const OPENCODE_BIN = path.join(PROJECT_ROOT, 'node_modules/.bin/opencode')
 
 export function run(args) {
-  const sub = args[0] || 'list';
+  const sub = args[0] || 'list'
 
   switch (sub) {
     case 'list':
-      return list();
-    case 'get':
-      return get(args[1]);
-    case 'set':
-      return set(args[1], args[2]);
-    case 'reset':
-      return reset();
+      return list()
     case 'path':
-      return path();
+      return printPath()
+    case 'set-model':
+      return setModel(args[1])
+    case 'auth':
+      return auth(args.slice(1))
+    case 'reset':
+      return reset()
     default:
-      console.error(`未知子命令: ${sub}\n可用: list, get, set, reset, path`);
-      process.exit(1);
+      console.error(`未知子命令: ${sub}`)
+      console.error('可用: list, path, set-model <model>, auth [args...], reset')
+      process.exit(1)
   }
 }
 
 function list() {
-  const effective = getEffectiveConfig();
-  console.log('配置项:');
-  for (const [key, { value, source }] of Object.entries(effective)) {
-    const display = key === 'apiKey' && value ? maskKey(value) : formatValue(value);
-    console.log(`  ${key} = ${display}  [${source}]`);
+  prepareSandbox()
+  const paths = getSandboxPaths()
+  console.log(`sandbox: ${paths.root}`)
+  console.log(`opencode.json: ${paths.opencodeJson}`)
+  if (fs.existsSync(paths.opencodeJson)) {
+    const realPath = fs.realpathSync(paths.opencodeJson)
+    if (realPath !== paths.opencodeJson) {
+      console.log(`  (symlink → ${realPath})`)
+    }
+    console.log('---')
+    console.log(fs.readFileSync(paths.opencodeJson, 'utf-8').trimEnd())
+  } else {
+    console.log('  (不存在，尚未配置)')
+  }
+  console.log('')
+  console.log(`auth.json: ${paths.authJson}`)
+  if (fs.existsSync(paths.authJson)) {
+    const realPath = fs.realpathSync(paths.authJson)
+    if (realPath !== paths.authJson) {
+      console.log(`  (symlink → ${realPath})`)
+    } else {
+      console.log('  (存在)')
+    }
+  } else {
+    console.log('  (不存在，请运行 deepspider config auth login)')
   }
 }
 
-function get(key) {
-  if (!key) {
-    console.error('用法: deepspider config get <key>');
-    process.exit(1);
-  }
-  if (!Object.hasOwn(DEFAULTS, key)) {
-    console.error(`未知配置项: ${key}\n可用: ${Object.keys(DEFAULTS).join(', ')}`);
-    process.exit(1);
-  }
-  const effective = getEffectiveConfig();
-  const { value, source } = effective[key];
-  const display = key === 'apiKey' && value ? maskKey(value) : formatValue(value);
-  console.log(`${key} = ${display}  [${source}]`);
+function printPath() {
+  const paths = getSandboxPaths()
+  console.log(paths.root)
 }
 
-function set(key, value) {
-  if (!key || value === undefined) {
-    console.error('用法: deepspider config set <key> <value>');
-    process.exit(1);
+function setModel(model) {
+  if (!model) {
+    console.error('用法: deepspider config set-model <provider/model>')
+    console.error('示例: deepspider config set-model anthropic/claude-sonnet-4-5')
+    process.exit(1)
   }
-  if (!Object.hasOwn(DEFAULTS, key)) {
-    console.error(`未知配置项: ${key}\n可用: ${Object.keys(DEFAULTS).join(', ')}`);
-    process.exit(1);
-  }
-  const config = loadConfig();
-  // 布尔类型配置项：CLI 字符串转布尔值存储
-  config[key] = typeof DEFAULTS[key] === 'boolean'
-    ? (value === 'true' || value === '1')
-    : value;
-  saveConfig(config);
 
-  const envVar = ENV_MAP[key];
-  console.log(`已设置 ${key} = ${key === 'apiKey' ? maskKey(value) : value}`);
-  if (process.env[envVar]) {
-    console.log(`注意: 环境变量 ${envVar} 已设置，将优先使用环境变量的值`);
+  prepareSandbox()
+  const paths = getSandboxPaths()
+  const target = paths.opencodeJson
+
+  // 1. 先读出当前内容（符号链接：读原文件，稍后替换为独立文件）
+  let data = {}
+  let wasSymlink = false
+  if (fs.existsSync(target)) {
+    try {
+      const st = fs.lstatSync(target)
+      wasSymlink = st.isSymbolicLink()
+      const sourceForRead = wasSymlink ? fs.realpathSync(target) : target
+      data = JSON.parse(fs.readFileSync(sourceForRead, 'utf-8'))
+    } catch (e) {
+      console.error(`[config] 解析 ${target} 失败：${e.message}`)
+      process.exit(1)
+    }
   }
+  data.model = model
+
+  // 2. 写到临时文件 + rename 实现原子替换。
+  //    这样即使写入过程中进程崩溃，原链接/原文件仍然完好，不会出现空文件或半写入。
+  const tmp = `${target}.tmp.${process.pid}.${Date.now()}`
+  const content = JSON.stringify(data, null, 2) + '\n'
+  try {
+    fs.writeFileSync(tmp, content, { mode: 0o600 })
+    // 若原来是符号链接，rename 会把符号链接替换成实体文件（不动指向的原文件），
+    // 这正是我们想要的——沙箱保存一份独立副本，不污染用户原配置。
+    if (wasSymlink) {
+      console.error('[config] opencode.json 当前是软链接，已在沙箱内独立保存。')
+    }
+    fs.renameSync(tmp, target)
+  } catch (e) {
+    try { fs.unlinkSync(tmp) } catch { /* cleanup best-effort */ }
+    console.error(`[config] 写入 ${target} 失败：${e.message}`)
+    process.exit(1)
+  }
+
+  console.log(`已设置 model = ${model}`)
+  console.log(`位置: ${target}`)
+}
+
+function auth(rest) {
+  applySandboxEnv()
+  if (!fs.existsSync(OPENCODE_BIN)) {
+    console.error(`找不到 opencode 可执行文件: ${OPENCODE_BIN}`)
+    console.error('请确认 deepspider 安装完整（pnpm install）')
+    process.exit(1)
+  }
+  const result = spawnSync(OPENCODE_BIN, ['auth', ...rest], {
+    stdio: 'inherit',
+    env: process.env,
+  })
+  process.exit(result.status ?? 0)
 }
 
 function reset() {
-  if (resetConfig()) {
-    console.log('配置已重置');
-  } else {
-    console.log('配置文件不存在，无需重置');
+  const paths = getSandboxPaths()
+  const initMarker = path.join(paths.root, '.init-done')
+  const targets = [paths.opencodeJson, paths.authJson, initMarker]
+  let removed = 0
+  for (const t of targets) {
+    try {
+      const st = fs.lstatSync(t)
+      if (st.isSymbolicLink() || st.isFile()) {
+        fs.unlinkSync(t)
+        removed++
+      }
+    } catch {
+      // 不存在
+    }
   }
-}
-
-function path() {
-  console.log(CONFIG_FILE);
-}
-
-function formatValue(value) {
-  if (value === undefined || value === null || value === '') return '(未设置)';
-  return String(value);
-}
-
-function maskKey(key) {
-  if (key.length <= 8) return '****';
-  return key.slice(0, 4) + '****' + key.slice(-4);
+  console.log(`已清理 ${removed} 项。下次启动 deepspider agent 会重新触发初始化向导。`)
 }

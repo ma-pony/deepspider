@@ -1,96 +1,55 @@
 /**
  * DeepSpider MCP Server
- * 通过 MCP 协议暴露 DeepSpider 工具
- * 复用 Agent 工具定义
+ * Exposes ~22 tools via MCP protocol for Claude Code integration
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
 
-import { coreTools } from '../agent/tools/index.js';
+import { registerBrowserTools } from './tools/browser.js';
+import { registerNetworkTools } from './tools/network.js';
+import { registerScriptTools } from './tools/script.js';
+import { registerDebuggerTools } from './tools/debugger.js';
+import { registerHookTools } from './tools/hook.js';
+import { registerCaptureTools } from './tools/capture.js';
+import { registerRebuildTools } from './tools/rebuild.js';
+import { registerStealthTools } from './tools/stealth.js';
+import { cleanup } from './context.js';
 
-/**
- * MCP 安全策略：只暴露 coreTools（主 Agent 使用的工具子集）
- * 不暴露 allTools，因为其中包含 sandbox_execute、run_node_code 等
- * 可执行任意代码的内部工具，通过 MCP 暴露存在安全风险
- */
-const mcpTools = coreTools;
-
-const server = new Server(
-  { name: 'deepspider', version: '1.0.0' },
-  { capabilities: { tools: {} } }
+const server = new McpServer(
+  { name: 'deepspider', version: '1.0.0' }
 );
 
-// 构建工具映射
-const toolMap = new Map();
-for (const tool of mcpTools) {
-  toolMap.set(tool.name, tool);
-}
+// Register all tool groups
+registerBrowserTools(server);
+registerNetworkTools(server);
+registerScriptTools(server);
+registerDebuggerTools(server);
+registerHookTools(server);
+registerCaptureTools(server);
+registerRebuildTools(server);
+registerStealthTools(server);
 
-// 列出所有工具
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: mcpTools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.schema._def ? zodToJsonSchema(tool.schema) : {},
-    })),
-  };
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.error('[MCP] Shutting down...');
+  await cleanup();
+  process.exit(0);
 });
 
-// Zod schema 转 JSON Schema（简化版）
-function zodToJsonSchema(zodSchema) {
-  const shape = zodSchema._def?.shape?.();
-  if (!shape) return { type: 'object', properties: {} };
-
-  const properties = {};
-  const required = [];
-
-  for (const [key, value] of Object.entries(shape)) {
-    const def = value._def;
-    properties[key] = {
-      type: def?.typeName?.replace('Zod', '').toLowerCase() || 'string',
-      description: def?.description || '',
-    };
-    if (!def?.isOptional) {
-      required.push(key);
-    }
-  }
-
-  return { type: 'object', properties, required };
-}
-
-// 调用工具
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  const tool = toolMap.get(name);
-  if (!tool) {
-    throw new Error(`Unknown tool: ${name}`);
-  }
-
-  try {
-    const result = await tool.invoke(args);
-    return {
-      content: [{ type: 'text', text: result }],
-    };
-  } catch (error) {
-    return {
-      content: [{ type: 'text', text: `Error: ${error.message}` }],
-      isError: true,
-    };
-  }
+process.on('SIGTERM', async () => {
+  await cleanup();
+  process.exit(0);
 });
 
-// 启动服务器
+// Start server
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('DeepSpider MCP server running');
+  console.error('DeepSpider MCP server running (51 tools registered)');
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error('MCP server failed to start:', err);
+  process.exit(1);
+});

@@ -1,0 +1,221 @@
+# 算法升级快速重定位协议
+
+## 适用场景
+
+以下情况说明目标网站对已逆向的加密进行了升级：
+
+- 之前可用的爬虫开始返回 403/412/签名错误
+- 请求中出现了之前没有的新参数
+- 已知参数的值格式发生变化（长度变了、前缀变了、编码方式变了）
+- API 端点发生迁移
+- 响应中出现新的挑战字段
+
+重要区分：**算法升级** vs **密钥轮换**。方法相同，但密钥轮换修复成本极低。
+
+---
+
+## 快速重定位步骤
+
+### Step 1：重新捕获证据（Evidence Gate）
+
+不要依赖旧的 request-chain.md，必须重新抓包。
+
+```
+1. navigate_page(url)                → 打开目标页面
+2. 执行目标操作（登录、搜索等）
+3. list_network_requests()           → 找到目标请求
+4. get_network_request(reqId)        → 保存完整新请求（headers + params + body）
+```
+
+记录：新请求与旧请求的差异点（参数名、参数值格式、新增参数、缺失参数）。
+
+### Step 2：与历史 request-chain.md 对比
+
+```
+对比维度：
+□ 请求 URL 是否变化（端点迁移）
+□ 请求方法是否变化（GET → POST）
+□ 参数数量是否变化（新增 or 删除）
+□ 已有参数的值格式是否变化
+  - 长度变化（32 chars → 64 chars → 可能从 MD5 升级到 SHA256）
+  - 前缀/后缀变化（如加了版本号 `v2_xxx`）
+  - 编码变化（hex → base64 → 可能是格式调整）
+□ 请求头是否新增签名相关字段
+□ Cookie 中是否出现新的挑战 Cookie
+```
+
+### Step 3：确认变化范围
+
+根据对比结果分类处理：
+
+| 变化类型 | 处理方案 | 工时估计 |
+|---------|---------|---------|
+| 只是密钥/Salt 轮换 | 重新 Hook 捕获新密钥 | < 30 分钟 |
+| 新增一个参数 | 单独逆向新参数 | 1-3 小时 |
+| 算法从 MD5 升级到 SHA256 | 更新 Python 实现 | < 1 小时 |
+| 完全重写加密逻辑 | 完整重走逆向流程 | 视复杂度 |
+| 端点迁移 + 逻辑不变 | 只更新 URL | < 15 分钟 |
+
+### Step 4：重新定位（使用相同方法）
+
+利用旧分析的经验加速新一轮定位：
+
+```
+1. get_request_initiator(newReqId)    → 获取新的调用栈
+   对比旧调用栈：
+   - 文件名相同但行号变了 → 代码有改动，但位置大致相同
+   - 文件名变了 → 可能加载了新版 JS bundle
+
+2. find_in_script(old_keyword)        → 用旧的特征关键字搜索
+   如果找不到：说明关键字也变了，需要用新参数值的格式特征推导新关键字
+
+3. set_breakpoint(new_location)       → 在新位置断点验证
+```
+
+### Step 5：确认算法变化 vs 密钥轮换
+
+在断点处捕获新的函数调用：
+
+```
+evaluate_on_callframe("JSON.stringify({ input: args, output: result })")
+```
+
+对比新旧输入输出：
+- 输入格式相同，输出格式相同，但值不同 → **密钥轮换**，只需更新密钥
+- 输入或输出格式发生变化 → **算法升级**，需要重新还原
+
+---
+
+## 常见变化模式与应对
+
+### 密钥轮换（Key Rotation）
+
+特征：算法逻辑不变，但 secret/salt/key 的值变了。
+
+```
+识别：新旧请求的 sign 参数格式相同（长度、前缀一致），但值不同
+应对：
+1. inject_hook 重新捕获新的 key/secret
+2. 或通过 get_frame_variables 在断点处查看 key 变量
+3. 更新 Python 实现中的 key/secret 值
+```
+
+### 算法升级（Algorithm Upgrade）
+
+特征：sign 参数的格式发生变化。
+
+```
+MD5(32 chars hex) → SHA256(64 chars hex)：直接升级哈希函数
+AES-128-CBC → AES-256-CBC：key 长度从 16 bytes → 32 bytes
+新增 HMAC 包装：之前直接 hash，现在 HMAC-SHA256
+```
+
+### 新增参数（New Parameter Added）
+
+特征：请求中出现之前没有的参数名。
+
+```
+应对：
+1. 只针对新参数做单独逆向（不要重跑完整流程）
+2. get_request_initiator 看新参数的 writer
+3. 单独 Hook/断点，不干扰旧参数
+4. 更新 Python 实现时只添加新参数逻辑
+```
+
+### 端点迁移（Endpoint Migration）
+
+特征：请求 URL 变化，但请求结构基本不变。
+
+```
+应对：
+1. 只需更新 Python 中的 URL
+2. 验证新端点的请求头要求（可能有新的必选 Header）
+3. 检查 Cookie 策略（新域名可能需要单独的 Cookie）
+```
+
+### 参数混淆升级（Obfuscation Upgrade）
+
+特征：JS 文件 hash/版本号变化，混淆程度更高。
+
+```
+识别：list_scripts() 中文件名的 hash 变了
+应对：
+1. 用旧的逻辑特征（常量值、算法结构）重新搜索
+2. 如果采用了新的混淆工具（如 VM 混淆），升级应对策略
+3. 不要试图 diff 新旧混淆代码（无意义），直接从新请求出发
+```
+
+---
+
+## 利用历史知识加速
+
+上一次逆向积累的知识可以大幅缩短本次时间：
+
+### 已知的函数签名
+
+```
+# 旧版逆向记录：
+# sign = encrypt(params_sorted + secret, 'sha256')
+# secret 在页面初始化时从 /api/config 接口获取
+
+# 新版快速验证：
+# 1. 先检查 /api/config 接口是否还存在
+# 2. 如果存在，检查 secret 字段值是否变化
+# 3. 只在 secret 变了时才重新逆向获取 secret 的方式
+```
+
+### 已知的 Hook 注入点
+
+```
+# 旧版记录：加密函数在 utils.js 的第 847 行
+# 新版：先检查 utils.js 文件 hash 是否变化
+# - 未变化 → 可能代码没改，直接验证旧位置
+# - 已变化 → 用旧的关键字（如函数名）重新搜索位置
+```
+
+### 已知的特征常量
+
+```
+# 旧版记录：算法中使用了常量 0x67452301（MD5 init vector）
+# 如果常量没变，即使代码重新混淆，也可以用常量快速定位
+find_in_script("67452301")
+```
+
+---
+
+## 更新 learned/ 知识
+
+每次成功应对算法升级后，更新对应的 learned 文件：
+
+```
+# 在 request-chain.md 中追加版本记录
+## Version 2 (升级后)
+- 变化点：sign 算法从 MD5 升级到 HMAC-SHA256
+- 新 secret 获取位置：页面内联 script 第 3 行
+- 变更日期参考：JS bundle hash 变化时检测到
+
+## Version 1 (原版)
+...
+```
+
+这样下次再次升级时，可以快速对比 Version 差异，判断是否是同类变化模式。
+
+---
+
+## 紧急降级方案
+
+若短时间内无法完成重定位，可临时切换到浏览器自动化模式：
+
+```python
+# 临时方案：用 Patchright 直接操作浏览器获取数据
+# 缺点：速度慢，但可以在重定位期间保持数据采集
+
+from patchright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=False)  # headed 模式避免检测
+    page = browser.new_page()
+    page.goto(target_url)
+    # 操作页面获取数据
+    # 同时抓包记录新的请求特征，用于后续逆向
+```

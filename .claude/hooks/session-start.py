@@ -116,7 +116,71 @@ Read and follow all instructions below carefully.
     print("</instructions>")
     print()
 
-    # 6. Final directive
+    # 6. DeepSpider MCP Tool Index
+    print("""<deepspider-tools>
+## DeepSpider MCP Tools
+
+### Browser Control
+- `navigate_page` — Navigate to URL or reload
+- `click` — Click element by CSS selector
+- `fill` — Fill input field
+- `press_key` — Press keyboard key
+- `take_screenshot` — Take page screenshot
+- `scroll_page` — Scroll page up/down
+- `wait_for` — Wait for element
+- `evaluate_script` — Execute JS in page via CDP
+- `get_page_info` — Get URL, title, cookies
+
+### Network Interception
+- `list_network_requests` — List/search captured requests
+- `get_network_request` — Get full request details
+- `get_request_initiator` — Get JS call stack for request
+
+### Script Analysis
+- `list_scripts` — List captured JS scripts
+- `get_script_source` — Get script source (chunked)
+- `find_in_script` — Search + extract context from scripts
+
+### Debugger
+- `set_breakpoint` — Set breakpoint at location
+- `resume` — Resume from breakpoint
+- `step_over` — Single step
+- `evaluate_on_callframe` — Evaluate at breakpoint
+- `get_call_stack` — Get call stack
+- `get_frame_variables` — Get frame variables
+- `set_logpoint` — Set logpoint (no pause)
+
+### Hook System
+- `inject_hook` — Inject custom Hook code
+- `get_hook_data` — Get Hook captured logs
+- `search_hook_data` — Search Hook logs
+
+### Environment Capture
+- `collect_env` — Full browser env snapshot
+- `collect_property` — Collect specific property
+
+### Env Rebuild
+- `export_rebuild_bundle` — Export env-patching project
+- `diff_env_requirements` — Parse errors for missing APIs
+
+### Anti-Debug
+- `toggle_anti_debug` — Toggle debugger skip
+
+## DeepSpider Commands
+- `/ds:trace` — Request tracing & crypto location
+- `/ds:reverse` — Reverse analysis & Python implementation
+- `/ds:rebuild` — Env patching local debugging
+- `/ds:crawl` — Generate Python crawler project
+
+## References
+- `cat skills/deepspider/references/crypto-patterns.md`
+- `cat skills/deepspider/references/env-patching.md`
+- `cat skills/deepspider/references/anti-bot.md`
+- `cat skills/deepspider/references/fallbacks.md`
+</deepspider-tools>
+""")
+
+    # 7. Final directive
     print("""<ready>
 Context loaded. Wait for user's first message, then follow <instructions> to handle their request.
 </ready>""")
