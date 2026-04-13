@@ -46,7 +46,7 @@ export default [
       'node_modules/**',
       '.deepspider-data/**',
       'dist/**',
-      'test/samples/**',
+      'library/**',
     ],
   },
 ];

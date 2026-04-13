@@ -1,4 +1,1 @@
 npx lint-staged
-
-# Check for overdue evolved experiences (cross-platform Node.js)
-node scripts/evolve-check.mjs
