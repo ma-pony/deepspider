@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { join } from 'path';
-import { getBrowserClient, getPage, getCDPSession, cdpEvaluate, navigateTo } from '../context.js';
+import { getBrowserClient, getPage, getCDPSession, cdpEvaluate, navigateTo, setActiveFrameContext, clearActiveFrameContext, getActiveFrameContext } from '../context.js';
 import { PATHS, ensureDir, generateFilename } from '../../config/paths.js';
 
 let _savedSessionState = null;
@@ -151,23 +151,23 @@ export function registerBrowserTools(server) {
 
   server.tool(
     'evaluate_script',
-    'Evaluate JavaScript expression in page context via CDP',
+    'Evaluate JavaScript expression in page context via CDP. Promises are always awaited. Honors select_frame active iframe context.',
     {
       expression: z.string().describe('JS expression to evaluate'),
-      awaitPromise: z.boolean().optional().default(true),
     },
-    async ({ expression, awaitPromise }) => {
+    async ({ expression }) => {
       try {
-        const cdp = await getCDPSession();
-        const result = await cdp.send('Runtime.evaluate', {
-          expression,
-          returnByValue: true,
-          awaitPromise,
-        });
-        if (result.exceptionDetails) {
-          return { content: [{ type: 'text', text: `Error: ${result.exceptionDetails.text}` }], isError: true };
-        }
-        return { content: [{ type: 'text', text: JSON.stringify(result.result?.value, null, 2) }] };
+        // Route through cdpEvaluate so active iframe context (if any) is honored.
+        const value = await cdpEvaluate(expression);
+        // Backward-compatible contract: when no frame is active, return the raw
+        // evaluated value (existing consumers parse this directly). Only wrap in
+        // an envelope when an iframe context is active, so callers can tell which
+        // frame produced the value.
+        const frameCtx = getActiveFrameContext();
+        const payload = frameCtx.contextId != null
+          ? { frameId: frameCtx.frameId, value }
+          : value;
+        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
       }
@@ -218,18 +218,23 @@ export function registerBrowserTools(server) {
 
   server.tool(
     'select_frame',
-    'Switch execution context to a specific iframe by frame ID',
+    'Switch execution context to a specific iframe by frame ID. Subsequent evaluate_script / cdpEvaluate / collect_property calls run in this frame until select_frame(mainFrame), select_page, or navigate_page is called.',
     {
-      frameId: z.string().describe('Frame ID from list_frames'),
+      frameId: z.string().describe('Frame ID from list_frames. Pass empty string to clear and return to main frame.'),
     },
     async ({ frameId }) => {
       try {
+        if (!frameId) {
+          clearActiveFrameContext();
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, cleared: true }) }] };
+        }
         const cdp = await getCDPSession();
         // Create isolated world in the target frame
         const { executionContextId } = await cdp.send('Page.createIsolatedWorld', {
           frameId, worldName: 'deepspider',
         });
-        return { content: [{ type: 'text', text: JSON.stringify({ success: true, frameId, executionContextId }) }] };
+        setActiveFrameContext(frameId, executionContextId);
+        return { content: [{ type: 'text', text: JSON.stringify({ success: true, frameId, executionContextId, note: 'subsequent evaluate/cdpEvaluate calls will run in this frame until cleared' }) }] };
       } catch (err) {
         return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
       }
@@ -271,8 +276,14 @@ export function registerBrowserTools(server) {
         const client = await getBrowserClient();
         const pages = client.context.pages();
         if (index < 0 || index >= pages.length) {
-          return { content: [{ type: 'text', text: JSON.stringify({ error: `Index ${index} out of range (${pages.length} pages)` }) }] };
+          return { content: [{ type: 'text', text: JSON.stringify({ error: `Index ${index} out of range (${pages.length} pages)` }) }], isError: true };
         }
+        // Switching tabs invalidates any iframe context bound to the previous page.
+        clearActiveFrameContext();
+        // Console listener was attached to the previous page's CDP session; drop it
+        // so list_console_messages re-subscribes on the new session.
+        _consoleTracking = false;
+        _consoleMessages = [];
         client.page = pages[index];
         await pages[index].bringToFront();
         const url = pages[index].url();
@@ -315,7 +326,7 @@ export function registerBrowserTools(server) {
     async () => {
       try {
         if (!_savedSessionState) {
-          return { content: [{ type: 'text', text: JSON.stringify({ error: 'No saved state. Call save_session_state first.' }) }] };
+          return { content: [{ type: 'text', text: JSON.stringify({ error: 'No saved state. Call save_session_state first.' }) }], isError: true };
         }
 
         const cdp = await getCDPSession();
@@ -385,7 +396,7 @@ export function registerBrowserTools(server) {
     async ({ index }) => {
       try {
         if (index < 0 || index >= _consoleMessages.length) {
-          return { content: [{ type: 'text', text: JSON.stringify({ error: `Index ${index} out of range (${_consoleMessages.length} messages)` }) }] };
+          return { content: [{ type: 'text', text: JSON.stringify({ error: `Index ${index} out of range (${_consoleMessages.length} messages)` }) }], isError: true };
         }
         return { content: [{ type: 'text', text: JSON.stringify(_consoleMessages[index], null, 2) }] };
       } catch (err) {
@@ -401,7 +412,7 @@ export function registerBrowserTools(server) {
       depth: z.number().optional().default(4).describe('Max depth to traverse'),
       selector: z.string().optional().describe('CSS selector to start from'),
     },
-    async ({ depth, selector }) => {
+    async ({ depth, selector: _selector }) => {
       try {
         const cdp = await getCDPSession();
         const { root } = await cdp.send('DOM.getDocument', { depth });

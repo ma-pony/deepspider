@@ -37,19 +37,74 @@ npm install -g deepspider
 
 ### 配置
 
-```bash
-deepspider config set apiKey sk-ant-api03-xxx
-deepspider config set baseUrl https://api.anthropic.com
-deepspider config set model claude-opus-4-6
+DeepSpider 不维护自己的配置文件。所有 provider / model / 凭据都落在一个完全隔离的 opencode 沙箱里：
+
+```
+~/.deepspider/opencode-sandbox/
+├── config/opencode/opencode.json   # model、provider 等
+└── data/opencode/auth.json         # 登录凭据
 ```
 
-### 使用
+**首次运行 `deepspider agent` 会弹出初始化向导**：如果你本机已经装过 opencode，可以选择把 `opencode.json` 和 `auth.json` 软链接过来复用，也可以只链接 `auth.json`（配置独立、凭据共享），或者创建全新空沙箱。
+
+之后的日常操作：
 
 ```bash
-# 分析目标网站
-deepspider https://example.com
+# 登录 provider（透传给沙箱内的 opencode auth）
+deepspider config auth login
+deepspider config auth list
 
-# 快速 HTTP 请求（轻量级）
+# 设置/切换模型
+deepspider config set-model anthropic/claude-sonnet-4-5
+deepspider config set-model deepseek/deepseek-chat
+deepspider config set-model openai/gpt-4o
+
+# 查看当前沙箱配置
+deepspider config list
+deepspider config path
+
+# 重置沙箱（下次启动重新触发初始化向导）
+deepspider config reset
+```
+
+`deepspider agent --model <id>` 可以临时覆盖单次运行的模型。更精细的配置（baseURL、多 provider 等）直接编辑沙箱的 `opencode.json` 即可，格式与 opencode 原生 `opencode.json` 完全一致。
+
+### 两种使用方式
+
+**方式 A：独立 Agent（基于 opencode）**
+
+内置 opencode TUI，自带 spider Agent + 八阶段工作流，开箱即用。
+
+```bash
+# 启动 Agent（默认模型）
+deepspider agent
+
+# 指定模型
+deepspider agent --model deepseek/deepseek-chat
+deepspider agent --model anthropic/claude-opus-4-6
+
+# 详细日志
+deepspider agent --verbose
+```
+
+**方式 B：MCP Server（集成 Claude Code）**
+
+作为 MCP Server 挂载到 Claude Code，由 Claude Code 承担决策层。
+
+```bash
+# 在 Claude Code 中注册
+claude mcp add deepspider node src/mcp/server.js
+
+# 然后在 Claude Code 中使用 slash commands:
+# /ds:trace https://target-site.com
+# /ds:reverse
+# /ds:rebuild
+# /ds:crawl
+```
+
+**轻量模式**
+
+```bash
 deepspider fetch https://api.example.com
 ```
 

@@ -7,30 +7,46 @@ import { getBrowserClient, getDataStore } from '../context.js';
 import { CDPSession } from '../../browser/cdp.js';
 
 let cdpSession = null;
+let cdpSessionRawClient = null; // 追踪底层 raw CDP client 身份，用于检测 page 切换
 let isPaused = false;
 let currentCallFrames = [];
 let activeBreakpoints = [];
 
+/**
+ * 获取 CDP 调试会话。
+ * select_page 或 popup 切换后 BrowserClient.getCDPSession() 会返回新的 raw client，
+ * 此时必须重建 CDPSession wrapper，否则断点/求值会打到已 detach 的旧页面。
+ */
 async function getSession() {
-  if (!cdpSession) {
-    const client = await getBrowserClient();
-    cdpSession = await CDPSession.fromBrowser(client);
+  const browserClient = await getBrowserClient();
+  const rawClient = await browserClient.getCDPSession();
 
-    cdpSession.on('Debugger.paused', (params) => {
-      const isBreakpoint = params.reason === 'breakpoint' || params.hitBreakpoints?.length > 0;
-      if (isBreakpoint) {
-        isPaused = true;
-        currentCallFrames = params.callFrames || [];
-        const top = currentCallFrames[0];
-        console.error(`[debug] Breakpoint hit: ${top?.functionName || '(anonymous)'} @ ${top?.url?.split('/').pop() || '?'}:${top?.location?.lineNumber ?? '?'}`);
-      }
-    });
-
-    cdpSession.on('Debugger.resumed', () => {
-      isPaused = false;
-      currentCallFrames = [];
-    });
+  if (cdpSession && cdpSessionRawClient === rawClient) {
+    return cdpSession;
   }
+
+  // 清理过期状态（pause 事件是旧会话的，新会话 Debugger.paused 会重新触发）
+  isPaused = false;
+  currentCallFrames = [];
+
+  cdpSession = await CDPSession.fromBrowser(browserClient);
+  cdpSessionRawClient = rawClient;
+
+  cdpSession.on('Debugger.paused', (params) => {
+    const isBreakpoint = params.reason === 'breakpoint' || params.hitBreakpoints?.length > 0;
+    if (isBreakpoint) {
+      isPaused = true;
+      currentCallFrames = params.callFrames || [];
+      const top = currentCallFrames[0];
+      console.error(`[debug] Breakpoint hit: ${top?.functionName || '(anonymous)'} @ ${top?.url?.split('/').pop() || '?'}:${top?.location?.lineNumber ?? '?'}`);
+    }
+  });
+
+  cdpSession.on('Debugger.resumed', () => {
+    isPaused = false;
+    currentCallFrames = [];
+  });
+
   return cdpSession;
 }
 
@@ -292,7 +308,7 @@ export function registerDebuggerTools(server) {
       frameIndex: z.number().optional().default(0).describe('Stack frame index (when paused)'),
       depth: z.number().optional().default(2).describe('Max traversal depth'),
     },
-    async ({ expression, frameIndex, depth }) => {
+    async ({ expression, frameIndex, depth: _depth }) => {
       try {
         const session = await getSession();
 
@@ -348,12 +364,18 @@ export function registerDebuggerTools(server) {
           await client.antiDebugInterceptor.enablePauses();
         }
 
-        // Use DataStore to search scripts (same as find_in_script)
+        // Use DataStore to search scripts. searchInScripts's second arg is a site/hostname filter,
+        // not a scriptUrl filter — so we search all sites and then filter by scriptUrl ourselves.
         const store = getDataStore();
-        const matches = await store.searchInScripts(pattern, scriptUrl || null);
+        let matches = await store.searchInScripts(pattern, null);
+
+        if (scriptUrl) {
+          matches = matches.filter(m => m.url === scriptUrl || (m.url && m.url.includes(scriptUrl)));
+        }
 
         if (matches.length === 0) {
-          return { content: [{ type: 'text', text: JSON.stringify({ error: `Pattern "${pattern}" not found in any script` }) }] };
+          const scopeMsg = scriptUrl ? ` within script "${scriptUrl}"` : '';
+          return { content: [{ type: 'text', text: JSON.stringify({ error: `Pattern "${pattern}" not found${scopeMsg}` }) }] };
         }
 
         // Get first match and find line/column

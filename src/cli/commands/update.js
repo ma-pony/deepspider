@@ -6,7 +6,7 @@ import readline from 'readline';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
-import { getVersion } from '../../config/settings.js';
+import { getVersion } from './version.js';
 
 export async function run() {
   const current = getVersion();

@@ -1,116 +1,46 @@
 /**
  * TUI 包装层
- * attach opencode TUI，DeepSpider 只做最小包装：
- * - 启动参数传递
- * - 进程生命周期管理
- * - Ctrl+C 信号处理
+ * 最小包装：spawn `opencode attach <url>` 继承 stdio，让官方 TUI 接管
  */
 
-import { createSession } from './session.js'
+import { spawn } from 'child_process'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const PROJECT_ROOT = path.resolve(__dirname, '../..')
+const OPENCODE_BIN = path.join(PROJECT_ROOT, 'node_modules/.bin/opencode')
 
 /**
- * 启动 TUI 交互循环
- * 使用 opencode 内置 TUI，通过 SSE 事件流消费输出
+ * 启动 TUI：attach 到已启动的 opencode server
  *
- * @param {object} client - opencode SDK client
- * @param {object} server - opencode server 句柄
+ * 返回 exit code。不调用 process.exit —— 调用方负责退出+清理，这样
+ * bin/cli.js 的 SIGINT handler 能先关掉 server 再退出。
+ *
+ * @param {object} server - opencode server 句柄（server.url）
  * @param {object} options - 选项
- * @param {boolean} [options.verbose] - 详细日志
+ * @param {boolean} [options.verbose]
+ * @returns {Promise<number>} 子进程 exit code
  */
-export async function startTUI(client, server, options = {}) {
-  const session = await createSession(client)
+export async function startTUI(server, options = {}) {
+  if (!server?.url) {
+    throw new Error('server.url missing, cannot attach TUI')
+  }
 
   if (options.verbose) {
-    console.error(`[tui] session created: ${session.id}`)
+    console.error(`[tui] attaching to ${server.url}`)
   }
 
-  console.log('DeepSpider Agent')
-  console.log('输入目标 URL 开始逆向分析，Ctrl+C 退出')
-  console.log('')
-
-  // 订阅事件流
-  const events = await client.event.subscribe()
-
-  // Ctrl+C 处理
-  let aborting = false
-  process.on('SIGINT', async () => {
-    if (aborting) {
-      // 第二次 Ctrl+C：强制退出
-      console.log('\n退出')
-      server.close()
-      process.exit(0)
-    }
-    aborting = true
-    console.log('\n中止当前操作...（再次 Ctrl+C 退出）')
-    try {
-      await client.session.abort({ sessionID: session.id })
-    } catch {
-      // 忽略 abort 错误
-    }
-    // 重置 aborting 标志，允许后续操作
-    setTimeout(() => { aborting = false }, 1000)
+  const child = spawn(OPENCODE_BIN, ['attach', server.url], {
+    stdio: 'inherit',
+    env: process.env,
   })
 
-  // 事件处理循环
-  for await (const event of events.stream) {
-    switch (event.type) {
-      case 'message.part.updated': {
-        // 流式输出
-        if (event.properties?.content) {
-          process.stdout.write(event.properties.content)
-        }
-        break
-      }
-
-      case 'session.idle': {
-        // 会话空闲，等待用户输入
-        aborting = false
-        const input = await readLine()
-        if (!input) continue
-        if (input === 'exit' || input === 'quit') {
-          console.log('退出')
-          server.close()
-          return
-        }
-
-        await client.session.prompt({
-          sessionID: session.id,
-          parts: [{ type: 'text', text: input }],
-        })
-        break
-      }
-
-      case 'permission.asked': {
-        // 权限确认 — opencode TUI 处理
-        if (options.verbose) {
-          console.error(`[tui] permission asked: ${JSON.stringify(event.properties)}`)
-        }
-        break
-      }
-    }
-  }
-}
-
-/**
- * 简单的行读取
- */
-function readLine() {
-  return new Promise((resolve) => {
-    process.stdout.write('\n> ')
-    const chunks = []
-    const onData = (data) => {
-      const str = data.toString()
-      if (str.includes('\n')) {
-        chunks.push(str.split('\n')[0])
-        process.stdin.removeListener('data', onData)
-        process.stdin.pause()
-        resolve(chunks.join('').trim())
-      } else {
-        chunks.push(str)
-      }
-    }
-    process.stdin.resume()
-    process.stdin.setEncoding('utf-8')
-    process.stdin.on('data', onData)
+  // 等待 TUI 进程退出
+  const exitCode = await new Promise((resolve, reject) => {
+    child.on('exit', (code) => resolve(code ?? 0))
+    child.on('error', reject)
   })
+
+  return exitCode
 }

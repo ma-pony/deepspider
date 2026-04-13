@@ -9,8 +9,13 @@
  * @returns {Promise<object>} session 对象
  */
 export async function createSession(client) {
-  const session = await client.session.create({ body: {} })
-  return session.data
+  const res = await client.session.create({ body: {} })
+  if (!res?.data?.id) {
+    throw new Error(
+      `session.create returned invalid shape: ${JSON.stringify(res).slice(0, 300)}`
+    )
+  }
+  return res.data
 }
 
 /**

@@ -1,6 +1,13 @@
 /**
  * Agent 配置构建
- * 构建 opencode 配置对象，用于 SDK 注入
+ *
+ * 只负责把 DeepSpider 自有的 MCP / Plugin / Skills / Agent 等"注入项"
+ * 拼成 opencode config。用户的 provider/model/apiKey 配置完全走沙箱的
+ * opencode.json + auth.json，DeepSpider 不再代管。
+ *
+ * SDK 内部会把本对象 JSON.stringify 后设为 OPENCODE_CONFIG_CONTENT，
+ * 与沙箱内的 opencode.json 合并（SDK 语义：传入对象优先，未覆盖的字段
+ * 继续从 opencode.json 读）。
  */
 
 import fs from 'fs'
@@ -12,21 +19,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(__dirname, '../..')
 
 /**
- * 构建 opencode 配置对象
- * SDK 内部自动 JSON.stringify 设为 OPENCODE_CONFIG_CONTENT
+ * 构建 opencode 注入配置
  *
- * @param {object} userConfig - 用户配置（来自 ~/.deepspider/config/settings.json）
+ * @param {object} overrides
+ * @param {string} [overrides.model] - CLI --model 覆盖（可选）
  * @returns {object} opencode 配置对象
  */
-export function buildOpencodeConfig(userConfig = {}) {
+export function buildOpencodeConfig(overrides = {}) {
   const root = PROJECT_ROOT
 
-  return {
-    model: userConfig.model || 'anthropic/claude-sonnet-4-5',
+  const config = {
     default_agent: 'spider',
     autoupdate: false,
 
-    // MCP：DeepSpider 浏览器工具
     mcp: {
       deepspider: {
         type: 'local',
@@ -34,15 +39,12 @@ export function buildOpencodeConfig(userConfig = {}) {
       },
     },
 
-    // Plugin：DeepSpider 专用插件
     plugin: [path.join(root, 'plugins/deepspider-plugin')],
 
-    // Skills：领域知识
     skills: {
       paths: [path.join(root, 'skills/deepspider')],
     },
 
-    // 权限：内置工具直接用名，MCP 工具用 mcp_<server>_<tool> 格式
     permission: {
       read: 'allow',
       glob: 'allow',
@@ -53,12 +55,15 @@ export function buildOpencodeConfig(userConfig = {}) {
       'mcp_deepspider_*': 'allow',
     },
 
-    // Agent 定义（从 agents/*.md 解析）
     agent: loadAgentDefinitions(path.join(root, 'agents')),
-
-    // Provider（从用户配置合并）
-    provider: userConfig.provider || {},
   }
+
+  // 仅在明确指定时覆盖 model；否则完全由沙箱 opencode.json 决定
+  if (overrides.model) {
+    config.model = overrides.model
+  }
+
+  return config
 }
 
 /**
